@@ -1,8 +1,8 @@
 import pytest
 
-from saveclock.main import create_app
+from tests.conftest import make_app
 
 
 @pytest.mark.unit
 def test_app_title() -> None:
-    assert create_app().title == "SaveClock API"
+    assert make_app(checks={}).title == "SaveClock API"
