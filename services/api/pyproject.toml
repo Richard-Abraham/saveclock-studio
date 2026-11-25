@@ -60,8 +60,12 @@ ignore = [
 strict = true
 plugins = ["pydantic.mypy"]
 warn_unused_ignores = true
-files = ["src", "tests"]
+files = ["src", "tests", "migrations"]
 mypy_path = "src"
+
+[[tool.mypy.overrides]]
+module = ["asyncpg", "asyncpg.*"]
+ignore_missing_imports = true  # asyncpg ships no stubs; only the tests use it directly
 
 [tool.pytest.ini_options]
 markers = [
