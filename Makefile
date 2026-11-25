@@ -7,7 +7,17 @@ CONTAINER := $(shell command -v docker >/dev/null 2>&1 && echo docker || echo po
 COMPOSE = $(COMPOSE_BIN) -p saveclock --env-file .env -f infra/compose/compose.yml
 COMPOSE_TEST = $(COMPOSE_BIN) -p saveclock-test -f infra/compose/compose.test.yml
 
-.PHONY: help guard doctor fmt-check lint types test check-fast check
+.PHONY: help guard doctor fmt-check lint types test check-fast check env env-docs env-docs-check
+
+env-docs:
+	$(UV) run python ../../scripts/gen_env_docs.py
+
+env-docs-check: env-docs
+	@echo "==> stage env-docs-check"
+	git diff --exit-code .env.example infra/ENV.md
+
+env:
+	scripts/gen_env.sh
 
 help:
 	@echo "targets: check-fast check dev down sandbox (see Makefile)"
