@@ -1,6 +1,93 @@
 {
   "components": {
     "schemas": {
+      "AnthropicKey": {
+        "additionalProperties": false,
+        "properties": {
+          "configured": {
+            "title": "Configured",
+            "type": "boolean"
+          },
+          "fallback_active": {
+            "title": "Fallback Active",
+            "type": "boolean"
+          },
+          "llm_enabled": {
+            "title": "Llm Enabled",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "configured",
+          "llm_enabled",
+          "fallback_active"
+        ],
+        "title": "AnthropicKey",
+        "type": "object"
+      },
+      "ByArea": {
+        "additionalProperties": false,
+        "properties": {
+          "renders": {
+            "title": "Renders",
+            "type": "integer"
+          },
+          "songs": {
+            "title": "Songs",
+            "type": "integer"
+          },
+          "work": {
+            "title": "Work",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "songs",
+          "work",
+          "renders"
+        ],
+        "title": "ByArea",
+        "type": "object"
+      },
+      "Configured": {
+        "additionalProperties": false,
+        "properties": {
+          "configured": {
+            "title": "Configured",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "configured"
+        ],
+        "title": "Configured",
+        "type": "object"
+      },
+      "Disk": {
+        "additionalProperties": false,
+        "properties": {
+          "by_area": {
+            "$ref": "#/components/schemas/ByArea"
+          },
+          "projects": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Projects",
+            "type": "array"
+          },
+          "volume": {
+            "$ref": "#/components/schemas/Volume"
+          }
+        },
+        "required": [
+          "volume",
+          "by_area",
+          "projects"
+        ],
+        "title": "Disk",
+        "type": "object"
+      },
       "ErrorBody": {
         "additionalProperties": false,
         "properties": {
@@ -121,6 +208,27 @@
         "title": "HealthReady",
         "type": "object"
       },
+      "Keys": {
+        "additionalProperties": false,
+        "properties": {
+          "anthropic": {
+            "$ref": "#/components/schemas/AnthropicKey"
+          },
+          "pexels": {
+            "$ref": "#/components/schemas/Configured"
+          },
+          "pixabay": {
+            "$ref": "#/components/schemas/Configured"
+          }
+        },
+        "required": [
+          "pexels",
+          "pixabay",
+          "anthropic"
+        ],
+        "title": "Keys",
+        "type": "object"
+      },
       "ProjectItem": {
         "additionalProperties": false,
         "properties": {
@@ -198,6 +306,98 @@
         "title": "ProjectList",
         "type": "object"
       },
+      "SettingsOut": {
+        "additionalProperties": false,
+        "properties": {
+          "disk": {
+            "$ref": "#/components/schemas/Disk"
+          },
+          "keys": {
+            "$ref": "#/components/schemas/Keys"
+          },
+          "stock": {
+            "$ref": "#/components/schemas/Stock"
+          },
+          "tuning": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Tuning"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "keys",
+          "stock",
+          "tuning",
+          "disk"
+        ],
+        "title": "SettingsOut",
+        "type": "object"
+      },
+      "Stock": {
+        "additionalProperties": false,
+        "properties": {
+          "pixabay_enabled": {
+            "title": "Pixabay Enabled",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "pixabay_enabled"
+        ],
+        "title": "Stock",
+        "type": "object"
+      },
+      "Tuning": {
+        "additionalProperties": false,
+        "properties": {
+          "device": {
+            "title": "Device",
+            "type": "string"
+          },
+          "fetch_concurrency": {
+            "title": "Fetch Concurrency",
+            "type": "integer"
+          },
+          "ffmpeg_threads": {
+            "title": "Ffmpeg Threads",
+            "type": "integer"
+          },
+          "heavy": {
+            "title": "Heavy",
+            "type": "integer"
+          },
+          "source": {
+            "additionalProperties": {
+              "enum": [
+                "auto",
+                "override"
+              ],
+              "type": "string"
+            },
+            "title": "Source",
+            "type": "object"
+          },
+          "torch_threads": {
+            "title": "Torch Threads",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "heavy",
+          "torch_threads",
+          "ffmpeg_threads",
+          "fetch_concurrency",
+          "device",
+          "source"
+        ],
+        "title": "Tuning",
+        "type": "object"
+      },
       "UiStatus": {
         "description": "What the UI shows (ARCH \u00a74). Python owns this mapping; web takes the enum from OpenAPI.",
         "enum": [
@@ -211,6 +411,25 @@
         ],
         "title": "UiStatus",
         "type": "string"
+      },
+      "Volume": {
+        "additionalProperties": false,
+        "properties": {
+          "free": {
+            "title": "Free",
+            "type": "integer"
+          },
+          "total": {
+            "title": "Total",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "total",
+          "free"
+        ],
+        "title": "Volume",
+        "type": "object"
       }
     }
   },
@@ -440,6 +659,67 @@
         "summary": "List ",
         "tags": [
           "projects"
+        ]
+      }
+    },
+    "/api/v1/settings": {
+      "get": {
+        "operationId": "get_settings",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SettingsOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "forbidden; details.reason is one of host_not_allowed, origin_mismatch, cross_site"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "not found"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "validation_error (details.fields)"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "internal_error"
+          }
+        },
+        "summary": "Get ",
+        "tags": [
+          "settings"
         ]
       }
     }

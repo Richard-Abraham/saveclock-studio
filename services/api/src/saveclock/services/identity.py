@@ -1,6 +1,7 @@
 """Identity: the single owner (Phase P replaces this with real accounts; the seam is `user_id`)."""
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
+from typing import Any
 from uuid import UUID
 
 import structlog
@@ -18,6 +19,7 @@ log = structlog.get_logger()
 class CurrentUser:
     id: UUID
     display_name: str | None
+    settings: dict[str, Any] = field(default_factory=dict)
 
 
 async def get_owner(session: AsyncSession) -> CurrentUser:
@@ -25,4 +27,4 @@ async def get_owner(session: AsyncSession) -> CurrentUser:
     if user is None:
         log.error("owner.missing", hint="owner row missing: run migrations")
         raise InternalError("internal error")
-    return CurrentUser(id=user.id, display_name=user.display_name)
+    return CurrentUser(id=user.id, display_name=user.display_name, settings=dict(user.settings))

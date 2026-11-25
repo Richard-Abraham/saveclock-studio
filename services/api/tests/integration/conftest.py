@@ -92,9 +92,21 @@ async def redis_client() -> AsyncIterator[Redis]:
 
 
 @pytest.fixture
-async def api_client(migrated_db: Db) -> AsyncIterator[httpx.AsyncClient]:
+def blob_root(tmp_path: Path) -> Path:
+    root = tmp_path / "blobs"
+    root.mkdir(mode=0o700)
+    return root
+
+
+@pytest.fixture
+async def api_client(migrated_db: Db, blob_root: Path) -> AsyncIterator[httpx.AsyncClient]:
     """The real app over ASGI, talking to the migrated test database as `app_rw`."""
-    app = make_app(database_url=migrated_db.url("app_rw"), redis_url=REDIS_URL)
+    app = make_app(
+        database_url=migrated_db.url("app_rw"),
+        redis_url=REDIS_URL,
+        blob_root=str(blob_root),
+        disk_low_watermark_gb=0,  # the host's free space must not decide test results
+    )
     async with client_for(app) as client:
         yield client
     await app.state.deps.close()

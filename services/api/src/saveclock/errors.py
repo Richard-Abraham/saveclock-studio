@@ -57,15 +57,22 @@ class ForbiddenReason(StrEnum):
 
 class AppError(Exception):
     code: ErrorCode = ErrorCode.INTERNAL_ERROR
+    status_override: int | None = None  # for the rare status the catalogue does not map (416)
 
-    def __init__(self, message: str, details: dict[str, Any] | None = None) -> None:
+    def __init__(
+        self,
+        message: str,
+        details: dict[str, Any] | None = None,
+        headers: dict[str, str] | None = None,
+    ) -> None:
         super().__init__(message)
         self.message = message
         self.details = details
+        self.headers = headers or {}
 
     @property
     def status(self) -> int:
-        return HTTP_STATUS[self.code] or 500
+        return self.status_override or HTTP_STATUS[self.code] or 500
 
 
 class NotFound(AppError):
@@ -100,3 +107,12 @@ class PayloadTooLarge(AppError):
 
 class InternalError(AppError):
     code = ErrorCode.INTERNAL_ERROR
+
+
+class RangeNotSatisfiable(BadRequest):
+    status_override = 416
+
+    def __init__(self, size: int) -> None:
+        super().__init__(
+            "range not satisfiable", {"size": size}, {"content-range": f"bytes */{size}"}
+        )

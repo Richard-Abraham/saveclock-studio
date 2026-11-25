@@ -27,7 +27,11 @@ def current_request_id() -> str:
 
 
 def error_response(
-    code: ErrorCode, message: str, details: dict[str, Any] | None = None, status: int | None = None
+    code: ErrorCode,
+    message: str,
+    details: dict[str, Any] | None = None,
+    status: int | None = None,
+    headers: dict[str, str] | None = None,
 ) -> JSONResponse:
     """Built here (not by middleware) so errors raised outside the router keep the same shape.
 
@@ -44,15 +48,15 @@ def error_response(
             "doc_url": None,
         }
     }
-    headers = dict(SECURITY_HEADERS)
+    out = {**SECURITY_HEADERS, **(headers or {})}
     if request_id:
-        headers["x-request-id"] = request_id
-    return JSONResponse(body, status_code=status or HTTP_STATUS[code] or 500, headers=headers)
+        out["x-request-id"] = request_id
+    return JSONResponse(body, status_code=status or HTTP_STATUS[code] or 500, headers=out)
 
 
 async def _app_error(_: Request, exc: Exception) -> JSONResponse:
     assert isinstance(exc, AppError)  # noqa: S101
-    return error_response(exc.code, exc.message, exc.details, exc.status)
+    return error_response(exc.code, exc.message, exc.details, exc.status, exc.headers)
 
 
 async def _validation_error(_: Request, exc: Exception) -> JSONResponse:
