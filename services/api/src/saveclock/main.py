@@ -6,7 +6,11 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 
 from saveclock.api.error_handlers import register_error_handlers
-from saveclock.api.middleware import RequestIdMiddleware, SecurityHeadersMiddleware
+from saveclock.api.middleware import (
+    AccessGuardMiddleware,
+    RequestIdMiddleware,
+    SecurityHeadersMiddleware,
+)
 from saveclock.api.v1 import health
 from saveclock.config import Settings
 from saveclock.container import Deps, build_deps
@@ -40,5 +44,6 @@ def create_app(settings: Settings | None = None, deps: Deps | None = None) -> Fa
     app.include_router(health.router, prefix=API_PREFIX)
     # add_middleware: the last one added is the outermost.
     app.add_middleware(SecurityHeadersMiddleware)
+    app.add_middleware(AccessGuardMiddleware, settings=settings)
     app.add_middleware(RequestIdMiddleware)
     return app

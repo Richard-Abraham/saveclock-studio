@@ -2,7 +2,7 @@ from typing import Any
 
 from pydantic import BaseModel, ConfigDict
 
-from saveclock.errors import ErrorCode
+from saveclock.errors import ErrorCode, ForbiddenReason
 
 
 class ErrorBody(BaseModel):
@@ -22,7 +22,11 @@ class ErrorResponse(BaseModel):
 
 
 ERROR_RESPONSES: dict[int | str, dict[str, Any]] = {
-    403: {"model": ErrorResponse, "description": "forbidden (details.reason)"},
+    403: {
+        "model": ErrorResponse,
+        "description": "forbidden; details.reason is one of "
+        + ", ".join(r.value for r in ForbiddenReason),
+    },
     404: {"model": ErrorResponse, "description": "not found"},
     422: {"model": ErrorResponse, "description": "validation_error (details.fields)"},
     500: {"model": ErrorResponse, "description": "internal_error"},
