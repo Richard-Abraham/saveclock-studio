@@ -7,7 +7,7 @@ CONTAINER := $(shell command -v docker >/dev/null 2>&1 && echo docker || echo po
 COMPOSE = $(COMPOSE_BIN) -p saveclock --env-file .env -f infra/compose/compose.yml
 COMPOSE_TEST = $(COMPOSE_BIN) -p saveclock-test -f infra/compose/compose.test.yml
 
-.PHONY: help guard doctor fmt-check lint types test check-fast check env env-docs env-docs-check contracts contracts-check test-deps-up test-deps-down
+.PHONY: help guard doctor fmt-check lint types test check-fast check env env-docs env-docs-check contracts contracts-check arch test-deps-up test-deps-down
 
 env-docs:
 	$(UV) run python ../../scripts/gen_env_docs.py
@@ -18,6 +18,10 @@ env-docs-check: env-docs
 
 env:
 	scripts/gen_env.sh
+
+arch:
+	@echo "==> stage arch"
+	$(UV) run lint-imports
 
 test-deps-up:
 	@echo "==> stage test-deps-up"

@@ -9,8 +9,11 @@ from dataclasses import dataclass
 from pathlib import Path
 
 import asyncpg
+import httpx
 import pytest
 from redis.asyncio import Redis
+
+from tests.conftest import client_for, make_app
 
 API_DIR = Path(__file__).resolve().parents[2]
 PG_HOST, PG_PORT = "127.0.0.1", 55432
@@ -86,3 +89,12 @@ async def redis_client() -> AsyncIterator[Redis]:
     yield client
     await client.flushdb()
     await client.aclose()
+
+
+@pytest.fixture
+async def api_client(migrated_db: Db) -> AsyncIterator[httpx.AsyncClient]:
+    """The real app over ASGI, talking to the migrated test database as `app_rw`."""
+    app = make_app(database_url=migrated_db.url("app_rw"), redis_url=REDIS_URL)
+    async with client_for(app) as client:
+        yield client
+    await app.state.deps.close()

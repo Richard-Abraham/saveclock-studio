@@ -83,3 +83,18 @@ testpaths = ["tests"]
 [tool.coverage.run]
 branch = true
 source = ["saveclock"]
+
+[tool.importlinter]
+root_package = "saveclock"
+
+# Shared kernel (config, errors, observability, ids) and the wiring modules (main, container)
+# are deliberately not listed.
+[[tool.importlinter.contracts]]
+name = "layers"
+type = "layers"
+layers = [
+  "saveclock.api | saveclock.workers",
+  "saveclock.services",
+  "saveclock.repositories | saveclock.adapters",
+  "saveclock.models",
+]

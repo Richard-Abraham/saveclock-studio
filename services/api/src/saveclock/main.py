@@ -11,7 +11,7 @@ from saveclock.api.middleware import (
     RequestIdMiddleware,
     SecurityHeadersMiddleware,
 )
-from saveclock.api.v1 import health
+from saveclock.api.v1 import health, projects
 from saveclock.config import Settings
 from saveclock.container import Deps, build_deps
 from saveclock.observability.logging import configure_logging
@@ -42,6 +42,7 @@ def create_app(settings: Settings | None = None, deps: Deps | None = None) -> Fa
     app.state.deps = deps
     register_error_handlers(app)
     app.include_router(health.router, prefix=API_PREFIX)
+    app.include_router(projects.router, prefix=API_PREFIX)
     # add_middleware: the last one added is the outermost.
     app.add_middleware(SecurityHeadersMiddleware)
     app.add_middleware(AccessGuardMiddleware, settings=settings)
