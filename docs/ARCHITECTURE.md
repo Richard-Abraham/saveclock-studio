@@ -1,17 +1,19 @@
 # SaveClock Studio — Architecture
 
-Status: DRAFT · **Rev 3 — Personal edition (public-ready)** · Date: 2026-11-08 · Source of truth for decisions: `DECISIONS.md` Rev 3 (this doc must agree; deviations are in §17 Open questions only).
-Siblings (by filename): `PRD.md`, `ROADMAP.md`, `CHECKLIST.md`, `SECURITY.md`, `QUALITY.md`, `DESIGN.md`, `UX-SPEC.md`, `STANDARDS.md`, `adr/0001..0013`.
+Status: DRAFT · **Rev 3.6 — Personal edition (public-ready), local-only** · Date: 2026-11-26 · Source of truth for decisions: `DECISIONS.md` Rev 3.6 (this doc must agree; deviations are in §17 Open questions only).
+Siblings (by filename): `PRD.md`, `ROADMAP.md`, `CHECKLIST.md`, `SECURITY.md`, `QUALITY.md`, `DESIGN.md`, `UX-SPEC.md`, `STANDARDS.md`, `adr/0001..0014`.
 The full public-edition design (Rev 2.2: accounts, billing, DMCA, worker VM, R2) is archived unchanged in `archive/public-edition-rev2.2/ARCHITECTURE.md` and is the starting point for **Phase P**.
 
-## Rev 3 changelog (2026-11-08)
+## Rev 3 changelog (2026-11-08; latest Rev 3.6, 2026-11-26)
 
+- **Rev 3.6 (2026-11-26, DECISIONS §8g):** concurrency and threads are auto-detected at worker start (`WORKER_HEAVY_CONCURRENCY = max(1, min(cpu // 4, (ram_gb - 2) // 3))`, `FFMPEG_THREADS`/`TORCH_THREADS = cpu`, `FETCH_CONCURRENCY = 4`, `DEVICE = cpu`), every value overridable and shown read-only in Settings (§8, §18); timing budgets are measured on the owner's machine with per-stage timings on every job (§3, §13); Phase 0 trimmed; FFmpeg pinned to the BtbN 9.0.x GPL static build by sha256 (§0, §18, OQ-1 resolved); the `saveclock` CLI is specified as a thin client of the existing endpoints (§2, mapping table; gaps in OQ-25).
+- **Rev 3.5 (2026-11-26, DECISIONS §8f, ADR-0014):** local-only. No VPS, no Tailscale, no Dokploy: the `tailscale` container, `TAILNET_ENFORCE`, `TRUSTED_PROXY_CIDRS`, `OWNER_TAILSCALE_LOGIN`, `TS_AUTHKEY`, `TS_HOSTNAME` and the Caddy fallback are gone (OQ-19/20/21 superseded). Every published port binds `127.0.0.1` (`BIND_ADDR`); the API enforces a `Host` allowlist (`ALLOWED_HOSTS`) and an `Origin` check on state-changing requests (§7). Two clients of one API: the web editor and the `saveclock` CLI. Keyword order: explicit keywords → Haiku only if `ANTHROPIC_API_KEY` is set → offline table (§16). Backups go to a local or external folder (§23).
 - **Rev 3.3 (2026-11-08, DECISIONS §8d):** single-user simplifications. Endpoints 33 -> **27**, tables 9 -> **8**. One streamed `POST /projects/{id}/song` replaces the five chunked-upload endpoints; signed file tokens and `GET /files/{token}` removed (the API serves files directly, path containment kept; `FILES_SIGNING_KEY`, `FILE_TOKEN_TTL_S`, `UPLOAD_PART_MB` gone); `op_id` and every `Idempotency-Key` removed (plan `version` + `base_version` stay; renders dedupe by `job_hash`); `exports` folded into `renders` (`mode_a_key`, `mode_a_state`); `GET /plans/{version}` folded into `GET /plan?version=`; disk-usage, key-status and stock endpoints collapse into `GET/PUT /settings` (+ `POST /housekeeping/run`); preview media gets `GET /projects/{id}/preview/{name}`. Old numbers #1-#33 are retired; the table below is the only numbering.
 - **Rev 3.2 (2026-11-08, DECISIONS §8c):** `worker-maint` is a canonical service (OQ-22 resolved); the owner row is seeded by the baseline Alembic data migration (fixed UUID `00000000-0000-4000-8000-000000000001`, `OWNER_DISPLAY_NAME`; no manual step; OQ-24 resolved); Settings endpoints (superseded by Rev 3.3: now `GET/PUT /settings` + `POST /housekeeping/run`); Tailscale-serve verification test + Caddy fallback (§14, OQ-19).
 
-Rescoped to **one user (the owner) on a private Tailscale network**, keeping the seams needed to go public later. Section numbers are unchanged from Rev 2.2 so existing citations still resolve; §24/§25 are repurposed (see below).
+Rescoped to **one user (the owner)**, keeping the seams needed to go public later. (Rev 3 first put this on a private Tailscale network on a VPS; Rev 3.5 superseded that with a local-only edition, see the Rev 3.5 entry.) Section numbers are unchanged from Rev 2.2 so existing citations still resolve; §24/§25 are repurposed (see below).
 
-- **Topology (§2, §14):** one Docker Compose stack on the existing VPS — `web`, `api`, `worker` (+ `worker-maint`, same image), `postgres`, **one** `redis` (`noeviction`), `tailscale` sidecar publishing the app with `tailscale serve` on `https://<host>.<tailnet>.ts.net`. **No public Traefik route, no public port**, single origin (`/api/*` → FastAPI, rest → Next.js). Removed: worker VM, egress proxy, WireGuard tunnel, `redis-cache`, Traefik, Dokploy-specific wiring (Dokploy or plain `docker compose` both work). ADR-0012.
+- **Topology (§2, §14):** one Docker Compose stack (Rev 3.5: on the owner's own machine, no VPS) — `web`, `api`, `worker` (+ `worker-maint`, same image), `postgres`, **one** `redis` (`noeviction`), ~~`tailscale` sidecar publishing the app with `tailscale serve`~~ (superseded by Rev 3.5: no tailscale service; ports on `127.0.0.1`). **No public Traefik route, no public port**, single origin (`/api/*` → FastAPI, rest → Next.js). Removed: worker VM, egress proxy, WireGuard tunnel, `redis-cache`, Traefik, Dokploy-specific wiring (Dokploy or plain `docker compose` both work). ADR-0012 (superseded in part by ADR-0014).
 - **Storage (§9):** `BlobStore` adapter; `FilesystemBlobStore` on a local volume (`songs/`, `work/<project>/{raw,mezz,proxy}/`, `renders/`); `S3BlobStore` (R2) is a stub listed for Phase P. Upload is one streamed `POST` through the API; files are served by the API directly (Rev 3.3: no signed tokens; path containment kept). R2, presigned URLs, bucket CORS, lifecycle rules removed. ADR-0013.
 - **Retention (§4, §9):** the 72 h clock, `expired` state, re-attach-by-hash and R2 lifecycle backstop are gone. Songs, plans and renders (incl. the Mode A file) stay until the owner deletes the project; the `maintenance` housekeeping job removes **intermediates** (raw, mezz, proxy, canonical audio) 7 days after the project's last use and everything for deleted projects. Disk usage is part of `GET /settings`.
 - **Removed:** auth/sessions/CSRF/OAuth/Turnstile, email + outbox + Mailpit, Stripe/billing/tiers/quotas/usage counters, watermark, fingerprinting, DMCA tables/endpoints/CLI/admin tooling, age gate/consents, rate-limit table, idempotency store in Redis, feedback endpoint, data-export/delete-account endpoints. Edit plan loses `overlays.watermark_version` and `output.tier/scale_to` (never implemented; Phase P re-adds them as additive optional fields).
@@ -37,7 +39,7 @@ Legend: facts with a URL were checked on 2026-11-08; "(inference)" = engineering
 | FastAPI | current (0.16x) | PyPI **0.162.2** (F-40) | Pre-1.0: pin exact, upgrade deliberately. |
 | Pydantic / SQLAlchemy / Alembic | v2 / 2.x / — | Pydantic **2.14.3**; SQLAlchemy **2.1.8** latest (needs Python >= 3.11), 2.0.x still the conservative line (F-41/F-42); Alembic version not verified | Choose 2.0.x vs 2.1.x at scaffold after reading the 2.1 migration notes. |
 | Dramatiq | 2.x on Redis | PyPI **2.2.1** (F-43), Python >= 3.10 | **Defaults quoted from 1.x docs are unverified for 2.x.** Every limit/retry is set explicitly per actor (§8). Re-read the 2.x changelog before ADR-0003 is accepted. |
-| FFmpeg | **>= 8.1; exact build pinned by the Phase 0 spike** | ffmpeg.org (F-12): **9.0.2** 2026-09-18, **8.1.3** 2026-09-21, 8.0.3, 7.1.5 | Spike runs golden + hardening tests on 8.1.x and 9.0.x, pins one build with checksum. Templates here are version-agnostic. |
+| FFmpeg | **9.0.x — BtbN `release/9.0` GPL static build, pinned by URL + sha256 (DECISIONS §8g, Rev 3.6)** | ffmpeg.org (F-12): **9.0.2** 2026-09-18, 8.1.3 2026-09-21; libx264 required (Fedora's 8.1.3 lacks it) | Passed every spike row it could evaluate (G0-20/21/24/25); same-encoder ratio bit-identical and 26 % faster; 9.0 carries five CVE fixes not listed for 8.1.x. The build is cached locally so rebuilds do not depend on the URL. `--disable-network` source build deferred to Phase P. Templates here are version-agnostic. |
 | PySceneDetect | 0.7.x | PyPI **0.7.2** (F-44) | `scenedetect` Python API; check 0.6 → 0.7 changes at scaffold. BSD-3. |
 | TransNetV2 | adopt when weights terms checked (T-0.6) | repo LICENSE = **MIT** (code) (F-37) | Weights terms check remains. |
 | Beat This! | MIT, CPU | PyTorch >= 2.0 (+ `torchaudio`, F-06); `File2Beats(checkpoint_path="final0", device="cpu", dbn=False)`; `final0` ~78 MB (F-05); install from GitHub ([repo](https://github.com/CPJKU/beat_this)) | `dbn=True` needs **madmom** (NC weights) — **never enable** (F-07). Pin git commit SHA. Torch pinned well above 2.6 (CVE-2025-32434). |
@@ -45,7 +47,7 @@ Legend: facts with a URL were checked on 2026-11-08; "(inference)" = engineering
 | Pexels API | **default provider** | `GET https://api.pexels.com/videos/search`, `Authorization: <key>`, `orientation=portrait`; `videos[].video_files[]`; 200 req/h, 20k/month default (F-18); params/fields **unverified** (F-20) | Verify with one live call in T-0.5. fps read from ffprobe. |
 | Pixabay API | **optional, behind `PIXABAY_ENABLED`** (default off) | `GET https://pixabay.com/api/videos/?key=…&q=…`; 100 req/60 s; responses cached 24 h; no hotlinking (F-21/F-22) | Enabled only if Pexels fails the G0 stock test. No orientation filter assumed (F-23) → filter by `width/height`. |
 | Claude Haiku | `claude-haiku-5-5`, **optional** | model exists (F-46); ~$0.10 / $0.50 per MTok in/out (F-47) | Cost per video ~$0.001–0.01; absent key = fallback keyword table (§16). |
-| Tailscale | free Personal plan (non-commercial) | `tailscale serve` publishes a local service over HTTPS on `*.ts.net` (requires MagicDNS + HTTPS certificates enabled for the tailnet) | **(unverified today)** exact `tailscale serve` flags / `TS_SERVE_CONFIG` JSON shape, and whether `serve` identity headers (`Tailscale-User-Login`) are forwarded to path handlers; confirm at scaffold (T-1.x). Personal plan is non-commercial: going public (Phase P) ends the Tailscale-only access model anyway. |
+| ~~Tailscale~~ | **dropped in Rev 3.5** (local-only, ADR-0014) | was `tailscale serve` on `*.ts.net`; no longer used | Optional later only if phone access is wanted (ADR-0012 stays as the recipe). The earlier `serve`/identity-header questions are moot. |
 | restic / rclone | backups (§23) | current stable at scaffold | Either; restic gives encryption + dedup out of the box. |
 
 ---
@@ -54,42 +56,44 @@ Legend: facts with a URL were checked on 2026-11-08; "(inference)" = engineering
 
 ```mermaid
 flowchart LR
-  owner([Owner<br/>phone or laptop on the tailnet])
-  subgraph SC[SaveClock Studio]
-    sys[Web app + API + worker<br/>one Docker Compose stack on the VPS]
+  owner([Owner])
+  br[Browser: web editor<br/>http://localhost:3000]
+  cli[saveclock CLI<br/>driven by Claude Code]
+  subgraph SC[SaveClock Studio on the owner's machine]
+    sys[Web app + API + worker<br/>one Docker Compose stack, ports on 127.0.0.1]
   end
   pexels[(Pexels API + CDN)]
   pixabay[(Pixabay API + CDN<br/>optional, flag)]
   llm[(Anthropic API<br/>Claude Haiku, optional)]
-  backup[(Off-box backup target<br/>restic / rclone)]
-  owner -->|HTTPS over Tailscale<br/>*.ts.net| sys
+  backup[(Backup folder<br/>local or external drive)]
+  owner --> br & cli
+  br -->|HTTP on localhost| sys
+  cli -->|HTTP on localhost| sys
   sys --> pexels & pixabay & llm
   sys -->|nightly| backup
 ```
 
-Nobody but the owner reaches the app: there is no public DNS name, no public port. External services are called only by the worker (stock, LLM) and the backup job.
+Nobody but the owner reaches the app: there is no public DNS name, no tailnet and no public port; every port binds `127.0.0.1` and the API checks `Host` and `Origin` (§7). The browser and the `saveclock` CLI are both clients of the same API on localhost. External services are called only by the worker (stock, LLM) and the backup job; audio is never sent to Claude.
 
 ---
 
 ## 2. Containers (C4 level 2)
 
-One host (the existing VPS), one Compose project. Only the `tailscale` container is attached to the tailnet; `web` and `api` publish **no host ports**.
+One host (the owner's machine), one Compose project. `web` publishes `127.0.0.1:3000` and `api` publishes `127.0.0.1:8000`; nothing else publishes a host port and nothing listens on `0.0.0.0`. The browser and the `saveclock` CLI are both clients of the same API.
 
 ```mermaid
 flowchart TB
-  tn((Tailnet)) -->|HTTPS 443 on *.ts.net| ts
-  subgraph VPS["VPS — one Docker Compose stack"]
-    ts["tailscale sidecar<br/>tailscale serve:<br/>/api/* to api:8000, / to web:3000"]
-    web["web<br/>Next.js 16 SSR"]
-    api["api (target: api)<br/>FastAPI + uvicorn"]
+  br([Browser]) -->|"http://localhost:3000"| web
+  cli(["saveclock CLI (Claude Code)"]) -->|"http://127.0.0.1:8000/api/v1"| api
+  subgraph host["Owner's machine: one Docker Compose stack (ports on 127.0.0.1)"]
+    web["web<br/>Next.js 16 SSR<br/>/api/* rewrite to api"]
+    api["api (target: api)<br/>FastAPI + uvicorn<br/>Host/Origin checks"]
     wk["worker (target: worker)<br/>queues analysis, fetch, render"]
     wm["worker-maint (target: worker)<br/>queue maintenance + scheduler"]
     pg[(PostgreSQL 16)]
     rd[(redis 7<br/>noeviction, AOF)]
     vol[("blob volume<br/>songs/ work/ renders/")]
-    ts --> web
-    ts -->|/api/*| api
-    web -->|server-side fetch, internal DNS| api
+    web -->|"/api/*, SSR fetch (internal DNS)"| api
     api --> pg & rd
     wk --> pg & rd
     wm --> pg & rd
@@ -97,21 +101,36 @@ flowchart TB
   end
   ext[(Pexels, Pixabay opt., Anthropic opt.)]
   wk --> ext
-  vol & pg -.->|nightly restic / rclone| bk[(off-box backup)]
+  vol & pg -.->|nightly restic / copy| bk[(local or external backup folder)]
 ```
 
 ### Component responsibilities
 
 | Component | Owns | Must not |
 |---|---|---|
-| `tailscale` | tailnet identity of the node, HTTPS termination on `*.ts.net`, path routing `/api/*` → api, `/` → web | Expose any other port; run app code |
+| `saveclock` CLI (not a container; a command on the owner's host) | a thin client of the REST API on `127.0.0.1` (§2 "The `saveclock` CLI"): argument parsing, one HTTP call per command, `--json` output, polling/SSE for progress | Hold any business logic, talk to Postgres/Redis/the blob volume, or call anything but localhost |
 | `web` (Next.js) | UI, SSR shells, generated API client, SSE consumption, client-side preview player | Hold secrets other than public config; touch DB/Redis/volume directly |
-| `api` (FastAPI, build target `api`) | Owner resolution (`current_user()` = seeded owner, after the Tailscale-origin check), validation, ownership-scoped repositories, streamed upload ingest, direct file serving (path-contained), enqueue, SSE stream, settings + housekeeping endpoints | Run FFmpeg/ML, parse media, call stock/LLM APIs (workers do), block > 1 s. Contains **no torch, no ffmpeg** |
+| `api` (FastAPI, build target `api`) | Owner resolution (`current_user()` = seeded owner, after the Host/Origin checks, §7), validation, ownership-scoped repositories, streamed upload ingest, direct file serving (path-contained), enqueue, SSE stream, settings + housekeeping endpoints | Run FFmpeg/ML, parse media, call stock/LLM APIs (workers do), block > 1 s. Contains **no torch, no ffmpeg** |
 | `worker` | validate/canonicalize (ffprobe + decode), Beat This, energy segmenter, waveform peaks, then **enqueues the draft job**; keywords (LLM or fallback), stock search/download, low-res sampling, PySceneDetect, SigLIP rank, top-K normalize, planner, preview proxies, lazy normalize; final render (silent master + cut list), verify, Mode A remux | Be reachable from outside; run with write access outside the blob volume and scratch |
 | `worker-maint` | housekeeping sweeper, orphan-upload reaper (stale `incoming.bin.part`), stuck-job reaper, project purge (`delete`), disk-usage rollup | Parse media; business flows. Same image as `worker`, separate process so housekeeping never waits behind a render |
 | PostgreSQL | System of record | Store audio/video blobs |
 | redis | Dramatiq broker (ids only), SSE pub/sub, stock-search cache and provider token buckets (every non-broker key carries a TTL). `noeviction`, AOF `everysec` | Be the only copy of anything |
 | blob volume | All media (§9), reached only through `BlobStore` | Be served directly by any web server |
+
+### The `saveclock` CLI (thin API client, Rev 3.5/3.6)
+
+Two ways in, one pipeline (DECISIONS §8f): the web editor and a `saveclock` command-line tool that Claude Code drives. The CLI is a thin client of the REST API (§7): it adds **no endpoints, no second code path and no business logic**. It talks only to `SAVECLOCK_API_URL` (default `http://127.0.0.1:8000`; a non-loopback host is refused), sends no `Origin` header, and prints human text or `--json`. The app itself never calls `claude`: Claude Code reads `saveclock show <id> --json` (tempo, sections, energy, the owner's vibe text; never audio) and writes the keywords back. A project skill, `.claude/skills/saveclock/SKILL.md`, tells Claude Code how to use it. (`saveclock jobs requeue-dead <id>`, §8, is a separate operator command run inside the worker container; it is not part of this client.)
+
+| Command | Calls (endpoint # from the §7 table) | Notes |
+|---|---|---|
+| `new <song> [--vibe]` | #1 `POST /projects`, then #6 `POST /projects/{id}/song` (streamed upload); prints the project id | `--vibe` has **no field to land in yet** (OQ-25a) |
+| `show <id> --json` | #3 `GET /projects/{id}` + #10 `GET /projects/{id}/analysis` (+ #11 `GET /plan` when a draft exists) | merged into one JSON object: project, song meta, tempo, sections, energy, keywords, UI status, flags |
+| `keywords set <id> <words…>` | #12 `PATCH /projects/{id}/plan` with op `set_keywords` (`base_version` from #11) | triggers a replan-fetch, `draft_ready → planning` (OQ-28) |
+| `plan <id>` | #11 `GET /projects/{id}/plan` (+ #13 `GET /candidates` with `--candidates`) | read-only view of the working plan (OQ-25c) |
+| `render <id>` | #17 `POST /projects/{id}/renders`, then #18 `GET /renders/{id}` (or #7 SSE) until `ready` | prints the `render_id` |
+| `export <id> --mode a\|b` | **a:** #20 `POST /renders/{id}/mode-a`, poll #18, then #21 `GET /renders/{id}/download?kind=with_song`. **b:** #21 with `kind=silent_video`, `cutlist_json`, `cutlist_csv`, plus #16 `GET /credits` | saves files to the current directory or `--out` |
+| `status [<id>]` | with id: #3 `GET /projects/{id}` (`--watch` follows #7 SSE); without: #2 `GET /projects` | |
+| `open <id>` | **none** (client-side only) | opens `<APP_ORIGIN>/projects/<id>` in the default browser (OQ-25b) |
 
 Code layout: one Python package `services/api/src/saveclock` contains `api/` (routers), `services/`, `repositories/`, `adapters/` (pexels, pixabay, blobstore, llm, ffmpeg, scenedetect, siglip, beat_this), `domain/` (pure: beat grid, planner, edit-plan models), `workers/` (Dramatiq actors = thin wrappers around services). Two Docker build targets from the one codebase: `api` and `worker` (ADR-0011, the two-build-target part remains in force). Details in `STANDARDS.md`.
 
@@ -173,9 +192,9 @@ sequenceDiagram
   A-->>W: 200 file bytes
 ```
 
-### Timing budgets (DECISIONS §6; all p95 on a 4-vCPU worker running 4 threads, **[spike]** until profiled)
+### Timing budgets (DECISIONS §6; measured on the owner's machine; per-stage timings recorded on every job)
 
-The budgets below are the **targets**. The G0 **hard NO-GO limits** are analysis ≤ 40 s, draft ≤ 180 s, render ≤ 90 s, remux ≤ 10 s (QUALITY G0-13…G0-16). All numbers assume exclusive use of the 4 vCPU; contended-load p95 per stage and the worker-concurrency recommendation come from ROADMAP T-0.11 / QUALITY G0-27. On the one-box stack the API, Postgres and Redis share those CPUs, so the contended measurement is the number that counts.
+The budgets below are the **targets**. The G0 **hard NO-GO limits** are analysis ≤ 40 s, draft ≤ 180 s, render ≤ 90 s, remux ≤ 10 s (QUALITY G0-13…G0-16). Rev 3.5/3.6: these are **targets measured on the owner's machine** (its CPU/RAM are recorded in the spike report and detected at worker start, §8g), not gated by a pre-launch benchmark: the app records per-stage timings on every job (`jobs.timings`), so real speed is visible after the fact. QUALITY G0-13…G0-16 and G0-27 are "not measured in Phase 0" (DECISIONS §8g). On the one-box stack the API, Postgres and Redis share the CPUs with the worker.
 
 Four separate metrics, each with its own span. Stage budgets are allocated so that they **sum to the target**; a stage exceeding its allocation is a logged warning, the span total is the target.
 
@@ -449,9 +468,9 @@ DB roles (reduced): `app_rw` (api, worker, worker-maint: CRUD, no DDL) and `migr
 
 ## 7. REST API contract (v1) — the ONE canonical endpoint table
 
-Base: `https://<host>.<tailnet>.ts.net/api/v1` (single origin, ADR-0012); all paths below are relative to `/api/v1`. JSON; UTC ISO-8601; ids ULID/UUID strings. OpenAPI generated by FastAPI is the contract (`packages/contracts/openapi.json` committed, TS client generated; `make check` fails on drift).
+Base: `http://localhost:3000/api/v1` for the browser (single origin through the Next.js `/api/*` rewrite, §14) and `http://127.0.0.1:8000/api/v1` for the `saveclock` CLI (ADR-0014); all paths below are relative to `/api/v1`. JSON; UTC ISO-8601; ids ULID/UUID strings. OpenAPI generated by FastAPI is the contract (`packages/contracts/openapi.json` committed, TS client generated; `make check` fails on drift).
 
-**Access (replaces cookie auth/CSRF/CORS):** there is no login. The API trusts exactly one network path: requests must come from the `tailscale` sidecar's address on the internal compose network (`TRUSTED_PROXY_CIDRS`) and, when `OWNER_TAILSCALE_LOGIN` is set, carry a `Tailscale-User-Login` header equal to it (headers added by `tailscale serve`; **(unverified)**, confirm at scaffold); anything else gets 403 `forbidden`. `current_user()` then returns the seeded owner row. `web` and `api` publish no host ports, so this check is defence in depth, not the boundary. State-changing requests additionally require `Content-Type: application/json` (or the raw upload part type) — which a cross-site form cannot send — and there are **no cookies**, so no CSRF token exists. No CORS (same origin). The check lives behind one dependency (`api/deps.py::current_user`) so Phase P swaps in session auth without touching routers.
+**Access (replaces cookie auth/CSRF/CORS; Rev 3.5 local-only, DECISIONS §8f):** there is no login and no auth UI. The boundary is that every published port binds `127.0.0.1` only (§14). Because other websites open in the same browser can still reach `localhost`, one middleware (before routing, applied to every endpoint except none) enforces two checks: **(1) `Host` allowlist** — the hostname part of `Host` must be in `ALLOWED_HOSTS` (default `localhost`, `127.0.0.1`; any port), otherwise 403 `forbidden` (`host_not_allowed`), which defeats DNS rebinding; **(2) `Origin` check on state-changing requests** (`POST`/`PUT`/`PATCH`/`DELETE`) — if an `Origin` header is present it must equal `APP_ORIGIN`, otherwise 403 `forbidden` (`origin_mismatch`), which stops cross-site requests from other tabs; a request with **no** `Origin` (the CLI, curl, tests) is accepted (OQ-27). `GET /health/live` is exempt from the `Origin` rule only. These replace the earlier "request came through Tailscale" check (`TRUSTED_PROXY_CIDRS`, `OWNER_TAILSCALE_LOGIN`, `Tailscale-User-Login`; superseded by Rev 3.5). `current_user()` then returns the seeded owner row. State-changing requests additionally require `Content-Type: application/json` (or the raw upload part type) — which a cross-site form cannot send — and there are **no cookies**, so no CSRF token exists. No CORS (same origin; the CLI is not a browser). The check lives behind one dependency/middleware pair (`api/deps.py::current_user` plus the Host/Origin middleware) so Phase P swaps in session auth without touching routers.
 
 **Error envelope** (all non-2xx):
 
@@ -467,7 +486,7 @@ Validation errors: `code:"validation_error"`, `details.fields = [{"loc":[…],"m
 |---|---|---|---|
 | `validation_error` | 422 | no | schema failure |
 | `bad_request` | 400 | no | malformed body / header |
-| `forbidden` | 403 | no | request did not come through the Tailscale proxy / wrong tailnet login |
+| `forbidden` | 403 | no | `Host` header not in `ALLOWED_HOSTS` (`details.reason=host_not_allowed`) or a state-changing request whose `Origin` is not `APP_ORIGIN` (`details.reason=origin_mismatch`) |
 | `not_found` | 404 | no | missing **or not owned** |
 | `conflict` | 409 | later | wrong state, active job exists |
 | `plan_version_conflict` | 409 | refetch | stale `base_version` |
@@ -524,7 +543,7 @@ Legend: "owner" = request passed the access check and the project is owned by th
 | 22 | `DELETE /renders/{id}` | delete one render and its Mode A file (free disk) → 204; refused while running | 404, 409 |
 | **Settings & housekeeping** |
 | 23 | `POST /housekeeping/run` | `{scope:"intermediates"\|"abandoned_uploads"\|"all", project_id?}` → 202; `project_id` + `intermediates` = "free this project's intermediates now" | 409 if already running |
-| 24 | `GET /settings` | `{keys:{pexels:{configured}, pixabay:{configured}, anthropic:{configured, llm_enabled, fallback_active}}, stock:{pixabay_enabled}, disk:{volume:{total,free}, by_area:{songs,work,renders}, projects:[{id,title,bytes,intermediate_bytes,last_activity_at}]}}` (disk part cached 60 s). Never returns a key or any part of one: `api` receives only the derived flags `PEXELS_KEY_CONFIGURED`, `PIXABAY_KEY_CONFIGURED`, `ANTHROPIC_KEY_CONFIGURED` (e.g. `${PEXELS_API_KEY:+true}`), so the real keys stay in `worker`. Keys change by editing the server environment and redeploying (UX-SPEC S11) | |
+| 24 | `GET /settings` | `{keys:{pexels:{configured}, pixabay:{configured}, anthropic:{configured, llm_enabled, fallback_active}}, stock:{pixabay_enabled}, tuning:{cpu, ram_gb, heavy_concurrency, ffmpeg_threads, torch_threads, fetch_concurrency, device}, disk:{volume:{total,free}, by_area:{songs,work,renders}, projects:[{id,title,bytes,intermediate_bytes,last_activity_at}]}}` (disk part cached 60 s). `tuning` (Rev 3.6, DECISIONS §8g) is the read-only set of auto-detected values the worker logged at start (an additive field; no DB column, no new endpoint; overrides are made in `.env`). Never returns a key or any part of one: `api` receives only the derived flags `PEXELS_KEY_CONFIGURED`, `PIXABAY_KEY_CONFIGURED`, `ANTHROPIC_KEY_CONFIGURED` (e.g. `${PEXELS_API_KEY:+true}`), so the real keys stay in `worker`. Keys change by editing the server environment and redeploying (UX-SPEC S11) | |
 | 25 | `PUT /settings` | `{pixabay_enabled: bool}` → 200 the same shape as `GET /settings` (US-038). Stored in `users.settings` (jsonb); `PIXABAY_ENABLED` is only the initial default; the `fetch` worker reads the effective value from Postgres at job time. Enabling without `PIXABAY_KEY_CONFIGURED` → 409 `pixabay_not_configured` | 409, 422 |
 | **Health** |
 | 26 | `GET /health/live` | 200 (no access check, for the container healthcheck) | |
@@ -549,24 +568,24 @@ Pagination: cursor (opaque base64 of `(created_at,id)`), `limit` default 20, max
 | S7 render progress, cancel | 17, 18, 7, 19 |
 | S8 export: choose A/B, download MP4/JSON/CSV, copy credits | 20 (Mode A only), 21, 16 |
 | S9 projects list, rename, delete | 2, 4, 5 |
-| Settings (S11): API-key status (read-only), Pixabay switch, disk usage, free intermediates / run housekeeping, delete a project/render | 24, 25, 23, 5, 22 |
+| Settings (S11): API-key status (read-only), auto-detected concurrency/threads (read-only, `tuning`), Pixabay switch, disk usage, free intermediates / run housekeeping, delete a project/render | 24, 25, 23, 5, 22 |
 | S12 errors | error catalogue above |
 
 ---
 
 ## 8. Queue design (Dramatiq 2.x + Redis)
 
-Four queues (DECISIONS §3). Every time limit, retry count and backoff below is **set explicitly per actor**; no Dramatiq default is relied on (§0). Dramatiq 2.x middleware names/semantics (`Retries`, `TimeLimit`, `Results`, per-message `priority`, the `.DQ` dead-letter queue and its TTL) are **(unverified)** and re-checked at scaffold. All queues run on the one VPS.
+Four queues (DECISIONS §3). Every time limit, retry count and backoff below is **set explicitly per actor**; no Dramatiq default is relied on (§0). Dramatiq 2.x middleware names/semantics (`Retries`, `TimeLimit`, `Results`, per-message `priority`, the `.DQ` dead-letter queue and its TTL) are **(unverified)** and re-checked at scaffold. All queues run on the owner's machine.
 
 | Queue | Process | Actors | Worker process config | Time limit | Retries | Notes |
 |---|---|---|---|---|---|---|
-| `analysis` | `worker` | `validate_audio`, `analyze_song` | 1 proc x 2 threads; `OMP_NUM_THREADS=4` for the Beat This step (torch threads = 4 is the budgeted configuration, §3) | 120 s | `max_retries=2`, backoff 5 s → 30 s; `ValidationFailed` is non-retryable | Model loaded once per process (lazy singleton). On success `analyze_song` **enqueues `fetch.build_draft`** |
-| `fetch` | `worker` | `build_draft` (parent), `search_stock`, `download_clip`, `sample_rank`, `normalize_topk`, `replan`, `swap_normalize`, `rehydrate_plan` | 1 proc x 4 threads (I/O heavy); normalize via semaphore of 2 concurrent FFmpeg | 180 s per actor | `max_retries=3`, backoff 2 s → 60 s (HTTP 429/5xx only) | Fan-out via `group`/pipeline; each sub-actor idempotent by `(project_id, provider, provider_id)` |
-| `render` | `worker` | `render_master`, `verify_render`, `remux_with_song` | 1 proc x 1 thread (FFmpeg `-threads 4`) | `render_master` **300 s** (FFmpeg subprocess 270 s); `remux_with_song` 30 s | `max_retries=1` | `prefetch=1`; remux messages get `priority=0` so they never wait behind a render |
+| `analysis` | `worker` | `validate_audio`, `analyze_song` | 1 proc x 2 threads; `OMP_NUM_THREADS = TORCH_THREADS = cpu` for the Beat This step (auto-detected, §8g; analysis runs one job at a time) | 120 s | `max_retries=2`, backoff 5 s → 30 s; `ValidationFailed` is non-retryable | Model loaded once per process (lazy singleton). On success `analyze_song` **enqueues `fetch.build_draft`** |
+| `fetch` | `worker` | `build_draft` (parent), `search_stock`, `download_clip`, `sample_rank`, `normalize_topk`, `replan`, `swap_normalize`, `rehydrate_plan` | 1 proc x `FETCH_CONCURRENCY` threads (auto = 4, I/O heavy); normalize via semaphore of 2 concurrent FFmpeg | 180 s per actor | `max_retries=3`, backoff 2 s → 60 s (HTTP 429/5xx only) | Fan-out via `group`/pipeline; each sub-actor idempotent by `(project_id, provider, provider_id)` |
+| `render` | `worker` | `render_master`, `verify_render`, `remux_with_song` | 1 proc x 1 thread (FFmpeg `-threads FFMPEG_THREADS`, auto = `cpu`, §8g) | `render_master` **300 s** (FFmpeg subprocess 270 s); `remux_with_song` 30 s | `max_retries=1` | `prefetch=1`; remux messages get `priority=0` so they never wait behind a render |
 | `maintenance` | `worker-maint` | `sweep_intermediates`, `reap_orphans` (incomplete uploads, stuck jobs), `purge_project`, `prune_jobs`, `disk_usage_rollup` | 1 proc x 2 threads | 60 s (`purge_project` 600 s) | `max_retries=5` | Housekeeping cannot starve behind renders. Deletes by key/prefix and runs DB queries only; never parses media |
 
 Rules:
-- **One heavy job at a time.** On the single box, CPU-heavy stages (Beat This, normalize, render) take a Redis lock `heavy` (TTL = the actor time limit) so a render never contends with an analysis and the budgets in §3 hold. `WORKER_HEAVY_CONCURRENCY=1` (raise only from the Phase 0 contended-load result, QUALITY G0-27). I/O-bound work (search/download) is not locked. Queue wait is the cost; with a single user it is rarely visible.
+- **Heavy jobs are slot-limited.** On the single box, CPU-heavy stages (Beat This, normalize, render) take a Redis lock `heavy` (TTL = the actor time limit) so a render never contends with an analysis and the budgets in §3 hold. `WORKER_HEAVY_CONCURRENCY` is **auto-detected at worker start** (DECISIONS §8g): `max(1, min(cpu // 4, (ram_gb - 2) // 3))`, where `cpu` = `os.cpu_count()` or the container's CPU quota and `ram_gb` = total memory or the cgroup limit (a render peaks at ~2.2 GB RSS, so 3 GB per slot plus 2 GB for the rest of the stack). It can be overridden in `.env`/Settings; the worker logs the chosen values and `GET /settings` shows them read-only. The detection lives in one small auto-tuning module (`services/autotune.py`, name indicative) that also sets `TORCH_THREADS`/`OMP_NUM_THREADS = cpu`, `FFMPEG_THREADS = cpu`, `FETCH_CONCURRENCY = 4`, `DEVICE = cpu`. I/O-bound work (search/download) is not locked. Queue wait is the cost; with a single user it is rarely visible.
 - **Time limits** raise inside the Python thread and cannot kill a child process. Every FFmpeg/ffprobe call goes through `adapters/ffmpeg.py::run()` using `subprocess.Popen(..., start_new_session=True)` with a wall-clock timeout, `os.killpg` on timeout/`TimeLimitExceeded`/cancel, and `prlimit` (`RLIMIT_AS`, `RLIMIT_CPU`). Stderr tail (last 4 KB) logged on failure.
 - **Idempotency**: `render_master` receives `render_id`; on start `UPDATE renders SET state='running', attempt=attempt+1 WHERE id=:id AND state IN ('queued','running')`; output keys are deterministic (`renders/{rid}/master.mp4`), written to a temp name then renamed (atomic on one filesystem), so a retry overwrites safely. Cross-request dedupe: `job_hash = sha256(plan.content_hash ‖ song.sha256)`; the unique partial index returns the existing active/ready render. Mode A: idempotent by `renders.mode_a_state` — repeat calls return the same result.
 - **At-least-once**: actors can run twice; all are written idempotent (check state, act under row lock, deterministic keys, upsert).
@@ -609,7 +628,7 @@ BLOB_ROOT/
 
 **`BlobStore` port** (`Protocol`): `put(key, stream)`, `open(key, range?)`, `stat(key)`, `exists(key)`, `delete(key)`, `delete_prefix(prefix)`, `list(prefix)`, `usage(prefix)`, `local_path(key)` (workers only: FFmpeg needs real paths; the `S3BlobStore` stub implements it as download-to-scratch). Phase P adds `url_for(key)` (presigned GET) where it is needed. Implementations: **`FilesystemBlobStore` (now)** and **`S3BlobStore` (R2) — stub, Phase P**, where uploads move to presigned PUTs and the two-bucket/lifecycle design from the archive applies. Atomicity: writes go to `<name>.part` in the same directory, `fsync`, then `rename`. `delete_prefix` refuses paths outside `BLOB_ROOT` and any key containing `..` (key validation is in `blob_keys.py`).
 
-**Serving.** The API never exposes the volume through a static route. Endpoints #15 and #21 open the blob through `BlobStore.open(key, range?)` and stream it to the client over the tailnet (no tokens, no signed URLs, Rev 3.3: Tailscale is the boundary). Byte-range requests are supported so `<video>`/`<audio>` seek works; responses carry `Cache-Control: private, no-store` and `X-Content-Type-Options: nosniff`. **Path containment (SEC-160) stays:** keys are built only by `blob_keys.py` from validated ids and an allowlisted `name`/`kind`; the resolved path must stay under `BLOB_ROOT`; `..`, absolute paths and symlinks are refused; `songs/` and `work/{pid}/raw|mezz` are never served.
+**Serving.** The API never exposes the volume through a static route. Endpoints #15 and #21 open the blob through `BlobStore.open(key, range?)` and stream it to the client on localhost (no tokens, no signed URLs, Rev 3.3; the boundary is the `127.0.0.1` bind plus the Host/Origin checks, Rev 3.5). Byte-range requests are supported so `<video>`/`<audio>` seek works; responses carry `Cache-Control: private, no-store` and `X-Content-Type-Options: nosniff`. **Path containment (SEC-160) stays:** keys are built only by `blob_keys.py` from validated ids and an allowlisted `name`/`kind`; the resolved path must stay under `BLOB_ROOT`; `..`, absolute paths and symlinks are refused; `songs/` and `work/{pid}/raw|mezz` are never served.
 
 **Housekeeping (`maintenance` queue, §8).** `sweep_intermediates` finds projects with `intermediates_purged_at IS NULL AND last_activity_at < now() - INTERMEDIATE_TTL_DAYS` and no active job, deletes `work/{pid}/`, sets `intermediates_purged_at`, and logs bytes freed. `purge_project` handles deleted projects (all prefixes, then rows). `reap_orphans` removes `songs/*/incoming.bin.part` older than 24 h and blob directories with no project row (found by a weekly reconcile of `list()` against the DB; reported, then removed after a second consecutive sighting). Free-space guard: `DISK_LOW_WATERMARK_GB` (default 5) refuses new uploads/drafts with 507 and surfaces a banner; the owner then deletes renders/projects or runs "free intermediates now" (`POST /housekeeping/run`). No cross-user cache exists to purge.
 
@@ -723,7 +742,7 @@ Synthetic songs (click tracks at 120/128/133.3 BPM, 30/60 s) → plan → render
 
 ## 12. Progress reporting (SSE)
 
-`GET /api/v1/projects/{id}/events` — same origin as the web app, through `tailscale serve`. `Content-Type: text/event-stream`, `Cache-Control: no-store`, `X-Accel-Buffering: no`, `retry: 3000`, heartbeat comment `: ping` every 15 s, `Last-Event-ID` supported: the server first sends the current snapshot (`state` event) then live events from the Redis pub/sub channel `proj:{id}`; missed events are not replayed beyond the snapshot, because the snapshot is authoritative. (Whether `tailscale serve` buffers or times out long-lived responses is **unverified**; the 3 s polling fallback below covers it, and the spike should test a 15-minute stream.)
+`GET /api/v1/projects/{id}/events` — same origin as the web app (through the Next.js `/api/*` rewrite), or directly on the api port for the CLI. `Content-Type: text/event-stream`, `Cache-Control: no-store`, `X-Accel-Buffering: no`, `retry: 3000`, heartbeat comment `: ping` every 15 s, `Last-Event-ID` supported: the server first sends the current snapshot (`state` event) then live events from the Redis pub/sub channel `proj:{id}`; missed events are not replayed beyond the snapshot, because the snapshot is authoritative. (Whether the Next.js rewrite buffers or times out long-lived responses is **unverified** (OQ-26); the 3 s polling fallback below covers it, and the CLI's `status --watch` may connect to the api port directly.)
 
 Event types (JSON `data`): `state {status, ui_status, flags}`, `progress {step, pct, message_key, eta_s?, queue_position?}`, `draft_ready {version}`, `render_ready {render_id}`, `mode_a_ready {render_id}`, `clip_ready {cut_index}`, `failed {stage, code, retryable}`. `message_key` is an i18n key, never raw server text.
 
@@ -737,13 +756,13 @@ Event types (JSON `data`): `state {status, ui_status, flags}`, `progress {step, 
 | Building your draft | `planning` | normalize top-K, plan, proxies |
 | Draft ready | `draft_ready` | — |
 
-Access check on connect (same as every endpoint); connection closed after a terminal event (`draft_ready` stays open for edits up to 15 min; client reconnects); max 5 concurrent streams; max connection age 15 min. Fallback: `GET /projects/{id}` polling every 3 s with backoff if SSE fails twice.
+Host/Origin check on connect (same as every endpoint, §7); connection closed after a terminal event (`draft_ready` stays open for edits up to 15 min; client reconnects); max 5 concurrent streams; max connection age 15 min. Fallback: `GET /projects/{id}` polling every 3 s with backoff if SSE fails twice.
 
 ---
 
 ## 13. Capacity & cost model (one user)
 
-Assumptions (inference; replace with spike measurements): the existing VPS gives the stack **4 vCPU / 8 GB RAM** (confirm the real figure; if it is 2 vCPU, every wall-clock number below roughly doubles and the §3 hard limits need the contended-load measurement from T-0.11 before they are accepted). A 30 s video; 4-min analysis song. Budgets in §3 are targets; this table is the CPU-time estimate behind them.
+Assumptions (inference; replace with spike measurements): the table below is a **reference estimate on a 4-core / 8 GB machine** (a sizing basis, not a requirement). The owner's real CPU/RAM are detected at worker start (§8g); wall-clock numbers scale with the real core count, and the measured per-stage timings of every job (`jobs.timings`) replace these estimates over time (Rev 3.5/3.6). A 30 s video; 4-min analysis song. Budgets in §3 are targets; this table is the CPU-time estimate behind them.
 
 | Step | CPU-seconds of 4 vCPU (wall ≈ CPU / cores used) | Notes |
 |---|---|---|
@@ -758,26 +777,26 @@ Assumptions (inference; replace with spike measurements): the existing VPS gives
 | Mode A remux (video copy + audio copy/AAC) | 1–2 | no video re-encode |
 | **Total per video** | **~2.0–2.5 min wall typical; p95 budget 120 s draft + 60 s render + 5 s remux** | |
 
-**Sizing.** One user makes a handful of videos a day at most (assume ≤ 10 drafts + ≤ 30 renders/day while actively editing). That is well under one 4-vCPU box running one heavy job at a time (`WORKER_HEAVY_CONCURRENCY=1`, §8): 10 drafts x 2 min + 30 renders x 1 min = 50 busy minutes. No horizontal scaling, no worker VM. Postgres, Redis and the API are idle compared to the worker; give the worker container the bulk of the CPU via compose `cpus`/`mem_limit` and leave ~1 vCPU/1 GB for the rest.
+**Sizing.** One user makes a handful of videos a day at most (assume ≤ 10 drafts + ≤ 30 renders/day while actively editing). That is well under one machine running one heavy job at a time (`WORKER_HEAVY_CONCURRENCY` auto-detected, usually 1 on a 4–8 core box, §8/§8g): 10 drafts x 2 min + 30 renders x 1 min = 50 busy minutes. No horizontal scaling, no worker VM. Postgres, Redis and the API are idle compared to the worker; give the worker container the bulk of the CPU via compose `cpus`/`mem_limit` and leave ~1 core/1 GB for the rest.
 
 **Memory:** analysis ≤ 2.5 GB (torch + audio), fetch ≤ 3 GB (SigLIP base ≈ 0.4 GB + buffers), render ≤ 2 GB; because heavy stages are serialized, the worker container limit is ~4 GB. Scratch ≤ 1 GB per job on tmpfs/ephemeral volume. Postgres 512 MB, Redis 256 MB, api 512 MB, web 512 MB → ~6 GB total.
 
 **Disk (the real constraint).** Per project (inference): `source` audio 3–15 MB + canonical FLAC 20–40 MB; raw downloads 12–16 clips x 8–25 MB ≈ 150–300 MB; mezzanines K≈15–20 x ~10 MB ≈ 150–200 MB; proxies ≈ 20–40 MB; each render master ≈ 8–15 MB; Mode A export ≈ 10–20 MB. So **~0.4–0.6 GB of intermediates + ~30–100 MB of permanent data per project**. With 7-day housekeeping and ~5 active projects/week the working set is ≈ 2–3 GB of intermediates; permanent data grows ~50–100 MB per finished project, i.e. ≈ 5–10 GB per 100 projects. Alert/refuse at `DISK_LOW_WATERMARK_GB` (5). Provision at least 40 GB free for the blob volume; measure real sizes in the spike and replace these numbers.
 
-**Cost.** Compute is the existing VPS (marginal ≈ €0). LLM ≈ $0.005–0.01 per video when enabled (cap `LLM_COST_CAP_USD_PER_VIDEO`), stock APIs free, no fingerprint vendor, no object storage fees. Backup target storage: the blob volume's permanent areas + DB dump, a few GB.
+**Cost.** Compute is the owner's own machine (marginal ≈ €0; no VPS, Rev 3.5). LLM ≈ $0.005–0.01 per video when enabled (cap `LLM_COST_CAP_USD_PER_VIDEO`), stock APIs free, no fingerprint vendor, no object storage fees. Backup target storage: the blob volume's permanent areas + DB dump, a few GB.
 
-Spike must measure: Beat This x86 latency at 4 threads (analysis budget 20 s) **with the API/PG/Redis idle and busy**, SigLIP base vs large CPU throughput on low-res frames, top-K size and normalize cost, vertical clip supply per keyword on Pexels alone (G0 stock test: decides whether `PIXABAY_ENABLED` is ever needed), FFmpeg 8.1 vs 9.0, real per-project disk footprint, the VPS's actual CPU/RAM/disk.
+Spike must measure: Beat This x86 latency at 4 threads (analysis budget 20 s) **with the API/PG/Redis idle and busy**, SigLIP base vs large CPU throughput on low-res frames, top-K size and normalize cost, vertical clip supply per keyword on Pexels alone (G0 stock test: decides whether `PIXABAY_ENABLED` is ever needed), real per-project disk footprint, the machine's actual CPU/RAM/disk. (Rev 3.6: no separate pre-launch speed run; per-stage timings are recorded on every job, §15, and FFmpeg is fixed to the BtbN 9.0.x build, §18.)
 
 ---
 
-## 14. Deployment topology (one Compose stack, Tailscale-only)
+## 14. One Compose stack on the owner's machine
 
 ```mermaid
 flowchart LR
-  tn((Tailnet devices)) -->|443 *.ts.net| ts
-  subgraph vps["VPS: one Docker Compose project"]
-    subgraph front["network: front (internal)"]
-      ts[tailscale]
+  br([Browser<br/>http://localhost:3000]) --> web
+  cli([saveclock CLI<br/>http://127.0.0.1:8000]) --> api
+  subgraph host["Owner's machine: one Docker Compose project (all ports on 127.0.0.1)"]
+    subgraph front["network: front"]
       web
       api
     end
@@ -790,32 +809,32 @@ flowchart LR
     end
     vol[("volume: blobs")]
   end
-  ts --> web & api
+  web -->|"/api/* rewrite"| api
   api --- api2
   api2 & wk & wm --> pg & rd
   api2 & wk & wm --- vol
   wk --> ext[(Pexels, Pixabay opt., Anthropic opt.)]
 ```
 
+Only `web` (`127.0.0.1:3000`) and `api` (`127.0.0.1:8000`) publish host ports, both on `BIND_ADDR=127.0.0.1`. `postgres`, `redis`, `worker` and `worker-maint` publish nothing. There is no `tailscale` service and no reverse proxy (Caddy is not needed).
+
 | Service | Image / target | Networks | Outbound internet | Resources (limits) | Replicas | Healthcheck |
 |---|---|---|---|---|---|---|
-| tailscale | `tailscale/tailscale` (userspace or `/dev/net/tun`), state volume, `TS_AUTHKEY` first boot only, `TS_SERVE_CONFIG` mounted | front | yes (tailnet control plane, DERP) | 128 MB | 1 | `tailscale status` |
-| web | `saveclock-web` (Node LTS slim, standalone, non-root) | front, back (for SSR fetch) | none | 512 MB / 1 CPU | 1 | `GET /healthz` (Next.js liveness, not part of `/api/v1`) |
-| api | `saveclock-api` **target `api`** (python:3.12-slim, uvicorn, non-root; **no torch, no ffmpeg, no weights**) | front, back | none | 512 MB / 1 CPU | 1 | `/api/v1/health/ready` |
+| web | `saveclock-web` (Node LTS slim, standalone, non-root); publishes `${BIND_ADDR}:3000` | front, back (for SSR fetch) | none | 512 MB / 1 CPU | 1 | `GET /healthz` (Next.js liveness, not part of `/api/v1`) |
+| api | `saveclock-api` **target `api`**; publishes `${BIND_ADDR}:8000` (python:3.12-slim, uvicorn, non-root; **no torch, no ffmpeg, no weights**) | front, back | none | 512 MB / 1 CPU | 1 | `/api/v1/health/ready` |
 | worker | `saveclock-worker` **target `worker`** (api + `ml` extra: torch CPU, transformers, beat-this, pinned ffmpeg, weights baked) | back | Pexels API/CDN, Pixabay (if enabled), Anthropic (if enabled), Sentry (if enabled) | ~4 GB / 3–4 CPU | 1 | process + Redis ping |
 | worker-maint | same image, command `dramatiq saveclock.workers.maintenance` | back | none | 256 MB | 1 | process + Redis ping |
 | postgres | `postgres:16` | back only | none | 512 MB | 1 | `pg_isready` |
 | redis | `redis:7`, `noeviction`, AOF `everysec`, `maxmemory 256mb` | back only | none | 256 MB | 1 | `PING` |
 
+
 Notes:
-- **Single origin over Tailscale (ADR-0012).** `tailscale serve` maps `https://<host>.<tailnet>.ts.net/` → `http://web:3000` and `/api` → `http://api:8000/api` (no path stripping; FastAPI mounts routers under `/api/v1`). Equivalent serve config (JSON, mounted as `TS_SERVE_CONFIG`) lives in `infra/tailscale/serve.json`. The Next.js app must not define routes under `/api/*`. **No host ports are published** by any service, no Traefik/Dokploy route exists for this stack, and the VPS firewall needs no inbound rule for it. HTTPS needs "HTTPS certificates" enabled in the tailnet admin console and a one-time auth key (or interactive login) for the sidecar. Funnel is **never** enabled (that would publish it to the internet).
-- **Tailscale-serve verification and Caddy fallback (DECISIONS §8c).** Phase 0 task T-0.15 (re-run in T-1.8 on the real stack) proves, from phone and laptop: path routing to `web` and `api`, SSE streaming through the proxy (`/events` delivers events unbuffered), a 100 MB streamed upload, and the identity headers reaching `api`. If any check fails, replace the sidecar's serve config with a **Caddy container bound to the tailnet IP** (compose service `caddy`, TLS from Tailscale certs, same route map); nothing else in the stack changes.
-- **Tailnet ACL:** restrict the `saveclock` node to the owner's devices (tag + ACL) so another member of a shared tailnet cannot reach it; `OWNER_TAILSCALE_LOGIN` is the in-app second check (§7).
+- **Single origin and ports (Rev 3.5, ADR-0014).** The browser uses `http://localhost:3000`; Next.js rewrites `/api/*` to `http://api:8000/api` (no path stripping; FastAPI mounts routers under `/api/v1`), so the UI never crosses origins. The CLI calls `http://127.0.0.1:8000` directly. The Next.js app must not define routes under `/api/*`. **Every published port binds `127.0.0.1` only, never `0.0.0.0`** (compose `ports: ["${BIND_ADDR:-127.0.0.1}:3000:3000"]`). Because a login-free local app can still be reached by any website open in the same browser, the API enforces the `Host` allowlist and the `Origin` check (§7). No TLS: `http://localhost` is a secure context for browsers. Funnel/Tailscale are not used. Phone access is not provided; adding Tailscale back as an optional sidecar is the later route (ADR-0012 is the recipe).
 - **Hardening that survives the rescope:** containers run as non-root UID 10001, `cap_drop: ALL`, `no-new-privileges`, default seccomp, read-only root FS where possible (writable: scratch tmpfs + blob volume), cgroup CPU/mem limits, wall-clock job limits. The worker is the only service with internet egress; its stock downloader validates every URL against per-provider host allowlists (`STOCK_HOST_ALLOWLIST`) and size caps before requesting (SSRF guard, no egress proxy). FFmpeg runs with `-protocol_whitelist file` and a forced demuxer (§11.3).
 - Images: multi-stage, `USER 10001`, `.dockerignore` (no `.env`, `.git`), base pinned by digest, tags `sha-<commit>`. Two Python targets from `infra/docker/Dockerfile.api` (`--target api`, `--target worker`) plus `Dockerfile.web` (ADR-0011).
 - Migrations: a one-shot `migrate` service (`alembic upgrade head`, `migrator` role) runs before `api` starts (`depends_on: condition: service_completed_successfully`); migrations are still backward compatible (expand/contract) so a rollback of the app image works against the new schema.
-- Secrets: `.env` file on the VPS (mode 0600, not in git) or the Dokploy secret store if Dokploy is used; `.env.example` placeholders only; never in images. Keep a copy of the secret inventory in the owner's password manager.
-- Deploy: `docker compose pull && docker compose up -d` (or Dokploy compose app). Rollback = redeploy the previous image tag. Single environment (prod); local dev is a separate compose file (§19). Phase P adds staging.
+- Secrets: `.env` / `secrets/env` file next to the compose file (mode 0600, git-ignored; no Dokploy); `.env.example` placeholders only; never in images. Keep a copy of the secret inventory in the owner's password manager.
+- Deploy: `docker compose build && docker compose up -d` on the owner's machine (images are built locally; there is no registry or remote host). Rollback = start the previous local image tag. Local dev is a separate compose file (§19). Phase P adds staging.
 - Backups: see §23.
 
 ---
@@ -825,7 +844,7 @@ Notes:
 - **Logs**: structured JSON to stdout (`structlog`), fields: `ts, level, service, env, version, request_id, project_id, job_id, render_id, stage, event, duration_ms, error_code`. Request id from `X-Request-Id` (generate if absent), propagated into Dramatiq message options and SSE. No API keys, no song titles. `docker compose logs` + `json-file` log rotation (`max-size 20m`, `max-file 5`) is the log store; no aggregator.
 - **Errors**: Sentry is optional (`SENTRY_DSN`); off by default.
 - **Per-stage timing** in `jobs.timings` is mandatory (it is how the §3 budgets are checked). The disk part of `GET /settings` and the job table are the only dashboards.
-- **Metrics**: optional Prometheus endpoint on an internal port (not routed through `tailscale serve`): `job_duration_seconds{stage}`, `jobs_total{stage,outcome}`, `render_cut_error_frames` (histogram), `stock_requests_total{provider,status}`, `llm_calls_total{outcome}`, `llm_fallback_total`, `beat_low_confidence_total`, `blob_bytes{area}`. Not wired in Phase 1.
+- **Metrics**: optional Prometheus endpoint on an internal port (never published to the host): `job_duration_seconds{stage}`, `jobs_total{stage,outcome}`, `render_cut_error_frames` (histogram), `stock_requests_total{provider,status}`, `llm_calls_total{outcome}`, `llm_fallback_total`, `beat_low_confidence_total`, `blob_bytes{area}`. Not wired in Phase 1.
 - **Targets** (not alerting SLOs; checked in the Phase 0/4 measurements and by `verify_render`): analysis p95 ≤ 20 s, draft ≤ 120 s, render ≤ 60 s, remux ≤ 5 s (DECISIONS §6; hard limits in §3); verification pass rate ≥ 99.5 % (cut ≤ 1 frame, drift ≤ 1 frame); job success rate ≥ 98 % (non-user-error). A failed verification is shown to the owner and logged at ERROR.
 - **Disk**: free space below `DISK_LOW_WATERMARK_GB` raises a banner in the app and fails `/health/ready`.
 - Phase P adds metrics/SLO/alert tables, traces and the audit log (archive §15).
@@ -840,7 +859,7 @@ Notes:
 | Pixabay down (if enabled) | same | Pexels only | none/minor |
 | Stock rate-limit exhausted | token bucket empty | stage waits ≤ 20 s then degrades to cache | slower |
 | Few portrait results for a keyword | < 6 candidates for a section | broaden query (drop adjectives → single noun → section-agnostic fallback list); landscape clips with centre-crop only if `PIXABAY_ENABLED` or Pexels returns them | possible weaker match |
-| LLM disabled / no key / down / timeout (8 s) / invalid JSON (after 1 repair retry) | config, exception or schema validation fail | **fallback keyword table** keyed by `(energy_bucket, tempo_bucket, style)` → curated 10-keyword lists per bucket (committed in repo `domain/keywords_fallback.py`); flag `degraded_keywords` (not set when the LLM is intentionally off) | none visible; slightly generic footage |
+| LLM disabled / no key (the default) / down / timeout (8 s) / invalid JSON (after 1 repair retry) — and no explicit keywords | config, exception or schema validation fail | order is **explicit keywords** (CLI/editor, Rev 3.5) → Haiku only if a key is set → **fallback keyword table** keyed by `(energy_bucket, tempo_bucket, style)` → curated 10-keyword lists per bucket (committed in repo `domain/keywords_fallback.py`); flag `degraded_keywords` (not set when the LLM is intentionally off) | none visible; slightly generic footage |
 | Beat This low confidence | `beat_confidence < 0.5` heuristic (to calibrate in spike) | tempo octave fold into 70–180 BPM; if still low → **energy-onset grid** (`fallback="energy_grid"`); UI banner + "half/double tempo" and "tap tempo / enter BPM" override | cuts less tight, owner can fix |
 | Beat This crashes/OOM | worker exit | retry once on a fresh process; then the QUALITY §6.2 fallback ladder (energy grid) | |
 | Clip has internal cut or low quality | PySceneDetect, ffprobe, Laplacian-variance blur | reject candidate; if pool exhausted, relax threshold once, else allow repeats flag `pool_exhausted` | |
@@ -850,7 +869,8 @@ Notes:
 | Mezzanine/raw missing at render (housekept, or manual file loss) | `FileNotFoundError` from `BlobStore` | `fetch.rehydrate_plan` (re-download by `(provider, id)` + re-normalize, no re-rank), then render; if a clip is gone at the provider → cut flagged `clip_unavailable`, render blocked until the owner swaps it | slower render, "Restoring clips…" |
 | Disk almost full | `DISK_LOW_WATERMARK_GB` check on upload init / draft / render, `/health/ready` | 507 `insufficient_storage`; banner; owner frees intermediates or deletes renders/projects | action required |
 | Disk full mid-job | `ENOSPC` | job fails (`internal_error`, retryable); partial `.part` files removed by the reaper | retry after freeing space |
-| Tailscale sidecar down / node logged out | tailnet unreachable | app unreachable from outside the VPS; jobs keep running; `docker compose logs tailscale` | outage until re-auth |
+| Request with a foreign `Host` or `Origin` (DNS rebinding, another tab's cross-site POST) | `ALLOWED_HOSTS` / `APP_ORIGIN` check in the API (§7) | 403 `forbidden` (`details.reason` = `host_not_allowed` / `origin_mismatch`); nothing executed | none for the owner; a mistyped URL such as the machine's LAN name is refused |
+| Machine asleep / off / Docker stopped | browser or CLI cannot connect | no rendering while off; on start the stuck-job reaper re-drives lost jobs from Postgres | wait; restart the stack |
 | Redis down | ping | API returns 503 for enqueue; reads still work (Postgres is the record); workers reconnect; stuck-job reaper re-drives after recovery; cache misses only | degraded |
 | Postgres down | health | API 503; workers retry with backoff | outage |
 | Worker killed mid-job | broker redelivery after ack timeout | idempotent actors resume/redo | |
@@ -862,16 +882,20 @@ Notes:
 
 Resolved by DECISIONS Rev 3 and removed from this list: worker-VM isolation (OQ-9), fingerprint vendor / Mode-A-on-match (OQ-2, OQ-15), re-attach clock (OQ-11), email provider (OQ-13), audit/DMCA retention (OQ-10), Beat This training-data counsel question (OQ-8, personal use), analytics (OQ-18), CI host (OQ-16, CI is optional). Remaining or new:
 
-1. **OQ-1 FFmpeg build.** 8.1.x vs 9.0.x, static vs distro build, checksum — decided by the Phase 0 spike (golden tests + hardening tests on both). Confirm `-progress <file>` and the forced-`-f` allowlist behave under `-protocol_whitelist file` on the chosen build (F-17 unverified).
+1. **OQ-1 FFmpeg build — resolved (DECISIONS §8g, Rev 3.6): BtbN `release/9.0` GPL static build, pinned by URL + sha256 and cached locally.** Confirm `-progress <file>` and the forced-`-f` allowlist behave under `-protocol_whitelist file` on that build at scaffold (F-17 unverified). The `--disable-network` source build is deferred to Phase P.
 2. **OQ-4 Top-K size and sampling.** K ~ 1.3 x cuts, frames per clip (6 vs 8), SigLIP aggregation and prompt template — tuned in the spike, then ADR-0008 updated.
-3. **OQ-14 Preview proxy resolution — resolved: 540×960** (DECISIONS §8e). T-3.4b still checks smoothness over Tailscale (direct vs DERP-relayed paths differ a lot for a phone); fall back to 360×640 if it stutters.
+3. **OQ-14 Preview proxy resolution — resolved: 540×960** (DECISIONS §8e). T-3.4b checks playback smoothness on the owner's machine; fall back to 360×640 only if playback stutters. (The tailnet/phone condition is gone, Rev 3.5.)
 4. **OQ-17 SQLAlchemy 2.0.x vs 2.1.x** and the Dramatiq 2.x middleware/default semantics — settled at scaffold (§0).
-5. **OQ-19 `tailscale serve` details (new).** Exact serve-config schema for path handlers, whether identity headers reach the upstream, long-lived SSE behaviour, request body limits for a 100 MB streamed POST, and whether the node must run in userspace mode on this VPS (no `/dev/net/tun`). Verified by task T-0.15 (extended, Phase 0) and re-run in T-1.8; if `tailscale serve` path handlers fall short, the fallback is a **Caddy container on the tailnet IP** (same single-origin routing: `/api/*` → api, rest → web; no public port) — see §14. The app's own check (`TRUSTED_PROXY_CIDRS`) works even without the identity header.
-6. **OQ-20 Upload transport over Tailscale (new).** A single streamed 100 MB `POST` through the API is assumed (Rev 3.3); T-0.15 verifies it through `tailscale serve` from phone and laptop. If a proxy limit or poor mobile-over-DERP throughput breaks it, reopen chunking then (not before).
-7. **OQ-21 VPS capacity (new).** CPU/RAM/disk of the existing VPS are assumed 4 vCPU / 8 GB / ≥ 40 GB free (§13); confirm before accepting the §3 hard limits. Also whether Dokploy or plain compose deploys the stack.
+5. **OQ-19 `tailscale serve` details — superseded by Rev 3.5.** No tailnet, no `tailscale serve`, no Caddy fallback (DECISIONS §8f, ADR-0014). Kept for ID stability; it returns only if phone access is added later as an optional sidecar (ADR-0012).
+6. **OQ-20 Upload transport over Tailscale — superseded by Rev 3.5.** The single streamed 100 MB `POST` now goes browser → Next.js rewrite → api on localhost (or CLI → api directly); no mobile/DERP path. Reopen chunking only if the local proxy hop (Next rewrite) limits or buffers the body (see OQ-26).
+7. **OQ-21 VPS capacity — superseded by Rev 3.5/3.6.** There is no VPS. The owner's CPU/RAM/disk are detected at worker start (§8g) and per-stage timings are recorded on every job; §3 hard limits are no longer gated by a pre-launch benchmark. Disk: still confirm ≥ 40 GB free for the blob volume (§13).
 8. **OQ-22 Second Dramatiq process (resolved, Rev 3.2).** `worker-maint` is a canonical compose service from the same image (DECISIONS §8c), so housekeeping never waits behind a render.
-9. **OQ-23 Backup target and key custody (new).** Which off-box location (restic repo on object storage / another host via rclone) and where the restic password lives (§23).
+9. **OQ-23 Backup target and key custody (new).** Which local or external folder/drive holds the backups (§23) and where the restic password lives (password manager, not only on this machine).
 10. **OQ-24 First-boot owner bootstrap (resolved, Rev 3.2).** The owner row is created by the baseline Alembic data migration (fixed UUID, `OWNER_DISPLAY_NAME`); prod never depends on dev seeds (DECISIONS §8c).
+11. **OQ-25 CLI → endpoint gaps (Rev 3.6).** (a) `saveclock new --vibe "<text>"`: there is no free-text vibe field in `projects.options` (only `style` and `keywords_override`) and no endpoint stores one, yet `show <id> --json` is meant to expose "the owner's vibe text" (DECISIONS §8f). Needs a decision: add an optional `options.vibe` string (additive; no new endpoint, `POST/PATCH /projects` carries it; DB-neutral because `options` is jsonb), or map `--vibe` to `style`/`vibe_chips` only. Until decided, `--vibe` is **not mapped**. (b) `saveclock open <id>` has no API endpoint by design: it opens the web editor URL `<APP_ORIGIN>/projects/<id>` in the default browser (a client-side action). (c) `saveclock plan <id>` is mapped to read-only `GET /projects/{id}/plan`; if "plan" is meant to re-run planning, it needs `PATCH /plan` ops (e.g. `set_keywords`) or a retry via #9, not a new endpoint. Confirm intent.
+12. **OQ-26 Single origin without a proxy (Rev 3.5).** The browser keeps one origin by serving the UI on `127.0.0.1:3000` and rewriting `/api/*` to `http://api:8000` inside Next.js (as dev already does, §19); the CLI calls the api port (`127.0.0.1:8000`) directly. Confirm at scaffold that the Next.js rewrite streams SSE and a 100 MB upload without buffering; if not, publish the api port as its own origin and allow `http://localhost:3000` through a narrow CORS rule (still `Origin`-checked).
+13. **OQ-27 Origin check and non-browser clients (Rev 3.5).** The `Origin` rule (§7) accepts a request with **no** `Origin` header (CLI, curl, tests; browsers always send one on cross-site state-changing requests) and rejects a present `Origin` that is not `APP_ORIGIN`. DECISIONS §8f says "reject state-changing requests whose `Origin` is not the app's own" without naming the absent case; this is the reading that lets the CLI work. Confirm.
+14. **OQ-28 Pause for keywords (Rev 3.6).** The automatic pipeline enqueues `build_draft` right after analysis (§8), so keywords set by Claude Code after `saveclock new` arrive as a `set_keywords` replan-fetch (one wasted first fetch with the offline table). Optionally the owner may want `new` to stop at `analyzed` until keywords arrive; that is a state-machine change, so it is not decided here.
 
 ---
 
@@ -882,20 +906,18 @@ Resolved by DECISIONS Rev 3 and removed from this list: worker-VM isolation (OQ-
 | Name | Type / default | Req | Secret | Svc | Notes |
 |---|---|---|---|---|---|
 | `APP_ENV` | `local\|ci\|prod` | y | n | all | |
-| `APP_ORIGIN` | url, `https://<host>.<tailnet>.ts.net` | y | n | A,W | single origin; links, SSE |
+| `APP_ORIGIN` | url, `http://localhost:3000` (or whatever port is published) | y | n | A,W | the app's own origin: the allowed `Origin` for state-changing requests (§7), links, SSE |
 | `API_INTERNAL_URL` | url, `http://api:8000/api/v1` | y | n | W | SSR → API over the internal network |
 | `LOG_LEVEL` | `INFO` | n | n | all | |
 | `SENTRY_DSN` / `SENTRY_ENV` | url / `APP_ENV` | n | y | all | off when empty |
 | `DATABASE_URL` | postgres+asyncpg url | y | y | A,K,M | role `app_rw` |
 | `MIGRATOR_DATABASE_URL` | url | migrate job | y | migrate | role `migrator` |
 | `REDIS_URL` | `redis://redis:6379/0` | y | y | A,K,M | the one `noeviction` instance |
-| `TAILNET_ENFORCE` | `true` | y in prod | n | A | `false` allowed only when `APP_ENV` is `local`/`ci`; refused otherwise |
-| `TRUSTED_PROXY_CIDRS` | list | y | n | A | the `tailscale` container's compose-network address |
-| `OWNER_TAILSCALE_LOGIN` | e.g. `me@example.com` | n | n | A | if set, `Tailscale-User-Login` must equal it |
+| `ALLOWED_HOSTS` | list, `localhost,127.0.0.1` | n | n | A | `Host` header allowlist (hostname part; any port). Anything else → 403 `forbidden` (`details.reason=host_not_allowed`): blocks DNS rebinding (Rev 3.5, SEC-166) |
+| `BIND_ADDR` | `127.0.0.1` | n | n | compose | host address every published port binds to. Never `0.0.0.0`; `make check` fails if a compose port lacks the prefix (SEC-165) |
+| `SAVECLOCK_API_URL` | url, `http://127.0.0.1:8000` | n | n | CLI | base URL the `saveclock` CLI calls (§2). The CLI refuses a non-loopback host (SEC-168) |
 | `OWNER_EMAIL` / `OWNER_DISPLAY_NAME` | `owner@saveclock.local` / required | `OWNER_DISPLAY_NAME` y | n | migrate | read only by the baseline migration's data step that seeds the single `users` row |
 | `PEXELS_KEY_CONFIGURED` / `PIXABAY_KEY_CONFIGURED` / `ANTHROPIC_KEY_CONFIGURED` | `true`/`false`, derived by Compose from the real keys | n | n | A | feed `GET /settings` (#24) and the `PUT /settings` validation (#25) only; `api` never holds the keys |
-| `TS_AUTHKEY` | tailscale auth key | first boot | y | tailscale | remove after the node is registered |
-| `TS_HOSTNAME` | `saveclock` | n | n | tailscale | becomes `saveclock.<tailnet>.ts.net` |
 | `BLOB_BACKEND` | `fs` (`s3` = Phase P stub) | n | n | A,K,M | selects `BlobStore` implementation |
 | `BLOB_ROOT` | `/data/blobs` | y | n | A,K,M | blob volume mount |
 
@@ -905,9 +927,12 @@ Resolved by DECISIONS Rev 3 and removed from this list: worker-VM isolation (OQ-
 | `INTERMEDIATE_TTL_DAYS` | `7` | n | n | M | DECISIONS §2 |
 | `SWEEP_INTERVAL_MIN` | `60` | n | n | M | |
 | `DISK_LOW_WATERMARK_GB` | `5` | n | n | A,K,M | 507 / banner below this |
-| `WORKER_HEAVY_CONCURRENCY` | `1` | n | n | K | Redis `heavy` lock count; raise only from Phase 0 contended-load data |
-| `FFMPEG_BIN` / `FFPROBE_BIN` | paths | y | n | K | pinned build |
-| `FFMPEG_THREADS` / `OMP_NUM_THREADS` | `4` / `4` | n | n | K | |
+| `WORKER_HEAVY_CONCURRENCY` | auto (§8g) — override | n | n | K | Redis `heavy` lock count; default `max(1, min(cpu // 4, (ram_gb - 2) // 3))`; the chosen value is logged at worker start and shown read-only in Settings |
+| `FFMPEG_BIN` / `FFPROBE_BIN` | paths; BtbN 9.0.x GPL static, sha256-pinned | y | n | K | BtbN `release/9.0` GPL static build (libx264 required; Fedora's 8.1.3 lacks it). Verified by sha256 before it is baked into the worker image and cached locally (DECISIONS §8g, SEC-170) |
+| `FFMPEG_THREADS` | auto (§8g) — override | n | n | K | default `cpu` |
+| `OMP_NUM_THREADS` / `TORCH_THREADS` | auto (§8g) — override | n | n | K | default `cpu`; analysis runs one job at a time |
+| `FETCH_CONCURRENCY` | auto (§8g) — override | n | n | K | default `4` |
+| `DEVICE` | `cpu` | n | n | K | torch device. A CUDA path is a later option (§8g) |
 | `BEAT_THIS_CHECKPOINT` | `final0` | n | n | K | `small0` only if the spike requires |
 | `SIGLIP_MODEL` | `google/siglip2-base-patch16-224` | n | n | K | baked into image |
 | `TOPK_FACTOR` | `1.3` | n | n | K | **[spike]** |
@@ -916,31 +941,33 @@ Resolved by DECISIONS Rev 3 and removed from this list: worker-VM isolation (OQ-
 | `PIXABAY_API_KEY` | | if enabled | y | K | |
 | `PEXELS_RATE_PER_HOUR` / `PIXABAY_RATE_PER_MIN` | `200` / `100` | n | n | K | token buckets |
 | `STOCK_HOST_ALLOWLIST` | list | y | n | K | download SSRF guard |
-| `LLM_ENABLED` | `true` | n | n | K | `false` or empty key = fallback keyword table |
-| `ANTHROPIC_API_KEY` | | n | y | K | optional |
+| `LLM_ENABLED` | auto: on only if `ANTHROPIC_API_KEY` is set | n | n | K | explicit `false` or no key = skip Haiku. Keyword order: explicit keywords (CLI/editor) → Haiku if enabled → offline table (§16) |
+| `ANTHROPIC_API_KEY` | | n | y | K | optional; no key needed for the normal Claude Code flow (§2). Only the analysis summary JSON is ever sent, never audio (SEC-169) |
 | `LLM_MODEL` / `LLM_TIMEOUT_S` / `LLM_MAX_TOKENS` | `claude-haiku-5-5` / `8` / `300` | n | n | K | one repair retry |
 | `LLM_DAILY_CALL_CAP` / `LLM_COST_CAP_USD_PER_VIDEO` | n / n | n | n | K | kill-switch + cost cap |
-| `BACKUP_*` (restic repo URL, password file, rclone remote) | | prod | y | host script | read by the backup cron on the host, not by app containers (§23) |
+| `BACKUP_*` (restic repo path, password file, or plain-copy destination folder) | | n | y | host script | local or external folder the owner chooses; read by the backup cron on the host, not by app containers (§23) |
 | `NEXT_PUBLIC_APP_ORIGIN` | | y | n | W | only `NEXT_PUBLIC_*` reach the browser |
 | `FAKE_STOCK`, `FAKE_ML`, `FAKE_LLM` | `false` | n | n | local/CI only | test doubles (§19, §22); rejected when `APP_ENV=prod` |
 
 **Removed vs Rev 2.2:** `APP_ENV=staging`, `WORKER_DATABASE_URL`, `REDIS_BROKER_URL`/`REDIS_CACHE_URL` (→ `REDIS_URL`), `SESSION_*`, `TURNSTILE_*`, all `R2_*`, `PRESIGN_*`, `USER_STORAGE_CAP_MB`, `RETENTION_HOURS`/`RETENTION_LEGAL_OVERRIDE`, `QUEUE_DEPTH_LIMIT`, `FINGERPRINT_*`, `HTTPS_PROXY`/`NO_PROXY`, `WIREGUARD_*`, `GOOGLE_OAUTH_*`, `EMAIL_*`/`SMTP_URL`, `STRIPE_*`, `BILLING_ENABLED`, `REQUIRE_EMAIL_VERIFIED`, `FREE_*`/`PRO_*`/`MAX_ACTIVE_JOBS_*`, `ADMIN_IP_ALLOWLIST`, `WATERMARK_*`, `MEZZ_*`, `NEXT_PUBLIC_TURNSTILE_SITE_KEY`. They return with Phase P.
 
+**Removed in Rev 3.5 (local-only):** `TAILNET_ENFORCE`, `TRUSTED_PROXY_CIDRS`, `OWNER_TAILSCALE_LOGIN`, `TS_AUTHKEY`, `TS_HOSTNAME` (superseded by `ALLOWED_HOSTS`, `BIND_ADDR` and the `Origin` check against `APP_ORIGIN`).
+
 ---
 
 ## 19. Local development topology
 
-`infra/compose/compose.dev.yml` (profiles keep the laptop light):
+`infra/compose/compose.dev.yml` (profiles keep the machine light). Every published port binds to `127.0.0.1` here too (`BIND_ADDR`, §18):
 
 | Service | Image | Port | Profile |
 |---|---|---|---|
 | postgres | `postgres:16` | 5432 | default |
 | redis | `redis:7` (`noeviction`) | 6379 | default |
-| api | build target `api`, `uvicorn --reload`, `TAILNET_ENFORCE=false` | 8000 | default |
-| web | `pnpm dev` (host) or container; dev-only Next `rewrites` send `/api/:path*` to `http://localhost:8000` to reproduce the single-origin shape | 3000 | default |
+| api | build target `api`, `uvicorn --reload`, Host/Origin checks on (they allow `localhost`/`127.0.0.1`) | 127.0.0.1:8000 | default |
+| web | `pnpm dev` (host) or container; dev-only Next `rewrites` send `/api/:path*` to `http://localhost:8000` to reproduce the single-origin shape | 127.0.0.1:3000 | default |
 | worker-light | target `api` + `FAKE_ML=1 FAKE_STOCK=1 FAKE_LLM=1`: deterministic stub analysis/plan, tiny generated clips | — | `light` (default for UI work) |
 | worker-full | build target `worker` (torch, ffmpeg, weights) | — | `full` |
-| tailscale | optional: run the real sidecar to test phone access end to end | — | `tailnet` |
+| ~~tailscale~~ | removed in Rev 3.5 (no phone access; ADR-0014). Optional later only if phone access is wanted (ADR-0012 is the recipe) | — | — |
 
 Blob root in dev is `./.data/blobs` (git-ignored). Make targets: `make up`, `make migrate`, `make seed` (§22), `make dev` (up + migrate + seed + web), `make test`, `make check` (all gates), `make contracts` (regenerate OpenAPI + edit-plan schema + TS client), `make down`. Acceptance: **fresh clone → first successful render of the seeded synthetic project in ≤ 15 min** (model-weights download is a one-time `make weights`, skipped in the `light` profile). Dev origin is `http://localhost:3000`; no TLS or cookies are involved, so the `__Host-`/mkcert setup from Rev 2.2 is gone. MinIO, Mailpit and the dev Traefik are no longer needed.
 
@@ -984,15 +1011,15 @@ Adding any column outside this map requires its own `DB CHANGE` notice and an up
 
 | Item | Policy |
 |---|---|
-| Postgres | nightly `pg_dump` (custom format) written to `BACKUP_STAGING_DIR`, then picked up by **restic** (or rclone to a remote) together with the blob volume; client-side encryption comes from restic; the repository password is kept in the owner's password manager and **not on the VPS only** |
+| Postgres | nightly `pg_dump` (custom format) written to `BACKUP_STAGING_DIR`, then picked up by **restic** (or a plain copy) into a **local or external folder/drive** the owner chooses (Rev 3.5, DECISIONS §8f; rclone to a remote is optional) together with the blob volume; client-side encryption comes from restic; the repository password is kept in the owner's password manager and **not only on this machine** |
 | Blob volume | back up `songs/` and `renders/` (permanent data). **Exclude `work/`** (intermediates are regenerable by rehydration, §4) and any `incoming.bin.part` |
 | Retention | restic `forget --prune`: keep 7 daily, 4 weekly, 6 monthly (tunable) |
 | RPO / RTO | RPO 24 h, RTO a few hours (restore dump + blobs, `docker compose up`) |
 | Restore drill | **once before Phase 4 closes**, then yearly or after any storage change: restore into a scratch Compose project, run the smoke suite (open a project, play a render) and record the result |
 | Pre-migration | a manual dump is taken before every production migration that alters data |
 | Redis | not backed up: the broker holds ids only; in-flight work is re-driven by the stuck-job reaper from Postgres; cache is disposable |
-| Config & secrets | `.env` inventory and `infra/tailscale/serve.json` in the repo (no secrets) / password manager; the tailnet node state volume is excluded (re-register with a new auth key) |
-| Off-box location | chosen by the owner (OQ-23); never the same disk as the blob volume |
+| Config & secrets | `.env.example` in the repo (no secrets); the real `.env` / `secrets/env` is kept in the owner's password manager. No tailnet state exists (Rev 3.5) |
+| Backup location | a local or external folder/drive chosen by the owner (OQ-23); never the same disk as the blob volume (an external drive or a second internal disk). Restore is tested once (drill above) |
 
 ## 24. Deferred to Phase P (public edition)
 
@@ -1005,12 +1032,12 @@ Before Phase P starts, DECISIONS §8 says to decide first whether to move proces
 ## 25. Phase P seams to preserve (do not undo these)
 
 1. **`users` table + `user_id` on every owned table** (`projects`, `renders`; reachable via join for the rest), and repositories that take `user_id` as a required argument. `current_user()` is the only place that knows "the owner".
-2. **One auth dependency** (`api/deps.py::current_user`) behind which a session-cookie implementation can replace the Tailscale-origin check; routers and services never read headers for identity.
+2. **One auth dependency** (`api/deps.py::current_user`) behind which a session-cookie implementation can replace the Host/Origin check (Rev 3.5); routers and services never read headers for identity.
 3. **`BlobStore` adapter** and centralized key construction (`blob_keys.py`); no direct filesystem paths outside `FilesystemBlobStore`; a presigned-URL `url_for(key)` can be added on the S3 implementation.
 4. **Layering** (routers → services → repositories/adapters; domain pure) and adapters for every external system (stock, LLM, blobstore, ffmpeg).
 5. **Worker ownership re-check** (`project.user_id` vs message `user_id`).
 6. **Two Docker build targets** (`api` without torch/ffmpeg) and `Settings` as the only env reader.
 7. **Error envelope + stable error codes**, cursor pagination, `/api/v1` versioning (Idempotency-Key support returns in Phase P).
 8. **Plan/edit-plan contract** (`schema_version`, additive optional fields only) so `watermark_version`/`tier` can return as a minor bump.
-9. **Single-origin routing** (`/api/*` → FastAPI) so the browser code never changes when Traefik replaces `tailscale serve`.
+9. **Single-origin routing** (`/api/*` → FastAPI) so the browser code never changes if a reverse proxy (Traefik) is added in Phase P.
 10. **Alembic discipline** (expand/contract, DB CHANGE notices) so Phase P migrations are additive.

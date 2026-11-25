@@ -1,6 +1,6 @@
 # SaveClock Studio — DESIGN.md (design brief)
 
-Status: DRAFT for approval (**Rev 3, personal edition**) · Date: 2026-11-08 · Consistent with `DECISIONS.md` Rev 3 (canonical). Siblings: `PRD.md`, `ROADMAP.md`, `CHECKLIST.md`, `ARCHITECTURE.md`, `STANDARDS.md`, `SECURITY.md`, `QUALITY.md`, `UX-SPEC.md` (screens), `mockups/index.html` (static mockup of the tokens below).
+Status: DRAFT for approval (**Rev 3.6, personal edition, local-only**) · Date: 2026-11-26 · Consistent with `DECISIONS.md` Rev 3.6 (canonical). Siblings: `PRD.md`, `ROADMAP.md`, `CHECKLIST.md`, `ARCHITECTURE.md`, `STANDARDS.md`, `SECURITY.md`, `QUALITY.md`, `UX-SPEC.md` (screens), `mockups/index.html` (static mockup of the tokens below).
 
 This is the brief the UI is built from. `UX-SPEC.md` says what each screen does; this file says what everything looks like and how it behaves. The public-edition design (Rev 2.2: sign-up, pricing, rights and fingerprint notices, 72 h countdown, landing page) is archived unchanged in `archive/public-edition-rev2.2/DESIGN.md` and returns only in Phase P.
 
@@ -8,10 +8,11 @@ This is the brief the UI is built from. `UX-SPEC.md` says what each screen does;
 
 ## Rev 3 changelog (2026-11-08) — personal edition
 
+- **Rev 3.6 (2026-11-26, DECISIONS §8f/§8g):** local-only: the app runs on the owner's own machine; no Tailscale and no phone-over-tailnet. The 540×960 preview proxy stays (360×640 only if playback stutters). Settings shows the auto-detected concurrency/thread values read-only (a plain `Card` list, no new component). The keyword field is typed or edited by the owner, with a hint that Claude Code can also set it. The mobile-first breakpoints (§4) are unchanged; their rationale is now narrow windows and responsive checks rather than a phone over a tailnet.
 - **Rev 3.3 (2026-11-08, DECISIONS §8d):** Settings is backed by `GET/PUT /settings` (key status, Pixabay switch, disk usage) plus `POST /housekeeping/run`; one streamed upload (progress bar and Cancel, no resume copy: a failed upload is re-sent); downloads are direct (no "link expired" state); live sign-in/16+/72 h/`ExpiryBadge`/fingerprint/pricing bullets deleted from the Rev 2 historical list (V3-03).
 - **Rev 3.2 (2026-11-08):** PRD story IDs reconciled (no "verify against PRD Rev 3" notes); "Report an issue" dropped (US-031 deferred); state list is the 14 ARCHITECTURE §4 states (no `expired`); Settings shows API-key status (from `GET /settings` since Rev 3.3).
 
-- **Rescoped to one user (the owner) on Tailscale.** The app opens straight to **Projects**; there is no sign-up, sign-in, landing or pricing page (DECISIONS Rev 3 §1).
+- **Rescoped to one user (the owner), local-only (Rev 3.5; was on Tailscale).** The app opens straight to **Projects**; there is no sign-up, sign-in, landing or pricing page (DECISIONS Rev 3 §1).
 - **Kept unchanged:** the "Click Track" direction, all tokens (§3), layout (§4), accessibility rules (§6), the beat-marked waveform, editor components, Mode A / Mode B export.
 - **Removed from the design:** `RightsGate`, `FingerprintNotice`, `ExpiryBadge`, `Countdown`, `PlanCard`, `UsageMeter`, auth forms, age/terms checkboxes, watermark, quota and queue copy, 72 h copy, §8 rights/copyright notice patterns, cookie/privacy surfaces. They are listed in the "Deferred to Phase P" table (§15).
 - **Added:** `ProjectCard` + disk-usage line (Projects home), `SettingsSection` (API-key status, Pexels/Pixabay toggle, housekeeping, delete project), `DiskMeter`. Retention is owner-controlled; intermediates are cleaned 7 days after last use.
@@ -149,7 +150,7 @@ Rules:
 
 ## 4. Layout grid and breakpoints
 
-Mobile-first (the owner mostly works from a phone over Tailscale, DECISIONS §1). Tailwind breakpoints:
+Mobile-first layout kept (narrow windows and responsive checks; phone access is not provided in the local-only edition, DECISIONS §8f). Tailwind breakpoints:
 
 | Name | Min width | Layout |
 |---|---|---|
@@ -294,7 +295,7 @@ Pexels API terms require a prominent link back to Pexels; Pixabay encourages cre
 3. **Beat pulse default — resolved (Rev 3.4): on** (owner choice, DECISIONS §8e); capped at 2 Hz, off switch in Settings, removed under reduced motion.
 4. Brand colour check on real stock-clip thumbnails (Tick crimson next to red-heavy footage).
 5. **Button and heading case.** Copy is sentence case; the Web Interface Guidelines suggest Title Case on buttons. Recorded as a deliberate deviation (calm-engineer voice, §7). **Resolved (Rev 3.4): sentence case confirmed by the owner** (DECISIONS §8e).
-6. **Preview proxy resolution — resolved (Rev 3.4): 540×960** (DECISIONS §8e); 360×640 only if the T-3.4b tailnet test stutters on the owner's phone.
+6. **Preview proxy resolution — resolved (Rev 3.4): 540×960** (DECISIONS §8e); 360×640 only if playback stutters (T-3.4b).
 7. **"Report an issue" entry point — resolved (Rev 3.2): dropped.** PRD US-031 / FR-045 are deferred to Phase P; no link in Settings.
 
 ## 13. Web Interface Guidelines check (design decisions)

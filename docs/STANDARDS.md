@@ -1,16 +1,18 @@
 # SaveClock Studio — Engineering Standards
 
-Status: DRAFT · **Rev 3 — Personal edition (public-ready)** · Date: 2026-11-08 · Base: the `sattva-production-grade-engineering` skill (layering, validation, ownership checks, error handling, secrets, tests, reproducible builds). Decisions: `DECISIONS.md`. Architecture: `ARCHITECTURE.md` (Rev 3). Related by filename: `SECURITY.md`, `QUALITY.md`, `CHECKLIST.md`, `adr/`.
+Status: DRAFT · **Rev 3.6 — Personal edition (public-ready), local-only** · Date: 2026-11-26 · Base: the `sattva-production-grade-engineering` skill (layering, validation, ownership checks, error handling, secrets, tests, reproducible builds). Decisions: `DECISIONS.md`. Architecture: `ARCHITECTURE.md` (Rev 3). Related by filename: `SECURITY.md`, `QUALITY.md`, `CHECKLIST.md`, `adr/`.
 
-## Rev 3 changelog (2026-11-08)
+## Rev 3 changelog (2026-11-08; latest Rev 3.6)
+
+- **Rev 3.6 (2026-11-26, DECISIONS §8f/§8g):** local-only: no Tailscale or VPS; ports on `127.0.0.1`; Host/Origin middleware replaces the Tailscale-origin check (the earlier "removed `Origin`-check rules" line below referred to the public-edition CSRF check; the Rev 3.5 `Origin` check on state-changing requests is new and required); the `saveclock` CLI is a thin API client (no second code path); concurrency/threads are auto-detected with overrides; FFmpeg is the BtbN 9.0.x GPL static build pinned by sha256. Review checklist item 4 now says "never reads headers itself".
 
 - **Rev 3.3 (2026-11-08, DECISIONS §8d):** no signed file tokens (the API streams files directly; `blob_keys.py` path containment stays mandatory), no `op_id` or `Idempotency-Key` convention (plan `base_version` + `job_hash` only), `exports` folded into `renders`, one streamed upload, one eval script. §15 seam list updated.
 - **Rev 3.2 (2026-11-08):** quota wording removed from the review checklist; compose services include `worker-maint` (DECISIONS §8c); the owner row comes from the baseline migration.
 
-Rescoped to the single-owner personal edition on Tailscale (`DECISIONS.md` Rev 3). Layering, typing, testing, DB, git and review rules are **unchanged**; what changed is what they apply to.
-- **Tree (§1):** `infra/` is now `docker/`, `compose/` (prod + dev), `tailscale/` (serve config); **no `worker-vm/`, no `r2/`, no `dokploy/`-specific Traefik labels**. `adapters/` gains `blobstore/` (filesystem now, S3 stub for Phase P) and loses `r2`, `fingerprint`, `stripe`, `email`. `security/` (passwords, sessions, CSRF, rate limit) is gone; `api/deps.py::current_user` is the single identity seam.
-- **Removed conventions:** auth/session/CSRF/`Origin`-check rules, `__Host-` cookie, `register` 202 rule, Idempotency-Key as *required*, quota/billing/retention-clock coverage targets, worker-VM/egress review items, Stripe/DMCA/auth mandatory tests, `worker_rw`/`retention`/`readonly` DB roles, Turnstile/OAuth/email/Stripe config groups.
-- **Added:** §15 *Phase P seams to preserve* (what must not be undone); `BlobStore` and path-contained file-serving rules (no signed tokens since Rev 3.3); Tailscale access check; housekeeping/disk rules; CI is optional (`make check` is the gate).
+Rescoped to the single-owner personal edition (`DECISIONS.md` Rev 3; Rev 3.5/3.6: local-only, no Tailscale; see the Rev 3.6 line below). Layering, typing, testing, DB, git and review rules are **unchanged**; what changed is what they apply to.
+- **Tree (§1):** `infra/` is now `docker/`, `compose/` (prod + dev); ~~`tailscale/` (serve config)~~ removed in Rev 3.5; **no `worker-vm/`, no `r2/`, no `dokploy/`-specific Traefik labels**. `adapters/` gains `blobstore/` (filesystem now, S3 stub for Phase P) and loses `r2`, `fingerprint`, `stripe`, `email`. `security/` (passwords, sessions, CSRF, rate limit) is gone; `api/deps.py::current_user` is the single identity seam.
+- **Removed conventions:** auth/session/CSRF rules (the public-edition `Origin` check; see Rev 3.6 for the local one), `__Host-` cookie, `register` 202 rule, Idempotency-Key as *required*, quota/billing/retention-clock coverage targets, worker-VM/egress review items, Stripe/DMCA/auth mandatory tests, `worker_rw`/`retention`/`readonly` DB roles, Turnstile/OAuth/email/Stripe config groups.
+- **Added:** §15 *Phase P seams to preserve* (what must not be undone); `BlobStore` and path-contained file-serving rules (no signed tokens since Rev 3.3); Host/Origin access checks (Rev 3.5; was a Tailscale access check); housekeeping/disk rules; CI is optional (`make check` is the gate).
 - **Kept as-is:** two Docker build targets (ADR-0011, minus the two-Redis part), generated contracts (ADR-0007), `user_id`-scoped repositories, DB CHANGE announcements, ponytail-review / design-gate process.
 
 ## Rev 2.1 changelog (2026-11-08) — historical, superseded by Rev 3 where it differs
@@ -21,7 +23,7 @@ Rescoped to the single-owner personal edition on Tailscale (`DECISIONS.md` Rev 3
 
 Reconciled to `DECISIONS.md` Rev 2 and the cross-check reviews.
 - **Images (D-31, S-1):** one Python codebase, **two mandatory Docker build targets** `api` (no torch/ffmpeg/weights) and `worker`; the `ml` extra is installed only in `worker`. Resolves former open question 2. ADR-0011.
-- **Origin (D-08):** single origin, `/api/*` path routing, **no CORS**; API paths are `/api/v1/...`. (Rev 3: routed by `tailscale serve`, no cookie, ADR-0012; ADR-0010 superseded.)
+- **Origin (D-08):** single origin, `/api/*` path routing, **no CORS**; API paths are `/api/v1/...`. (Rev 3.5: the browser's single origin comes from a Next.js `/api/*` rewrite on `localhost`; no cookie; ADR-0012/Tailscale superseded by ADR-0014; ADR-0010 superseded.)
 - **Repo shape:** `scripts/` added to the tree; `infra/` gains worker-VM, egress-proxy and compose profiles; Node LTS pinned via `.nvmrc` (not a fixed "22").
 - **Config (G-09):** the full variable inventory moved to ARCHITECTURE §18; groups here updated (two Redis, four R2 buckets, no `MEZZ_*`, `MAX_UPLOAD_MB=100`, email provider, Turnstile, age/consent).
 - **API/DB conventions:** 202-always for register; enums lowercase `text`+CHECK for statuses; multi-queue/4-queue and `worker_rw` role; migrations plan by phase (ARCHITECTURE §21); DB-role list; `PATCH` ops + `base_version`/`op_id` convention; error-code catalogue ownership.
@@ -64,7 +66,7 @@ saveclock/
 │       ├── src/saveclock/
 │       │   ├── main.py               # composition root: create_app()
 │       │   ├── config.py             # pydantic-settings, fail-fast
-│       │   ├── api/                  # routers (thin), deps (current_user = the Tailscale-origin check + seeded owner), schemas (Pydantic I/O), errors
+│       │   ├── api/                  # routers (thin), deps (current_user = seeded owner; Host/Origin middleware, Rev 3.5), schemas (Pydantic I/O), errors
 │       │   │   └── v1/
 │       │   ├── services/             # business logic: projects, uploads, planning, renders, housekeeping (retention), files (direct, path-contained serving)
 │       │   ├── repositories/         # SQLAlchemy queries only; every method takes user_id when user-owned
@@ -86,8 +88,8 @@ saveclock/
 │       └── package.json
 ├── infra/
 │   ├── docker/                       # Dockerfile.api (targets: api, worker), Dockerfile.web, .dockerignore
-│   ├── compose/                      # compose.yml (prod: web, api, worker, worker-maint, postgres, redis, tailscale), compose.dev.yml (pg, redis, api, web; profiles light/full/tailnet)
-│   ├── tailscale/                    # serve.json (TS_SERVE_CONFIG: / -> web, /api -> api), ACL notes (no auth keys)
+│   ├── compose/                      # compose.yml (prod: web, api, worker, worker-maint, postgres, redis; ports on 127.0.0.1), compose.dev.yml (pg, redis, api, web; profiles light/full)
+│   ├── (tailscale/ removed in Rev 3.5)
 │   └── backup/                       # restic/rclone cron script + pg_dump wrapper (no secrets)
 ├── eval/                             # golden set manifests + scripts (NO copyrighted audio committed)
 │   ├── manifests/                    # yaml: song id, source/license, annotator beats, hard-set flag
@@ -129,7 +131,7 @@ Boundary rules enforced by `import-linter` (Python) and ESLint `no-restricted-im
 - **Async policy**: API handlers are `async def` using SQLAlchemy async engine (`asyncpg`) and `httpx.AsyncClient`; CPU/ML/FFmpeg only in workers (sync). Never call blocking code in an async handler; use `run_in_threadpool` only for tiny things (there is no password hashing in this edition).
 - **Validation**: every request/response is a Pydantic v2 model with `model_config = ConfigDict(extra="forbid", frozen=True)` on inputs; constrained types (`conint`, `constr`, enums); responses use explicit `response_model` (no ORM leakage; mass-assignment impossible because input models list allowed fields only).
 - **Errors**: domain/service errors are subclasses of `AppError(code, http_status, message, details)`; a single exception handler renders the envelope (`ARCHITECTURE.md` §7). Unexpected exceptions → 500 `internal_error`, logged with `request_id`, never leaked. Never `except Exception: pass`; catch narrow types; retryable vs non-retryable explicitly (`Retryable`/`Permanent` base classes used by worker middleware).
-- **Ownership (Phase P seam, keep it)**: every user-owned repository method signature includes `user_id`; there is no `get_project(id)` without it. Identity comes from exactly one dependency, `current_user()` (today: the Tailscale-origin check returning the seeded owner). A test per resource asserts a different `user_id` gets 404, even though only one user exists.
+- **Ownership (Phase P seam, keep it)**: every user-owned repository method signature includes `user_id`; there is no `get_project(id)` without it. Identity comes from exactly one dependency, `current_user()` (today: returns the seeded owner after the Host/Origin checks). A test per resource asserts a different `user_id` gets 404, even though only one user exists.
 - **Subprocess**: only through `adapters/ffmpeg.run(args: Sequence[str], timeout, cwd, ...)`. `shell=True` is banned (ruff `S602/S604/S605` enabled). Arguments from user data are never interpolated into filter strings.
 - **Time/ids**: `datetime.now(UTC)` only (ruff `DTZ`); ids via `uuid7`/ULID helper; no money handling in this edition.
 - **Naming**: modules `snake_case`, classes `PascalCase`, functions verbs, repositories `ProjectRepository`, services `ProjectService`, adapter protocols `…Port`, implementations `…Adapter`.
@@ -152,9 +154,9 @@ Boundary rules enforced by `import-linter` (Python) and ESLint `no-restricted-im
 
 | Topic | Rule |
 |---|---|
-| Base & versioning | `/api/v1` URL prefix (single origin; `tailscale serve` routes `/api/*` to FastAPI, ADR-0012). Breaking change → `/v2` alongside; additive changes (new optional fields, new endpoints) stay in v1. (One consumer today, so deprecation headers are optional until Phase P.) |
+| Base & versioning | `/api/v1` URL prefix (single origin for the browser via the Next.js `/api/*` rewrite; the `saveclock` CLI calls the API directly, ADR-0014). Breaking change → `/v2` alongside; additive changes (new optional fields, new endpoints) stay in v1. (One consumer today, so deprecation headers are optional until Phase P.) |
 | Naming | plural nouns, kebab-case multiword, JSON `snake_case` fields, enums lowercase snake (statuses included) except export `mode` `A`/`B`. Actions that are not CRUD are sub-resources with POST (`/renders/{id}/cancel`). |
-| Verbs/status | GET 200; POST create 201 + `Location`; async accepted 202; PATCH 200; DELETE 204 (or 202 if async); 400 malformed; 403 forbidden (not via the Tailscale proxy); 404 missing **or not owned**; 409 state conflict; 413; 415; 422 validation; 500; 503; 507 insufficient storage. (401/429 are Phase P.) |
+| Verbs/status | GET 200; POST create 201 + `Location`; async accepted 202; PATCH 200; DELETE 204 (or 202 if async); 400 malformed; 403 forbidden (foreign `Host` or cross-site `Origin`); 404 missing **or not owned**; 409 state conflict; 413; 415; 422 validation; 500; 503; 507 insufficient storage. (401/429 are Phase P.) |
 | Errors | One envelope `{error:{code,message,details,request_id}}`, `code` is a stable machine string; messages are user-safe English (UI maps `code` → localized copy). |
 | Pagination | cursor-based `?limit=&cursor=` → `{items, next_cursor}`; max limit 100. |
 | Filtering/sorting | explicit allow-listed params (`status`, `sort=-created_at`). |
@@ -164,7 +166,7 @@ Boundary rules enforced by `import-linter` (Python) and ESLint `no-restricted-im
 | Rate limits | none in this edition (one trusted user); the `RateLimit-*` headers return in Phase P. |
 | Long work | never inline; 202 + SSE / polling (`ARCHITECTURE.md` §12). Replan-local edits are the only synchronous domain work (pure, ≤ 2 s). |
 | OpenAPI | `operation_id` stable and explicit (drives TS client names); every response model and error response declared; error `code` is an OpenAPI enum (catalogue in ARCHITECTURE §7); tags per resource; CI regenerates `openapi.json` and **fails on diff** (contract drift gate). **ARCHITECTURE §7 is the one endpoint table**; other docs cite it, never redefine paths. |
-| Security | **No CORS** (same origin); **no cookies, no CSRF token**; the API accepts only requests that arrived through the Tailscale sidecar (`TRUSTED_PROXY_CIDRS`, optional `OWNER_TAILSCALE_LOGIN`), enforced in the one `current_user()` dependency; files streamed directly by the API from allowlisted, path-contained keys (no signed tokens); `X-Content-Type-Options: nosniff`, `Referrer-Policy`, CSP on web; header test in `make check`. Details: `SECURITY.md`. |
+| Security | **No CORS** (same origin); **no cookies, no CSRF token**; every published port binds `127.0.0.1`, and the API rejects a `Host` outside `ALLOWED_HOSTS` and a state-changing request whose `Origin` is not `APP_ORIGIN` (Host/Origin middleware, SEC-165 to 167); files streamed directly by the API from allowlisted, path-contained keys (no signed tokens); `X-Content-Type-Options: nosniff`, `Referrer-Policy`, CSP on web; header test in `make check`. Details: `SECURITY.md`. |
 
 ## 5. Database conventions
 
@@ -196,7 +198,7 @@ Boundary rules enforced by `import-linter` (Python) and ESLint `no-restricted-im
 | Evaluation (not CI-blocking) | Beat F1 on golden set (mir_eval, 70 ms), hard set separately | `eval/scripts` | — | per model/dependency change; thresholds in `QUALITY.md` |
 
 Coverage: Python **>= 85 % lines overall, >= 95 % on `domain/`, `services/housekeeping`, `services/files` (path containment), `adapters/blobstore`, state-transition code**; branch coverage on. TS: >= 80 % on `lib/`, critical hooks. Coverage floor is enforced (`--cov-fail-under`), never lowered to pass; new code must not reduce it.
-Mandatory tests: Tailscale-origin check (403 without the proxy; owner resolved with it), worker ownership re-check, ownership (404 for a different `user_id`) for each resource, housekeeping (intermediates removed 7 days after last use and only then; songs/renders (incl. Mode A file) untouched; delete-project removes everything; abandoned uploads reaped; disk-low 507), `BlobStore` contract tests run against the filesystem implementation (and the S3 stub when it exists), file-serving Range/path-traversal/non-allowlisted-name tests, streamed-upload size cap (413 before reading, running byte count, `.part` cleanup), rehydration of missing mezzanines, graceful shutdown (SIGTERM during render), security-header test, state-machine illegal transitions, idempotency (`job_hash`), edit-plan invariants, upload validation (size/type/corrupt), ffprobe limits, error envelope shape, every bug fix gets a regression test.
+Mandatory tests: Host/Origin checks (403 for a foreign `Host` or cross-site `Origin`; owner resolved otherwise), CLI loopback-only check, worker ownership re-check, ownership (404 for a different `user_id`) for each resource, housekeeping (intermediates removed 7 days after last use and only then; songs/renders (incl. Mode A file) untouched; delete-project removes everything; abandoned uploads reaped; disk-low 507), `BlobStore` contract tests run against the filesystem implementation (and the S3 stub when it exists), file-serving Range/path-traversal/non-allowlisted-name tests, streamed-upload size cap (413 before reading, running byte count, `.part` cleanup), rehydration of missing mezzanines, graceful shutdown (SIGTERM during render), security-header test, state-machine illegal transitions, idempotency (`job_hash`), edit-plan invariants, upload validation (size/type/corrupt), ffprobe limits, error envelope shape, every bug fix gets a regression test.
 Never: delete/skip/loosen tests to go green; `xfail` without issue link; real third-party calls in `make check` (recorded fixtures only; opt-in `live` marker run manually with test keys).
 
 ## 7. Git conventions
@@ -232,10 +234,10 @@ Never: delete/skip/loosen tests to go green; `xfail` without issue link; real th
 ## 9. Config & secrets (12-factor)
 
 - All config from environment; typed `Settings`; same image across envs. `.env.example` lists every variable with placeholder values and a comment; `.env` ignored from the first commit; CI fails if `.env.example` and `Settings` fields diverge (test).
-- The authoritative variable table (name, type, default, required, secret, service) is **ARCHITECTURE §18**. Groups: `APP_*`/`API_INTERNAL_URL` (single origin), `DATABASE_URL`/`MIGRATOR_DATABASE_URL`, `REDIS_URL` (one instance), `TAILNET_ENFORCE`/`TRUSTED_PROXY_CIDRS`/`OWNER_*`/`TS_*` (access), `BLOB_BACKEND`/`BLOB_ROOT` (storage), `INTERMEDIATE_TTL_DAYS`/`SWEEP_INTERVAL_MIN`/`DISK_LOW_WATERMARK_GB` (housekeeping), `PEXELS_*`/`PIXABAY_ENABLED`+`PIXABAY_*`/`STOCK_HOST_ALLOWLIST`, optional `ANTHROPIC_API_KEY`/`LLM_*` (kill-switch, timeout 8 s, max tokens 300, cost cap), `SENTRY_*` (optional), `MAX_UPLOAD_MB=100`/`MIN_SONG_S=15`/`MAX_SONG_S=600`, `WORKER_HEAVY_CONCURRENCY`, `FFMPEG_BIN`/`FFPROBE_BIN`, `BEAT_THIS_CHECKPOINT`, `SIGLIP_MODEL`, `TOPK_FACTOR`, `BACKUP_*` (host script only), `FAKE_*` (local/CI only, refused in prod). R2, session, email, Stripe, Turnstile, OAuth, fingerprint, proxy and quota variables are Phase P (ARCHITECTURE §18).
-- Secrets live in a `0600` `.env` on the VPS (or the Dokploy secret store) with a copy of the inventory in the password manager; never in git, images, logs, error messages, URLs, or client bundles. A committed secret = rotate immediately and tell the maintainer (never rotate live secrets autonomously). Local dev uses its own throwaway keys.
+- The authoritative variable table (name, type, default, required, secret, service) is **ARCHITECTURE §18**. Groups: `APP_*`/`API_INTERNAL_URL` (single origin), `DATABASE_URL`/`MIGRATOR_DATABASE_URL`, `REDIS_URL` (one instance), `ALLOWED_HOSTS`/`BIND_ADDR`/`OWNER_*` (access; the `TAILNET_*`, `TRUSTED_PROXY_CIDRS`, `OWNER_TAILSCALE_LOGIN`, `TS_*` variables were removed in Rev 3.5), `BLOB_BACKEND`/`BLOB_ROOT` (storage), `INTERMEDIATE_TTL_DAYS`/`SWEEP_INTERVAL_MIN`/`DISK_LOW_WATERMARK_GB` (housekeeping), `PEXELS_*`/`PIXABAY_ENABLED`+`PIXABAY_*`/`STOCK_HOST_ALLOWLIST`, optional `ANTHROPIC_API_KEY`/`LLM_*` (kill-switch, timeout 8 s, max tokens 300, cost cap), `SENTRY_*` (optional), `MAX_UPLOAD_MB=100`/`MIN_SONG_S=15`/`MAX_SONG_S=600`, `WORKER_HEAVY_CONCURRENCY`/`FFMPEG_THREADS`/`OMP_NUM_THREADS`/`FETCH_CONCURRENCY`/`DEVICE` (auto-detected, overridable, DECISIONS §8g), `FFMPEG_BIN`/`FFPROBE_BIN`, `BEAT_THIS_CHECKPOINT`, `SIGLIP_MODEL`, `TOPK_FACTOR`, `BACKUP_*` (host script only), `FAKE_*` (local/CI only, refused in prod). R2, session, email, Stripe, Turnstile, OAuth, fingerprint, proxy and quota variables are Phase P (ARCHITECTURE §18).
+- Secrets live in a `0600` `.env` / `secrets/env` on the owner's machine (git-ignored) with a copy of the inventory in the password manager; never in git, images, logs, error messages, URLs, or client bundles. A committed secret = rotate immediately and tell the maintainer (never rotate live secrets autonomously). Local dev uses its own throwaway keys.
 - Feature flags: simple env flags (`PIXABAY_ENABLED`, `LLM_ENABLED`), no flag service. Features that are Phase P do not get a dormant flag — they are simply not built (ARCHITECTURE §24).
-- Retention is owner-controlled (DECISIONS §2): `INTERMEDIATE_TTL_DAYS` (default 7) applies only to intermediates under `work/`; `TAILNET_ENFORCE=false` is refused unless `APP_ENV` is `local`/`ci`; `FAKE_*` refused in prod.
+- Retention is owner-controlled (DECISIONS §2): `INTERMEDIATE_TTL_DAYS` (default 7) applies only to intermediates under `work/`; `FAKE_*` refused in prod.
 - The `worker` container receives only the keys it uses (Pexels, optional Pixabay/Anthropic, `DATABASE_URL`, `REDIS_URL`); `worker` never gets `api`-only values; there is no file-signing key (Rev 3.3).
 
 ## 10. Logging conventions
@@ -261,7 +263,7 @@ Reviewer ticks all that apply; blocking items marked (B).
 1. (B) Scope matches the plan/PR description; no drive-by rewrites.
 2. (B) Layering respected: no business logic in routers/actors; no SQL outside repositories; no third-party call outside adapters.
 3. (B) Inputs validated by typed schema at the boundary; unknown fields rejected.
-4. (B) Access: endpoint goes through `current_user()` (never reads Tailscale headers itself); **user-scoped repository call with `user_id` and a test (404 for a different `user_id`)**; **worker actors re-check ownership against the message's `user_id` (SEC-020)**; no ids in bodies that bypass the scoped lookup.
+4. (B) Access: endpoint goes through `current_user()` (never reads headers itself; Host/Origin are checked in middleware); **user-scoped repository call with `user_id` and a test (404 for a different `user_id`)**; **worker actors re-check ownership against the message's `user_id` (SEC-020)**; no ids in bodies that bypass the scoped lookup.
 5. (B) No secrets/keys/URLs with tokens in code, logs, errors, fixtures; `.env.example` updated.
 6. (B) SQL parameterised; queries use indexes (checked `EXPLAIN` for new hot paths); N+1 avoided.
 7. (B) DB changes via Alembic; "DB CHANGE" notice present; migration is backward compatible and reversible or flagged.
@@ -278,7 +280,7 @@ Reviewer ticks all that apply; blocking items marked (B).
 18. Dependencies: license allowed, pinned, lockfile updated, justified (ponytail check: stdlib/native first).
 19. Docs: README/ADR/CHECKLIST updated when behaviour or ops changes.
 20. Scope: nothing from ARCHITECTURE §24 (Phase P) sneaks in; no new third-party data sharing without a `SECURITY.md` update; no public sharing features (DECISIONS non-goal). The §15 seams are intact.
-21. Network: a new outbound host is added to `STOCK_HOST_ALLOWLIST`/the adapter's host check (and SECURITY) in the same PR; no service publishes a host port; Tailscale Funnel stays off.
+21. Network: a new outbound host is added to `STOCK_HOST_ALLOWLIST`/the adapter's host check (and SECURITY) in the same PR; no service publishes a host port except `web`/`api` on `127.0.0.1`.
 
 ## 13. Quality gates per language (what "green" means)
 
@@ -321,5 +323,5 @@ The personal edition is deliberately thin, but these structures are cheap now an
 5. Worker ownership re-check on every message.
 6. Two Docker build targets; `Settings` as the only env reader; `.env.example` parity.
 7. Error envelope with stable codes, cursor pagination, `/api/v1` versioning (Idempotency-Key returns in Phase P), additive-only edit-plan changes.
-8. Single-origin `/api/*` routing (the router in front may change from `tailscale serve` to Traefik; the app does not).
+8. Single-origin `/api/*` routing (the router in front may change from the Next.js rewrite to Traefik; the app does not).
 9. Alembic expand/contract discipline and DB CHANGE notices.

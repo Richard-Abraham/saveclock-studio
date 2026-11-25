@@ -10,7 +10,7 @@
 The owner will run SaveClock Studio on their own capable machine and use it only there. A VPS and a private network were planned to give always-on rendering and phone access, which the owner no longer needs. Removing them cuts moving parts, accounts and cost.
 
 ## Decision
-Run the Compose stack locally. Bind every port to `127.0.0.1`. Because a login-free local app can still be reached from other sites open in the same browser, the API rejects any `Host` other than `localhost`/`127.0.0.1` and any state-changing request whose `Origin` is not the app's own. Keywords are keyless by default (offline table plus owner editing); the Claude Haiku adapter turns on only when an API key is set.
+Run the Compose stack locally. Bind every port to `127.0.0.1`. Because a login-free local app can still be reached from other sites open in the same browser, the API rejects any `Host` other than `localhost`/`127.0.0.1` and any state-changing request whose `Origin` is not the app's own. The owner uses the app through Claude Code: a thin `saveclock` CLI over the same local API sits alongside the web editor. Claude Code supplies the clip keywords through the CLI, so no API key is needed. Haiku is used only if a key is set; otherwise the offline table is the fallback.
 
 ## Consequences
 - Good: no server, no tailnet, no keys required, nothing reachable from the network.

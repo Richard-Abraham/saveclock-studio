@@ -1,6 +1,6 @@
 # SaveClock Studio — UX-SPEC.md
 
-Status: DRAFT for design approval (**Rev 3, personal edition**) · Date: 2026-11-08 · Consistent with `DECISIONS.md` Rev 3 (canonical). Visual language, tokens and components: `DESIGN.md`. Siblings: `PRD.md`, `ROADMAP.md`, `CHECKLIST.md`, `ARCHITECTURE.md`, `STANDARDS.md`, `SECURITY.md`, `QUALITY.md`. Static mockup: `mockups/index.html`.
+Status: DRAFT for design approval (**Rev 3.6, personal edition, local-only**) · Date: 2026-11-26 · Consistent with `DECISIONS.md` Rev 3.6 (canonical). Visual language, tokens and components: `DESIGN.md`. Siblings: `PRD.md`, `ROADMAP.md`, `CHECKLIST.md`, `ARCHITECTURE.md`, `STANDARDS.md`, `SECURITY.md`, `QUALITY.md`. Static mockup: `mockups/index.html`.
 
 No application code is written in this phase. Per the repo process (DECISIONS §8) no UI plan executes until the owner approves this design. The public-edition spec (Rev 2.2) is archived unchanged in `archive/public-edition-rev2.2/UX-SPEC.md`.
 
@@ -10,11 +10,12 @@ Acceptance criteria use the form **AC-<screen>-<n>**. Every criterion carries th
 
 ## Rev 3 changelog (2026-11-08) — personal edition
 
+- **Rev 3.6 (2026-11-26, DECISIONS §8f/§8g):** local-only: the app opens at `http://localhost` on the owner's machine; no Tailscale, no phone-over-tailnet. Offline/"tailnet down" copy becomes "can't reach the server". The 540×960 preview stays; its stutter fallback now reads "if playback stutters". **S11 Settings** gains a read-only list of the auto-detected values (CPU, RAM, heavy concurrency, threads, device; AC-S11-5). **S6 keywords:** the owner can type or edit the keywords in the editor (chips as before), and a hint says Claude Code can also set them. No screen added or removed.
 - **Rev 3.3 (2026-11-08, DECISIONS §8d):** upload is one streamed request (progress bar, Cancel, and on failure "choose the song again"; no resume copy, AC-S3-2 reworded); downloads are direct file streams (no signed links, so no "link expired" state); Settings maps to `GET/PUT /settings` + `POST /housekeeping/run`; endpoint numbers follow the renumbered ARCHITECTURE §7 table (27 endpoints).
 - **Rev 3.2 (2026-11-08):** every acceptance criterion maps to an active PRD story (no `[no story]`); "Report an issue" dropped (US-031 deferred); Settings used endpoints #32/#33/#28/#29 in Rev 3.2; since Rev 3.3 see the Rev 3.3 line above (ARCHITECTURE §7).
 
-- **One user, no accounts.** The app opens straight to **Projects** (S9, the owner's home) over Tailscale. No sign-up, sign-in, verification, session expiry, landing page, legal pages or analytics banner.
-- **Screens now:** S3 Upload · S5 Analysis/draft progress · S6 Editor · S7 Render progress · S8 Export · S9 Projects (home, with disk usage) · S11 Settings (API-key status, Pexels/Pixabay toggle, housekeeping, delete project, appearance) · S12 Error/empty states. **Deferred to Phase P:** S1 Landing, S2 Sign up/in, S4 Rights & fingerprint notice, S10 Pricing, account/privacy/delete-account parts of S11 (table in §7). Screen numbers are kept stable.
+- **One user, no accounts.** The app opens straight to **Projects** (S9, the owner's home) on the owner's own machine at `localhost`. No sign-up, sign-in, verification, session expiry, landing page, legal pages or analytics banner.
+- **Screens now:** S3 Upload · S5 Analysis/draft progress · S6 Editor · S7 Render progress · S8 Export · S9 Projects (home, with disk usage) · S11 Settings (API-key status, auto-detected performance values read-only, Pexels/Pixabay toggle, housekeeping, delete project, appearance) · S12 Error/empty states. **Deferred to Phase P:** S1 Landing, S2 Sign up/in, S4 Rights & fingerprint notice, S10 Pricing, account/privacy/delete-account parts of S11 (table in §7). Screen numbers are kept stable.
 - **Removed elements:** rights warranty, fingerprint notice, age gate, 72 h countdown and "Files expired / Re-attach", watermark, quotas, free-tier queue copy, plan/usage chips, limit dialog.
 - **Retention:** files stay until the owner deletes the project; intermediates are cleaned 7 days after last use; disk usage is shown on Projects and in Settings (DECISIONS §2).
 - **Kept:** editor (preview, beat timeline, clip strip, segment, vibe chips, tempo ½×/2×, 4-stop cut density, swap/lock/move clip, nudge cut), render, export Mode A / Mode B with separate downloads and copy credits, all accessibility rules.
@@ -35,7 +36,7 @@ Evidence quality: most results were secondary blogs and vendor comparisons, not 
 | Response-time UX | 0.1 s feels instant; 1 s keeps flow; above ~10 s show a progress indicator, preferably percent-done; for multi-step show overall progress; variable waits need feedback most. | [Nielsen: response-time limits](https://www.nngroup.com/articles/response-times-3-important-limits/) | Analysis (~20 s target) and render (~60 s target) get determinate overall progress + step names + honest ETA. |
 | WCAG 2.2 | New AA: 2.4.11 Focus Not Obscured (Minimum), 2.5.7 Dragging Movements, 2.5.8 Target Size (Minimum 24×24), 3.3.7 Redundant Entry, 3.3.8 Accessible Authentication (Minimum). | [W3C What's new in WCAG 2.2](https://www.w3.org/WAI/standards-guidelines/wcag/new-in-22/), [WCAG 2.2](https://www.w3.org/TR/WCAG22/) | Rules in `DESIGN.md` §6. Exact exceptions to be checked against W3C Understanding pages in QA. |
 | Mobile editor patterns (inf) | Phone editors (CapCut, VN, InShot) keep the preview on top and the timeline/tools in the lower half with a bottom tool tray. Not independently re-verified in this session. | general product knowledge | Editor = preview top, bottom sheet for tools, timeline between. |
-| Long upload UX (inf) | Percent + bytes and a cancel are the baseline for a 5–100 MB upload. Rev 3.3: no chunking or resume (a failed upload is re-sent over the private tailnet). | tus.io / S3 multipart conventions (not adopted) | One streamed upload; screen shows percent, Cancel and, on failure, a retry that re-sends. |
+| Long upload UX (inf) | Percent + bytes and a cancel are the baseline for a 5–100 MB upload. Rev 3.3: no chunking or resume (a failed upload is re-sent). | tus.io / S3 multipart conventions (not adopted) | One streamed upload; screen shows percent, Cancel and, on failure, a retry that re-sends. |
 
 Not verified: VN's current auto-beat feature set; InVideo's current beat features; CapCut Web limits; exact Canva plan tiers. Do not quote competitors' features in marketing from this table.
 
@@ -58,7 +59,7 @@ Navigation:
 - **Mobile (base–md):** bottom nav with 3 items: **Projects**, **New** (primary, centre), **Settings**. Hidden on the editor screen (the editor has its own action bar). Top bar shows page title + back.
 - **Desktop (lg+):** top bar: logo, Projects, Settings, "New" button. Editor uses the full-bleed 3-region layout with a slim top bar.
 - State in the URL: editor timeline zoom/position (`?t=`), tab (`?tab=`), selected segment (`?seg=`) so refresh and back-button work.
-- There is **no sign-in**: Tailscale is the access boundary (DECISIONS §1, §3). Every row is still owned by the seeded owner `user_id` (seam for Phase P); nothing in the UI mentions users or accounts.
+- There is **no sign-in**: the loopback bind plus the API's Host/Origin checks are the access boundary (DECISIONS §1, §8f). Every row is still owned by the seeded owner `user_id` (seam for Phase P); nothing in the UI mentions users or accounts.
 
 ## 2. Primary journeys
 
@@ -142,13 +143,13 @@ Shortcuts do not fire inside inputs. Setting "Single-key shortcuts" can be turne
 | Fonts | ≤ 70 KB | | |
 | Images | hero is SVG/CSS; thumbnails ≤ 20 KB WebP; explicit width/height | | |
 - Waveform peaks sent as ≤ 2000 samples (≈ 4 KB); beat times as JSON array; no raw audio decode in the main thread (Web Worker if decoding is needed for preview).
-- Preview uses a proxy, not the 1080×1920 render: **540×960** (DECISIONS §8e); 360×640 only if the T-3.4b tailnet test stutters on the owner's phone.
+- Preview uses a proxy, not the 1080×1920 render: **540×960** (DECISIONS §8e); 360×640 only if playback stutters (T-3.4b).
 - Long lists (Projects > 50) virtualised / `content-visibility: auto`.
 - Preconnect to the media origin if it differs; `fetchpriority="high"` only on the LCP element.
 
 ### 3.6 Global states and patterns
 - **Sticky bars:** the bottom sheet, action bar and nav set `scroll-padding-bottom` to their height so a focused control is never hidden (WCAG 2.4.11).
-- **Offline / tailnet disconnected:** banner "You're offline. Check that Tailscale is connected." An upload in progress fails and must be re-sent. Render cannot start offline.
+- **Server unreachable / offline:** banner "Can't reach SaveClock. Check that it's running on this computer." An upload in progress fails and must be re-sent. Render cannot start while the server is unreachable.
 - **Reduced motion:** see `DESIGN.md` §3.4.
 - **Toast live region:** `aria-live="polite"`; errors stay until dismissed.
 - **Unsaved changes:** editor autosaves settings every change (debounced 800 ms); `beforeunload` warns only while a save is in flight.
@@ -297,7 +298,7 @@ Bottom sheet has 3 snap heights (peek 96 px, half, full), handle also a button (
 
 **Sub-spec: Segment picker.** Range `Slider` over the song, with numeric fields for start and end (mm:ss.s), "Auto-pick best section" button (energy-based choice, DECISIONS §3), length toggle **15 / 30 / 60 s / Custom**, ±1 beat / ±1 bar nudge for each end. Preview of the segment loops when "Loop" is on. Segment always starts on a beat; downbeat preferred.
 
-**Sub-spec: Vibe/keyword chips.** Suggested chips from the LLM ("night drive", "neon", "city rain", "dance floor"), user can toggle, remove, add a custom keyword (max 8 chips, each ≤ 30 chars). Changing chips shows "Update clips" (not live) to avoid re-fetch storms; applying re-ranks clips and keeps **locked** clips.
+**Sub-spec: Vibe/keyword chips.** Suggested chips (from Haiku when a key is set, else from the offline table; "night drive", "neon", "city rain", "dance floor"), user can toggle, remove, **type or edit** a keyword (max 8 chips, each ≤ 30 chars). Keywords the owner types or Claude Code sets through the `saveclock` CLI take precedence over suggestions (explicit, then Haiku if a key is set, then the offline table). Helper text under the field: "Claude Code can also set these." Changing chips shows "Update clips" (not live) to avoid re-fetch storms; applying re-ranks clips and keeps **locked** clips.
 
 **Sub-spec: Tempo control.** `ToggleGroup`: **½×**, **1×**, **2×** with the resulting BPM shown ("128 → 64 BPM"). The UI explains: "Half time cuts every other beat; double time cuts twice per beat." Octave clamp ~70–180 BPM (DECISIONS §3); options outside the clamp are disabled with reason.
 
@@ -344,7 +345,7 @@ Bottom sheet has 3 snap heights (peek 96 px, half, full), handle also a button (
 - AC-S6-7 [US-009]: Toggling a cut or chip responds in ≤ 200 ms (INP), scrubbing stays at ≥ 30 fps on a mid-tier Android phone; first preview frame ≤ 3 s on 4G.
 - AC-S6-8 [US-005]: With confidence below 0.5 the banner and "Use detected beats" toggle are present and operable; low-confidence ranges are visually marked and listed in text.
 - AC-S6-9 [US-009]: The Render button is a single labelled action with no quota, tier or watermark text; output is 1080×1920 (DECISIONS §1).
-- AC-S6-10 [US-007]: The keywords used (≤ 8) are visible as chips and editable.
+- AC-S6-10 [US-007]: The keywords used (≤ 8) are visible as chips and editable (typed or edited by the owner); keywords set from Claude Code through the CLI appear as chips after refresh or the next event.
 - AC-S6-11 [US-024]: Tabs expose `tablist/tab/tabpanel` with `aria-controls`, roving tabindex and arrow-key navigation; the mute toggle keeps a fixed label.
 - AC-S6-12 [US-017]: The editor shows no deletion countdown; the Credits item and Beat list are reachable from the overflow menu.
 
@@ -464,6 +465,7 @@ Not in the personal edition (no tiers, billing or "Coming soon" page). See §7 a
 - **API keys** — status only: Pexels (Set / Not set), Pixabay, Claude (vibe keywords; "Not set, using the fallback keyword table"). Keys live in the server environment (ARCHITECTURE env vars); the page never displays or accepts a key value.
 - **Stock sources** — Pexels (primary, always on); `Switch` "Also use Pixabay" (DECISIONS §3: Pixabay optional).
 - **Storage** — `DiskMeter` ("3.2 GB of 40 GB used"), note on the 7-day intermediates housekeeping, button **Clean up now** (removes intermediates older than 7 days).
+- **Performance (read-only)** — the values the app detected and uses (Rev 3.6, DECISIONS §8g): CPU cores, RAM, heavy-job concurrency, FFmpeg threads, torch threads, fetch concurrency, device. Values come from `GET /settings` (`tuning`); overrides are made in `.env`, not on this page. Plain `Card` list; no new component.
 - **Appearance** — theme (Light / Dark / System), "Pulse on beat", "Single-key shortcuts".
 - **Delete project** — pick a project, confirm. Dialog states exactly what is removed; the "Delete project" button is danger style, initial focus on Cancel.
 
@@ -480,6 +482,7 @@ Not in the personal edition (no tiers, billing or "Coming soon" page). See §7 a
 - AC-S11-2 [US-036]: Disk usage and housekeeping window (7 days) are read from server config, not hardcoded.
 - AC-S11-3 [US-038]: API-key rows show status only (from `GET /settings`); no key value is ever sent to the browser.
 - AC-S11-4 [US-024]: Appearance settings (theme, pulse, single-key shortcuts) persist and take effect immediately.
+- AC-S11-5 [US-036]: The Performance section shows the auto-detected values read-only, exactly as returned by `GET /settings` (no hardcoded numbers, no editable control).
 
 ### S12 Error and empty states (catalogue)
 Each is built from `EmptyState`/`Callout`/`Dialog`. Rules: say what happened, say what to do, offer one primary action, keep user work intact, no apologies or jokes.
@@ -494,7 +497,7 @@ Each is built from `EmptyState`/`Callout`/`Dialog`. Rules: say what happened, sa
 | Download failed | S8 | "The download didn't finish. Try again." | Try again |
 | Disk nearly full | S9, S11 | "Disk is 93% full. Clean up intermediates or delete old projects." | Open Settings |
 | Missing API key | S11, S6 | "Pexels isn’t set up, so no clips can be fetched. Set PEXELS_API_KEY in the server environment." | Open Settings |
-| Offline / tailnet down | global | see §3.6 | Retry |
+| Server unreachable / offline | global | see §3.6 | Retry |
 | 404 | any | "We can't find that page." | Go to Projects |
 | 500 / API down | any | "SaveClock Studio can't reach the server. Your work is saved. Retry" | Retry |
 | Empty projects | S9 | see DESIGN §7 | Choose a song |
@@ -526,7 +529,7 @@ Each is built from `EmptyState`/`Callout`/`Dialog`. Rules: say what happened, sa
 
 1. **Beat pulse default — resolved (Rev 3.4): on.** Capped at 2 Hz, removed under reduced motion, off switch in Settings.
 2. **Button case — resolved (Rev 3.4): sentence case** (recorded deviation in DESIGN §12).
-3. **Preview proxy resolution — resolved (Rev 3.4): 540×960** (360×640 fallback only if the T-3.4b tailnet test stutters).
+3. **Preview proxy resolution — resolved (Rev 3.4): 540×960** (360×640 fallback only if playback stutters in T-3.4b).
 4. **Single-key shortcuts default on desktop.** Default on with an off switch (WCAG 2.1.4). Confirm.
 5. **"Report an issue" entry point — resolved (Rev 3.2): dropped.** PRD US-031 / FR-045 are deferred to Phase P; Settings has no such link.
 6. **Editor on phones: landscape.** Not designed. Confirm acceptable.

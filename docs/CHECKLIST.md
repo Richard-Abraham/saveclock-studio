@@ -1,6 +1,7 @@
 # SaveClock Studio — Reusable Checklists
 
-Status: DRAFT · **Rev 3.3 — Personal edition** · Date: 2026-11-08 · Owner: project owner
+Status: DRAFT · **Rev 3.6 — Personal edition, local-only** · Date: 2026-11-26 · Owner: project owner
+**Rev 3.6 (2026-11-26):** DECISIONS §8f/§8g: local-only. Tailscale, VPS and phone/tailnet items replaced by loopback-bind and Host/Origin checks; G0 is judged on the measured rows only; benchmark-box item dropped; backups go to a local or external folder.
 **Rev 3.3 (2026-11-08):** DECISIONS §8d: upload item says single streamed 100 MB upload; Settings checks use `GET /settings`; no signed-link checks.
 **Rev 3.2 (2026-11-08):** aligned to DECISIONS Rev 3.2: serve-verification and Caddy fallback items, key-status check, quota wording removed.
 **Rev 3 changelog:** public-launch legal/compliance sections (old D) removed and replaced by a pointer to the archive (section D); pre-implementation, per-PR DoD, pre-deploy (malware guard + pre-push scan) and per-render checks kept; new personal deploy checklist (Tailscale ACL, no public ports, backups, restore test). Rev 2.2 checklists are archived unchanged in `archive/public-edition-rev2.2/CHECKLIST.md`.
@@ -17,14 +18,14 @@ Copy a section into a PR/issue and tick it. Every box needs evidence (link, comm
 - [ ] ARCHITECTURE.md, STANDARDS.md, SECURITY.md, QUALITY.md, DESIGN.md, UX-SPEC.md and `adr/` exist and do not contradict DECISIONS.md
 - [ ] Licence register (ROADMAP T-0.6) complete: every MVP dependency/model is commercially usable or marked for Phase P
 - [ ] ROADMAP Appendix A shows 0 orphans for every active US/FR/NFR, SEC and QM ID
-- [ ] Phase 0 spike report written and **G0 passed with the user's explicit "go"** (ROADMAP T-0.10; numeric G0 criteria in QUALITY §12, G0-x IDs); browser-feasibility go/no-go recorded (T-0.16)
+- [ ] Phase 0 spike report written and **G0 passed with the user's explicit "go"** (ROADMAP T-0.10; numeric G0 criteria in QUALITY §12, G0-x IDs; rows marked "not measured in Phase 0" are neither passed nor failed, DECISIONS §8g); browser-feasibility go/no-go recorded (T-0.16)
 
 ### A2. Access and environment
 - [ ] API keys obtained and smoke-tested: Pexels (free), Anthropic (optional; offline fallback otherwise) (T-0.7)
-- [ ] Tailscale account (free Personal plan) with the VPS, phone and laptop joined; `tailscale serve` hello page reachable from phone and laptop, and path routing, SSE streaming, 100 MB streamed upload and identity headers verified (Caddy-on-tailnet-IP fallback if not) (T-0.15)
-- [ ] 4-vCPU x86 box chosen for benchmarks (the VPS if it qualifies, OQ-16)
+- ~~Tailscale account, `tailscale serve` verification~~ dropped (T-0.15; local-only, DECISIONS §8f)
+- ~~4-vCPU x86 benchmark box~~ dropped: speed targets are read from per-stage timings on the owner's machine (DECISIONS §8g)
 - [ ] Secrets live in `.env`/a secret store; `.env.example` has names only; env-var inventory `infra/ENV.md` complete (T-1.12); secret scan configured
-- [ ] Toolchains pinned: Python 3.12, Node (current LTS, exact version pinned), FFmpeg >= 8.1 with the exact build chosen in the spike (T-0.13), PostgreSQL 16, Redis 7 (single instance, `noeviction`)
+- [ ] Toolchains pinned: Python 3.12, Node (current LTS, exact version pinned), FFmpeg 9.0.x BtbN GPL static build pinned by sha256 (T-0.13, SEC-170), PostgreSQL 16, Redis 7 (single instance, `noeviction`)
 - [ ] Config-malware guard command available in the shell history/alias and run before first npm/next/vite command
 
 ### A3. Process
@@ -42,7 +43,7 @@ Copy a section into a PR/issue and tick it. Every box needs evidence (link, comm
 - [ ] Config-malware grep run before any npm/pnpm/yarn/next/vite/jest/eslint/build command, and after pull/checkout/rebase: `grep -lE "global\.[a-z]='[0-9]-|_\$_[0-9a-f]{4}=\(function" *.config.* 2>/dev/null` printed nothing
 - [ ] Scope matches a plan item (T-id referenced in the PR body)
 - [ ] Format, lint, type-check (TS strict / Python types), build all green
-- [ ] Targeted tests pass 100%; **full suite** run and counts reported if the change touches shared code, schema, auth/tailnet guard, build config, or before push
+- [ ] Targeted tests pass 100%; **full suite** run and counts reported if the change touches shared code, schema, auth/Host-Origin guard, build config, or before push
 - [ ] New behaviour has tests (acceptance criteria from the US-id in PRD); bug fixes have a regression test; no skipped/deleted/loosened tests, no `any`/`@ts-ignore` to dodge types
 - [ ] No hardcoded secrets; no string-built SQL; inputs validated (Pydantic); every query scoped by `user_id`
 - [ ] FFmpeg/ffprobe calls go through the single audited runner: argument lists, `-protocol_whitelist file`, forced `-f` demuxer, probe limits; no user-controlled filter strings
@@ -59,7 +60,7 @@ Copy a section into a PR/issue and tick it. Every box needs evidence (link, comm
 - [ ] Keyboard-only walkthrough done; visible focus not obscured; targets >= 24x24 CSS px; no horizontal scroll at 320 px
 - [ ] axe-core: 0 serious/critical
 - [ ] `web-interface-guidelines` run on changed UI files; accepted findings applied
-- [ ] States covered: empty, loading, error, offline/retry, tailnet-disconnected
+- [ ] States covered: empty, loading, error, offline/retry, backend-unreachable
 
 ### B4. Review and close
 - [ ] `ponytail-review` run on the diff; findings triaged with the user; accepted ones applied
@@ -87,7 +88,7 @@ Run on every `git push`, deploy or publish. Read-only; report FOUND / NOT FOUND 
 - [ ] Full suite green with counts recorded; type-check, lint, build green (`make check`, or CI if enabled)
 - [ ] Per-render quality suite (section E) green; images built from the `api` (no torch/ffmpeg) and `worker` targets
 - [ ] Containers built from the exact commit; run as non-root with CPU/memory/time limits
-- [ ] Smoke: open over Tailscale -> upload -> automatic draft -> preview -> render -> export Mode A and Mode B (switching does not re-render)
+- [ ] Smoke: open at localhost (and run the same flow once through the `saveclock` CLI) -> upload -> automatic draft -> preview -> render -> export Mode A and Mode B (switching does not re-render)
 
 ### C3. Data and rollout
 - [ ] Migrations announced via DB CHANGE and run on a copy; down-migration tested
@@ -113,14 +114,14 @@ The public-launch legal/compliance checklist (ToS, Privacy, DMCA agent, rights w
 ## D2. Personal deploy checklist (every deploy of the live stack)
 
 ### Network exposure
-- [ ] Tailscale ACL reviewed: only the owner's devices can reach the node; node key expiry understood
-- [ ] No public ports: external scan of the VPS public IP shows no app/Postgres/Redis port open (NFR-029); no Traefik/public route; compose publishes no host ports for app services
-- [ ] App reachable only at the `*.ts.net` HTTPS URL; checked from phone and laptop; unreachable from a device off the tailnet
-- [ ] Tailnet guard test green: requests without the Tailscale proxy identity are rejected (FR-047)
-- [ ] SSH key-only, auto-updates on, Docker socket not mounted into any container
+- [ ] Every published port in the compose file is bound to `127.0.0.1` (`BIND_ADDR`); no `0.0.0.0` mapping (SEC-165)
+- [ ] Port-binding check: only `web` and `api` publish ports, on 127.0.0.1; Postgres/Redis/worker publish none; a connection from another machine on the LAN is refused (NFR-029); no Traefik/public route
+- [ ] App reachable at `http://localhost:<port>` on this machine; unreachable from another machine
+- [ ] Host/Origin guard tests green: foreign `Host` (rebinding) and cross-site `Origin` on state-changing requests are rejected with 403 (FR-047, SEC-166, SEC-167); the `saveclock` CLI refuses a non-loopback `SAVECLOCK_API_URL` (SEC-168)
+- [ ] OS auto-updates on, Docker socket not mounted into any container
 
 ### Backups and recovery
-- [ ] Last nightly backup succeeded (DB dump + project files, off-box, encrypted) and is no older than 24 h
+- [ ] Last nightly backup succeeded (DB dump + project files, to the local or external backup folder, encrypted) and is no older than 24 h
 - [ ] **Restore test** into scratch done after any backup-config change and at least quarterly; app lists projects and file checksums match (NFR-030); elapsed time recorded
 - [ ] Disk: free space above the warning threshold; housekeeping ran; Settings disk usage matches `du` (FR-048)
 

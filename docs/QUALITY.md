@@ -1,9 +1,10 @@
 # SaveClock Studio — Accuracy & Output Quality Plan
 
-Status: **Rev 3 — Personal edition, reconciled with `DECISIONS.md` Rev 3 (§6 targets unchanged from Rev 2.2)** · Date: 2026-11-08 · Owner: project owner
+Status: **Rev 3.6 — Personal edition, reconciled with `DECISIONS.md` Rev 3.6 (§6 targets unchanged from Rev 2.2; §12 G0 rows trimmed by DECISIONS §8g)** · Date: 2026-11-26 · Owner: project owner
 Scope: documentation only. No code scaffolding. Short pseudo-code is illustrative.
 
 ### Rev 3 changelog
+- **Rev 3.6 (2026-11-26, DECISIONS §8g, with §8f):** G0 trimmed for the local-only edition. **G0-1..9, G0-11, G0-13..16, G0-18 and G0-27 are "not measured in Phase 0"** (no golden set, no clip-rating session, no phone sync canary, no separate speed run); the rows and metrics stay for later use. Passed rows are recorded in section 12 (G0-10, G0-12: 20/20 with 0 frame errors; G0-20, G0-21, G0-24, G0-25: pass; G0-23: same-encoder ratio 0.736); G0-17 is pending the Pexels key. Speed targets are measured on the owner's machine, not a 4-vCPU VPS, and the app records per-stage timings on every job. FFmpeg is pinned to the BtbN 9.0.x GPL static build.
 - **Rev 3.3 (2026-11-08, DECISIONS §8d):** one simple eval script (`make eval`: beat metrics, render fidelity, timing); the `ci-lite`/`nightly`/`release` modes, paired-bootstrap regression gates, rater tooling and VMAF parity move to Phase 5 (ROADMAP T-5.7) / Phase P (T-P.12). **Deferred (IDs stay reserved): QM-072 (VMAF), QM-093 (paired preference sign test), G0-22 (VMAF parity).** Active QM catalog 77 -> 75. Delivery check says "direct download" (no signed tokens). Review sheet stays a CSV (QM-031, QM-090…092 read from it).
 - **Rev 3.2 (2026-11-08):** G0-1 gates on the mean over the golden core set (95% CIs reported, not gated; Q12 resolved); traceability and consistency sweep (see `review/rev3-fixes-log.md`).
 - **Rev 3 (2026-11-08, personal edition, DECISIONS Rev 3):** the product is single-user (the owner, over Tailscale), so this doc is rescoped; the Rev 2.2 public-edition version is archived unchanged in `archive/public-edition-rev2.2/QUALITY.md` and returns as Phase P.
@@ -247,7 +248,7 @@ Targets marked (H) are hypotheses to validate in the Phase 0 spike (section 14).
 | QM-086 | Perf | Mode A remux p95 | Song trim + mux onto silent master (no video re-encode) + QM-067/068/087 | benchmark harness | ≤5 s target, ≤10 s hard, on 4 vCPU (D6) [spike] | CI nightly / Release | Ph0, Ph2, CI |
 | QM-082 | Perf | Verification overhead | Time of section 7 checks | harness | ≤10% of render time (H) | Release | Ph2 |
 | QM-083 | Perf | Peak RSS, CPU-seconds | per stage | harness | Report; budget set after Phase 0 | Release | Ph2 |
-| QM-084 | Perf | Cost per video | CPU-seconds on the owner's VPS (informational) + LLM API calls (Haiku; per-video cost cap, DECISIONS §3) | harness | LLM spend within the per-video cap; total within $0.02–0.06 for reference (feasibility, inference) | Release | Ph2, Rpt |
+| QM-084 | Perf | Cost per video | CPU-seconds on the owner's machine (informational) + LLM API calls (Haiku; per-video cost cap, DECISIONS §3) | harness | LLM spend within the per-video cap; total within $0.02–0.06 for reference (feasibility, inference) | Release | Ph2, Rpt |
 
 ### 3.5 Owner review and owner-facing metrics
 
@@ -294,9 +295,11 @@ Allowed audio:
 2. Programmatically generated (G-synth): no rights issue.
 3. Optional: CC0/CC-BY tracks (no NC, no ND) or public research sets (G-pub), local only, if the owner wants to compare with published numbers. Keep URL, licence and retrieval date in the manifest. Avoid the MTG-Jamendo dataset (see 2.4).
 
-Rules: audio never in git. `eval/` holds manifests only: track ID, subset, source type (`owner-library` / `synth` / `cc` / `public`), SHA-256, split, annotation file hash. Audio and annotation files live in private storage on the owner's machine or VPS volume (outside the repo and outside the app's blob store, no public access, backed up with the other project files). Never train on this set (training is out of scope). **Public or commercial use of eval data (publishing the set, its annotations or quality numbers as a product claim) needs licence review in Phase P.** The owner's uploaded songs for projects and the golden set are the same library, but evaluation copies are kept separate from project data.
+Rules: audio never in git. `eval/` holds manifests only: track ID, subset, source type (`owner-library` / `synth` / `cc` / `public`), SHA-256, split, annotation file hash. Audio and annotation files live in private storage on the owner's machine (outside the repo and outside the app's blob store, no public access, backed up with the other project files). Never train on this set (training is out of scope). **Public or commercial use of eval data (publishing the set, its annotations or quality numbers as a product claim) needs licence review in Phase P.** The owner's uploaded songs for projects and the golden set are the same library, but evaluation copies are kept separate from project data.
 
 ### 4.3 Annotation process (one person, practical)
+
+> **Rev 3.6 status (DECISIONS §8g):** there is no golden set, so this annotation workflow is not run in Phase 0. Sonic Visualiser is installed on the owner's machine (Fedora flatpak `org.sonicvisualiser.SonicVisualiser`, 2026-11-26) as an **optional diagnostic tool**. When a cut on a real song feels off, open the song together with the app's exported `.beats`/cut-list CSV to see whether the beat detector or the planner is at fault. The same workflow below can build a golden set later if one is ever wanted.
 
 Tooling: Sonic Visualiser (open source) with a tap-along layer, spectrogram and click-track playback; output text/CSV time stamps (`time, beat_position`) where beat_position 1 = downbeat, seconds with ms resolution. A small converter validates files (monotone times, bar lengths consistent).
 
@@ -475,7 +478,7 @@ Design: same song and same clip pool, two configs (e.g. early-cut bias 0 vs 1 fr
 ## 9. Performance benchmark protocol
 
 Hardware & environment (pin and record in every result):
-- Benchmark host: the owner's VPS if it is 4 vCPU x86-64 (check `lscpu`); otherwise a rented 4 vCPU x86-64 box for the speed measurements. State the exact CPU model, 8 GB RAM, NVMe disk, no GPU; same container image as the deployed worker; cgroup limits (CPU 4, memory 8 GB) as deployed; torch intra-op threads = 4 (the contractual setting, DECISIONS §8a; an additional informational run with 2 shows headroom for concurrency).
+- Benchmark host (Rev 3.5/3.6): the owner's own machine (no VPS, no rented box); record its CPU model, RAM and disk with `lscpu`. Original text for reference: a 4 vCPU x86-64 box. State the exact CPU model, 8 GB RAM, NVMe disk, no GPU; same container image as the deployed worker; cgroup limits (CPU 4, memory 8 GB) as deployed; torch intra-op threads = 4 (the contractual setting, DECISIONS §8a; an additional informational run with 2 shows headroom for concurrency).
 - Software: Python 3.12, torch CPU build, FFmpeg exact build string (≥ 8.1; the G0 FFmpeg comparison in section 12 picks 8.1.x vs 9.0.x), libvmaf version, Redis 7 + Dramatiq as production.
 - Network: two profiles: (a) real network to Pexels (and Pixabay only if enabled) for end-to-end; (b) stock responses and media served from a local fixture cache to isolate compute. LLM call: recorded latency from real Haiku + a mock for compute-only runs.
 
@@ -560,65 +563,65 @@ Feedback loop (monthly, 20 minutes): review the flagged renders and the 10 lowes
 
 ## 12. G0 spike checklist (Phase 0 go/no-go)
 
-This section is the explicit G0 spike checklist referenced by `ROADMAP.md` (Phase 0 go/no-go). The spike: 50 varied songs from the owner's library (30 core + 20 hard, annotated per section 4.3), a 4-vCPU x86-64 benchmark host (the owner's VPS if it is 4 vCPU x86-64, else a rented box), a 50-vibe-keyword Pexels portrait test (Pixabay is enabled and re-tested only if Pexels fails G0-17), an end-to-end render proof, and an FFmpeg version comparison. **GO needs every "Must" row PASS. Every "Should" row must PASS or have a written mitigation.** Each row is binary: the numeric threshold either holds or it does not. Record the measured value, the run ID and the date next to each row in the spike report. Metrics are reported on all 50 tracks and on the fully corrected subset (section 4.3, point 4).
+This section is the explicit G0 spike checklist referenced by `ROADMAP.md` (Phase 0 go/no-go). **Rev 3.6 (DECISIONS §8g):** the spike was trimmed. The original design (50 varied songs from the owner's library annotated per section 4.3, a 4-vCPU x86-64 benchmark host, a 50-keyword rating session, a sync canary on the owner's phone, a speed run and a contended-load run) is **not run**. The rows it would have measured are marked **"not measured in Phase 0 (DECISIONS §8g)"** in the Status column, and the dropped rows are "not measured", never "passed". **GO is based on the rows that were measured and passed (plus G0-17 once the Pexels key is in);** a "not measured" row is neither a pass nor a fail. Beat accuracy rests on the synthetic self-tests (passed), Beat This's published results and the owner's judgement on real songs (the editor's beat nudge and half/double override are the remedy); clip ranking is judged by the owner on real videos; speed is read from the per-stage timings recorded on every job on the owner's machine. The rows below keep their wording and thresholds for later use. A "Must" row that was measured must PASS; a "Should" row must PASS or have a written mitigation. Record the measured value, the run ID and the date next to each measured row in the spike report.
 
 ### 12.1 Beat and alignment (untrimmed, `min_beat_time=0`, 70 ms, core subset = 30 tracks)
 
-| # | Criterion | Must/Should | PASS if | QM |
-|---|---|---|---|---|
-| G0-1 | Beat F1 @70 ms | Must | mean over the golden core set ≥ 0.85 (95% CI reported, not gated; DECISIONS §8c) | QM-001 |
-| G0-2 | AMLt | Must | mean ≥ 0.85 | QM-004 |
-| G0-3 | CMLt | Must | mean ≥ 0.75 | QM-003 |
-| G0-4 | Downbeat F1 @70 ms | Must | mean ≥ 0.75 | QM-010 |
-| G0-5 | Octave handling | Must | octave-error rate after the 70–180 clamp ≤ 5% on core, AND every remaining octave error is flagged by confidence or fixable by one half/double tap | QM-016 |
-| G0-6 | Musical alignment (prototype planner, `lead_frames=0`) | Must | ≥ 90% of planned cuts within 70 ms of an annotated beat | QM-026 |
-| G0-7 | Hard set (20 tracks) | Report only (ungated) | reported, not gated (DECISIONS §6, §8a): record F1/AMLt/CMLt per track, the share of tracks with F1 < 0.7 that were flagged (confidence < 0.5) and the overall flag rate; no PASS/FAIL | QM-002, QM-024 |
-| G0-8 | Confidence viability | Should | AUROC ≥ 0.75 on the 50 tracks (0.80 with the full set); the score-distribution and first band thresholds around 0.5 / 0.8 saved | QM-023 |
-| G0-9 | Mean signed beat offset | Should | |mean| ≤ 15 ms; decision record written for `lead_frames` (0 vs 1; positive = earlier) | QM-006 |
+| # | Criterion | Must/Should | PASS if | QM | Status (Rev 3.6) |
+|---|---|---|---|---|---|
+| G0-1 | Beat F1 @70 ms | Must | mean over the golden core set ≥ 0.85 (95% CI reported, not gated; DECISIONS §8c) | QM-001 | Not measured in Phase 0 (DECISIONS §8g) |
+| G0-2 | AMLt | Must | mean ≥ 0.85 | QM-004 | Not measured in Phase 0 (DECISIONS §8g) |
+| G0-3 | CMLt | Must | mean ≥ 0.75 | QM-003 | Not measured in Phase 0 (DECISIONS §8g) |
+| G0-4 | Downbeat F1 @70 ms | Must | mean ≥ 0.75 | QM-010 | Not measured in Phase 0 (DECISIONS §8g) |
+| G0-5 | Octave handling | Must | octave-error rate after the 70–180 clamp ≤ 5% on core, AND every remaining octave error is flagged by confidence or fixable by one half/double tap | QM-016 | Not measured in Phase 0 (DECISIONS §8g) |
+| G0-6 | Musical alignment (prototype planner, `lead_frames=0`) | Must | ≥ 90% of planned cuts within 70 ms of an annotated beat | QM-026 | Not measured in Phase 0 (DECISIONS §8g) |
+| G0-7 | Hard set (20 tracks) | Report only (ungated) | reported, not gated (DECISIONS §6, §8a): record F1/AMLt/CMLt per track, the share of tracks with F1 < 0.7 that were flagged (confidence < 0.5) and the overall flag rate; no PASS/FAIL | QM-002, QM-024 | Not measured in Phase 0 (DECISIONS §8g) |
+| G0-8 | Confidence viability | Should | AUROC ≥ 0.75 on the 50 tracks (0.80 with the full set); the score-distribution and first band thresholds around 0.5 / 0.8 saved | QM-023 | Not measured in Phase 0 (DECISIONS §8g) |
+| G0-9 | Mean signed beat offset | Should | |mean| ≤ 15 ms; decision record written for `lead_frames` (0 vs 1; positive = earlier) | QM-006 | Not measured in Phase 0 (DECISIONS §8g) |
 
 ### 12.2 Render, sync and speed (indicative at G0; enforced as G2 gates)
 
-| # | Criterion | Must/Should | PASS if | QM |
-|---|---|---|---|---|
-| G0-10 | Frame-exact rendering | Must | 20 test renders: 100% pass QM-060…064 (CFR, frame count, every cut within ±1 frame of plan) | QM-060…064 |
-| G0-11 | Sync canary | Must | flash vs click offset ≤ 1 frame after decode in ffmpeg AND on the owner's phone browser(s) and desktop Chrome; the owner perceives no lag (wired or low-latency audio, not Bluetooth) | QM-069 |
-| G0-12 | Mode A remux | Must | 20 remuxes (mix of AAC-LC and non-AAC sources) from `audio_source`: video packets bit-identical to the master (no video re-encode); AAC-LC sources stream-copied, others one AAC-LC 48 kHz encode, no other processing; |A/V offset| ≤ 33.3 ms; drift ≤ 33.3 ms / 60 s; audio duration within ±1 AAC frame (21.3 ms) | QM-067/068/087 |
-| G0-13 | Analysis speed | Must (hard) | **hard NO-GO: p95 ≤ 40 s** for a 4-min song, 4 vCPU (exclusive), ≥ 20 runs; **target (Should): p95 ≤ 20 s** | QM-080 |
-| G0-14 | Draft speed | Must (hard) | **hard: p95 ≤ 180 s** upload-complete → draft ready (30 s output), ≥ 10 runs; **target (Should): p95 ≤ 120 s** | QM-085 |
-| G0-15 | Render speed | Must (hard) | **hard: p95 ≤ 90 s** for 30 s 1080p, edit plan → verified silent master, ≥ 10 runs; **target (Should): p95 ≤ 60 s** | QM-081 |
-| G0-16 | Remux speed | Must (hard) | **hard: p95 ≤ 10 s**, ≥ 20 runs; **target (Should): p95 ≤ 5 s** | QM-086 |
-| G0-27 | Contended-load speed | Must (report) / Should (numbers) | analysis + fetch + render running **concurrently on the same 4-vCPU benchmark host** (≥ 10 mixed runs): report p95 per stage under contention (analysis, draft, render, remux) against the hard limits above, and record a **worker-concurrency recommendation** (one heavy stage at a time vs ≥ 8 vCPU vs split queues) | QM-080, QM-081, QM-085, QM-086 |
+| # | Criterion | Must/Should | PASS if | QM | Status (Rev 3.6) |
+|---|---|---|---|---|---|
+| G0-10 | Frame-exact rendering | Must | 20 test renders: 100% pass QM-060…064 (CFR, frame count, every cut within ±1 frame of plan) | QM-060…064 | **PASS (spike):** 20/20, 0 frame errors |
+| G0-11 | Sync canary | Must | flash vs click offset ≤ 1 frame after decode in ffmpeg AND on the owner's phone browser(s) and desktop Chrome; the owner perceives no lag (wired or low-latency audio, not Bluetooth) | QM-069 | Not measured in Phase 0 (DECISIONS §8g) |
+| G0-12 | Mode A remux | Must | 20 remuxes (mix of AAC-LC and non-AAC sources) from `audio_source`: video packets bit-identical to the master (no video re-encode); AAC-LC sources stream-copied, others one AAC-LC 48 kHz encode, no other processing; |A/V offset| ≤ 33.3 ms; drift ≤ 33.3 ms / 60 s; audio duration within ±1 AAC frame (21.3 ms) | QM-067/068/087 | **PASS (spike):** 20/20 |
+| G0-13 | Analysis speed | Must (hard) | **hard NO-GO: p95 ≤ 40 s** for a 4-min song, 4 vCPU (exclusive), ≥ 20 runs; **target (Should): p95 ≤ 20 s** | QM-080 | Not measured in Phase 0 (DECISIONS §8g) |
+| G0-14 | Draft speed | Must (hard) | **hard: p95 ≤ 180 s** upload-complete → draft ready (30 s output), ≥ 10 runs; **target (Should): p95 ≤ 120 s** | QM-085 | Not measured in Phase 0 (DECISIONS §8g) |
+| G0-15 | Render speed | Must (hard) | **hard: p95 ≤ 90 s** for 30 s 1080p, edit plan → verified silent master, ≥ 10 runs; **target (Should): p95 ≤ 60 s** | QM-081 | Not measured in Phase 0 (DECISIONS §8g) |
+| G0-16 | Remux speed | Must (hard) | **hard: p95 ≤ 10 s**, ≥ 20 runs; **target (Should): p95 ≤ 5 s** | QM-086 | Not measured in Phase 0 (DECISIONS §8g) |
+| G0-27 | Contended-load speed | Must (report) / Should (numbers) | analysis + fetch + render running **concurrently on the same 4-vCPU benchmark host** (≥ 10 mixed runs): report p95 per stage under contention (analysis, draft, render, remux) against the hard limits above, and record a **worker-concurrency recommendation** (one heavy stage at a time vs ≥ 8 vCPU vs split queues) | QM-080, QM-081, QM-085, QM-086 | Not measured in Phase 0 (DECISIONS §8g) |
 
 ### 12.3 Stock availability and clip quality
 
-| # | Criterion | Must/Should | PASS if | QM |
-|---|---|---|---|---|
-| G0-17 | Stock availability | Must | For the 50 vibe keywords (generated by the real LLM step from the 50 spike songs, plus fallback-table keywords), **Pexels** (`orientation=portrait`, deduplicated) returns **≥ 20 portrait clips at ≥ 1080p per keyword** for **≥ 80% of keywords (≥ 40 of 50)**. Pixabay is enabled and the test repeated (Pexels + Pixabay combined) only if Pexels alone fails; keywords below the bar are listed with their backoff keyword result | QM-032 |
-| G0-18 | Clip relevance | Must | SigLIP 2 P@1 ≥ 0.75 on 50 keywords × 20 clips (owner labels; κ ≥ 0.6 between the first pass and a blind re-label of 10 keywords a week later) AND lift ≥ +10 points over stock API order | QM-033/034 |
-| G0-19 | Internal cuts | Should | 0 detected by the admission detectors in the 100 audited used segments AND ≤ 1 of the 100 contains a human-confirmed hard cut (DECISIONS §6); the PySceneDetect 0.7.x threshold used is recorded; TransNetV2 weights terms checked (T-0.6) | QM-036 |
+| # | Criterion | Must/Should | PASS if | QM | Status (Rev 3.6) |
+|---|---|---|---|---|---|
+| G0-17 | Stock availability | Must | For the 50 vibe keywords (generated by the real LLM step from the 50 spike songs, plus fallback-table keywords), **Pexels** (`orientation=portrait`, deduplicated) returns **≥ 20 portrait clips at ≥ 1080p per keyword** for **≥ 80% of keywords (≥ 40 of 50)**. Pixabay is enabled and the test repeated (Pexels + Pixabay combined) only if Pexels alone fails; keywords below the bar are listed with their backoff keyword result | QM-032 | **Pending:** needs the Pexels key (`secrets/env`); runs once the key is in |
+| G0-18 | Clip relevance | Must | SigLIP 2 P@1 ≥ 0.75 on 50 keywords × 20 clips (owner labels; κ ≥ 0.6 between the first pass and a blind re-label of 10 keywords a week later) AND lift ≥ +10 points over stock API order | QM-033/034 | Not measured in Phase 0 (DECISIONS §8g) |
+| G0-19 | Internal cuts | Should | 0 detected by the admission detectors in the 100 audited used segments AND ≤ 1 of the 100 contains a human-confirmed hard cut (DECISIONS §6); the PySceneDetect 0.7.x threshold used is recorded; TransNetV2 weights terms checked (T-0.6) | QM-036 | Open: not listed in §8g; the PySceneDetect smoke test (after the Pexels key) gives partial evidence only |
 
 ### 12.4 FFmpeg version comparison (pins the exact build, DECISIONS §3)
 
 Build FFmpeg 8.1.x (latest point release) and 9.0.x (latest point release; 9.0.2 and 8.1.3 were current on 2026-11-08, F-12) from source with an identical configure line in the worker image, then run the same 20 G-render renders, the sync canary and the timing runs on each. Choose **9.0.x only if every row passes**; otherwise pin 8.1.x. Record the decision and the exact build string.
 
-| # | Criterion | Must/Should | PASS if |
-|---|---|---|---|
-| G0-20 | Both builds pass the render checks | Must | each build: 100% of 20 renders pass QM-060…064 and 077; canary offset ≤ 1 frame |
-| G0-21 | Frame-level agreement | Must | for the same plan, frame count and per-frame PTS are identical between the two builds; cut positions (QM-064) identical |
-| G0-22 | Encode quality parity | **Deferred (Rev 3.3)** | VMAF parity between FFmpeg builds (QM-072) moved to Phase 5/P; not a G0 criterion |
-| G0-23 | Speed parity | Should | 9.0.x render p95 (QM-081) no more than 10% slower than 8.1.x |
-| G0-24 | Remux parity | Must | Mode A remux produces bit-identical video packets and audio offset within ±1 AAC frame on both |
-| G0-25 | Hardening works on the chosen build | Must | `-protocol_whitelist file` and the `-f` demuxer allowlist behave as intended in a local test with hostile playlist/concat inputs (open fact-check item F-17); no unpatched advisory affecting the demuxers/decoders in use (ffmpeg.org security page checked) |
+| # | Criterion | Must/Should | PASS if | Status (Rev 3.6) |
+|---|---|---|---|---|
+| G0-20 | Both builds pass the render checks | Must | each build: 100% of 20 renders pass QM-060…064 and 077; canary offset ≤ 1 frame | **PASS (spike)** |
+| G0-21 | Frame-level agreement | Must | for the same plan, frame count and per-frame PTS are identical between the two builds; cut positions (QM-064) identical | **PASS (spike)** |
+| G0-22 | Encode quality parity | **Deferred (Rev 3.3)** | VMAF parity between FFmpeg builds (QM-072) moved to Phase 5/P; not a G0 criterion | Deferred (Rev 3.3) |
+| G0-23 | Speed parity | Should | 9.0.x render p95 (QM-081) no more than 10% slower than 8.1.x | **PASS (spike):** same-encoder ratio 0.736 (9.0.x vs 8.1.3 render p95) |
+| G0-24 | Remux parity | Must | Mode A remux produces bit-identical video packets and audio offset within ±1 AAC frame on both | **PASS (spike)** |
+| G0-25 | Hardening works on the chosen build | Must | `-protocol_whitelist file` and the `-f` demuxer allowlist behave as intended in a local test with hostile playlist/concat inputs (open fact-check item F-17); no unpatched advisory affecting the demuxers/decoders in use (ffmpeg.org security page checked) | **PASS (spike)** |
 
 ### 12.5 Data hygiene
 
-| # | Criterion | Must/Should | PASS if |
-|---|---|---|---|
-| G0-26 | Golden manifests contain no audio | Must | `eval/` manifests (and git history) contain no audio files or audio-derived blobs, only IDs, source type, SHA-256, subset and annotation hashes; all audio and annotations stay in private storage outside the repo (checked by a file-type/size scan of `eval/` and `git log --stat -- eval/`) |
+| # | Criterion | Must/Should | PASS if | Status (Rev 3.6) |
+|---|---|---|---|---|
+| G0-26 | Golden manifests contain no audio | Must | `eval/` manifests (and git history) contain no audio files or audio-derived blobs, only IDs, source type, SHA-256, subset and annotation hashes; all audio and annotations stay in private storage outside the repo (checked by a file-type/size scan of `eval/` and `git log --stat -- eval/`) | Not applicable while no golden set exists (not listed in §8g; open) |
 
-**NO-GO / pivot triggers:** G0-1…G0-6 fail on core: evaluate a commercial-licensed alternative or an own post-processing stage before continuing; G0-10…G0-12 fail: debug the render pipeline first (cheap, deterministic); G0-13…G0-16 fail (a hard limit exceeded; missing only the target is a Should miss, not a NO-GO): profile, then re-scope (the roadmap's earlier "40 s with optimisation path" relaxation is NOT in DECISIONS Rev 2 and needs an owner decision); G0-17 fails on Pexels alone: enable Pixabay and repeat before anything else; G0-17/18 still fail: rethink stock sourcing/ranking (or add AI hero shots earlier), the beat side remains valid; G0-20…G0-25 fail on 9.0.x: pin 8.1.x and continue.
+**NO-GO / pivot triggers (apply to measured rows only, Rev 3.6):** G0-1…G0-6 fail on core: evaluate a commercial-licensed alternative or an own post-processing stage before continuing; G0-10…G0-12 fail: debug the render pipeline first (cheap, deterministic); G0-13…G0-16 fail (a hard limit exceeded; missing only the target is a Should miss, not a NO-GO): profile, then re-scope (the roadmap's earlier "40 s with optimisation path" relaxation is NOT in DECISIONS Rev 2 and needs an owner decision); G0-17 fails on Pexels alone: enable Pixabay and repeat before anything else; G0-17/18 still fail: rethink stock sourcing/ranking (or add AI hero shots earlier), the beat side remains valid; G0-20…G0-25 fail on 9.0.x: pin 8.1.x and continue.
 
-Phase 0 also must produce: the confidence-score distribution, first-pass thresholds for the bands in 6.2, a measured benchmark table (four timed paths), the FFmpeg decision record, and the early-bias decision record.
+Phase 0 (Rev 3.6) produces: the FFmpeg decision record (BtbN 9.0.x GPL static, sha256-pinned, DECISIONS §8g), the spike's machine description, and the synthetic self-test, render and hardening results. The confidence-score distribution, first-pass band thresholds, the four-path benchmark table and the early-bias decision record are **not produced** in Phase 0; the app's per-stage job timings and the owner's judgement replace them.
 
 ---
 
@@ -698,7 +701,7 @@ Removed from the personal edition. Full Rev 2.2 text: `archive/public-edition-re
 | Second annotator, 25% double annotation, adjudication, IAA gates, 100% double annotation of odd-meter/rubato hard tracks | former §4.3 | One person | Optional self-agreement on 5 tracks (§4.3) |
 | Commissioned/licensed audio, counsel review of CC and public datasets, licence record per file, G0-26 legality row, Q1/Q2/Q3 | former §4.2, §12.5, §15 | Owner's own library for personal use | G0-26 "manifests contain no audio"; public/commercial use of eval data reviewed in Phase P |
 | Consented user "report issue" tracks in the golden set; monthly cap and consent process | former §4.4, Q2 | No other users | Owner-flagged renders join G-hard privately |
-| Private R2 bucket `eval-golden` with a CI access token | former §4.2 | Local disk adapter (DECISIONS §3) | Private storage on the owner's machine/VPS |
+| Private R2 bucket `eval-golden` with a CI access token | former §4.2 | Local disk adapter (DECISIONS §3) | Private storage on the owner's machine |
 | Pixabay by default in stock availability (QM-032, G0-17) | former QM-032, G0-17 | Pexels first (DECISIONS §3) | Pexels only; Pixabay only if Pexels fails |
 | `prod-sample` mode: 1% VMAF/verification on all production renders | former §5.3 | One user | Checks on every owner render; optional VMAF sample |
 | Preview-abandon after analysis | QM-105 | Needs multi-user analytics | – |

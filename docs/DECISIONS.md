@@ -1,6 +1,6 @@
 # SaveClock Studio — Canonical Decisions (source of truth)
 
-Status: **Rev 3.5 — Personal edition, local-only (public-ready)** · Date: 2026-11-26 · Owner: project owner
+Status: **Rev 3.6 — Personal edition, local-only (public-ready)** · Date: 2026-11-26 · Owner: project owner
 Every other doc in `docs/` MUST be consistent with this file. If a doc needs to deviate, it raises it in its "Open questions" section instead of silently changing a decision.
 
 **Rescope (Rev 3):** the app is for **one user — the owner** — reachable only over the owner's private **Tailscale** network. It may go public later, so the code keeps the seams needed for that (user-scoped data, adapters, layering), but none of the public-SaaS machinery is built now. The full public-edition design (Rev 2.2: accounts, billing, DMCA, compliance, worker VM) is archived unchanged in `archive/public-edition-rev2.2/` and becomes **Phase P** if/when the owner decides to launch.
@@ -82,12 +82,51 @@ Monorepo: `apps/web`, `services/api` (two Docker targets), `packages/contracts` 
 - **Tailscale serve verification** (path routing to web/api, SSE streaming, large chunked uploads, identity headers) is a Phase 0/1 test task; fallback is a Caddy container on the tailnet IP if `tailscale serve` path handlers fall short.
 - **Settings** (superseded in detail by §8d: `GET/PUT /settings` + `POST /housekeeping/run`) shows API-key status and disk usage read-only and offers a housekeeping trigger (ARCHITECTURE owns the paths). The Pixabay on/off switch is stored in `users.settings` (jsonb) via `PUT /settings/stock`. The env var supplies the default. The column ships in the baseline migration and is announced with a DB CHANGE notice at implementation time.
 
+## 8g. Self-tuning, trimmed Phase 0 and the FFmpeg pin (Rev 3.6, owner directive 2026-11-26)
+- **Concurrency and threads are auto-detected, and every value can be overridden.** At worker start, `spike`-measured costs plus the machine's own facts set the defaults, and all of them can be overridden in `.env` or Settings:
+  - `cpu = os.cpu_count()` (or the container's CPU quota) and `ram_gb` = total memory (or the cgroup limit).
+  - `TORCH_THREADS = cpu`, with analysis running one job at a time.
+  - `FFMPEG_THREADS = cpu`.
+  - `WORKER_HEAVY_CONCURRENCY = max(1, min(cpu // 4, (ram_gb - 2) // 3))`. A render peaks at about 2.2 GB RSS (spike Step 5), hence 3 GB per slot and 2 GB kept for the rest of the stack.
+  - `FETCH_CONCURRENCY = 4`.
+  - `DEVICE = cpu`. A CUDA path is a later option.
+  - The worker logs the chosen values at start, and `GET /settings` shows them read-only.
+  - Speed targets (§6) remain targets. The app records per-stage timings on every job, so real speed is visible on the owner's machine instead of being gated by a pre-launch benchmark.
+- **Phase 0 trimmed.** There is no golden song set, no clip-rating session, no phone sync canary, and no separate speed run (spike Steps 9, 10, 13 labels, 14 and 16 are dropped):
+  - **Beat accuracy** rests on the synthetic self-tests (passed), Beat This's published results, and the owner's judgement on real songs. The editor's beat nudge and the half/double override are the remedy.
+  - **G0-1..G0-9, G0-11, G0-13..G0-16, G0-18 and G0-27** become "not measured in Phase 0". QUALITY keeps the metrics for later use.
+  - **Clip ranking** is judged by the owner on real videos.
+  - **The Pexels availability test (G0-17)** and a SigLIP/PySceneDetect smoke test still run, once the Pexels key is in `secrets/env`.
+- **FFmpeg pin: 9.0.x.**
+  - The worker image uses the BtbN `release/9.0` GPL static build. libx264 is required, and Fedora's 8.1.3 lacks it. The build is pinned by URL plus sha256 and cached locally, so rebuilds don't depend on the URL staying up.
+  - Why 9.0.x:
+    - Every row the spike could evaluate passed (G0-20/21/24/25).
+    - The same-encoder comparison was bit-identical and 26 % faster.
+    - 9.0 carries five CVE fixes that are not listed for any 8.1.x.
+  - The `--disable-network` source build is deferred to Phase P. Locally, safety comes from the `-protocol_whitelist file` plus forced-`-f` templates and the magic-byte sniff (all proven in the spike).
+
+- **Resolved open questions (Rev 3.6, from the doc reconciliation):**
+  - **OQ-25 (CLI gaps).**
+    - `new <song> --vibe "<text>"` stores the text in a new optional `options.vibe` string (≤ 200 chars).
+    - Claude Code usually passes keywords up front (`--keywords`, mapped to the existing `options.keywords_override`), choosing them from the vibe text. `keywords set` after the draft triggers the normal replan.
+    - `plan` is read-only. `open` is client-side only.
+  - **OQ-28.** There is no new "await keywords" state, because keywords supplied up front avoid the wasted fetch.
+  - **OQ-27 / SECURITY OQ-6.**
+    - The API accepts a state-changing request that has **no** `Origin` header (the CLI).
+    - It rejects a request whose `Origin` is present but is not `APP_ORIGIN`.
+    - It also rejects `Sec-Fetch-Site: cross-site`.
+    - Browsers always send `Origin` on cross-site POSTs, so this blocks other tabs.
+  - **SECURITY OQ-1.** Loopback bind plus the Host/Origin checks is enough for a single-user machine, so there is no CLI token.
+  - **OQ-26 (single origin through a Next.js rewrite).** The Phase 1 walking skeleton verifies that SSE and a 100 MB upload stream through the rewrite without buffering. If they don't, the API gets its own localhost origin with CORS allowing only `APP_ORIGIN`.
+  - **RQ-5.** G2's golden-set numbers become "not measured" (§8g). G0-19 (TransNetV2) stays open, and G0-26 is not applicable.
+
 ## 8f. Local-only edition (Rev 3.5, owner directive 2026-11-26) — overrides §3, §8c, §8d where they mention the VPS or Tailscale
 - **Where it runs:** on the owner's own capable machine only, as the same Compose stack (or natively for dev). **No VPS, no Tailscale, no Dokploy.** The `tailscale` service is removed from the §8c service list.
 - **Access boundary:** every published port binds to **`127.0.0.1` only** (never `0.0.0.0`); the app is opened at `http://localhost:<port>`. Because a local app with no login can still be reached by other websites open in the same browser, the API **must** (a) reject any `Host` header other than `localhost` / `127.0.0.1` (blocks DNS rebinding) and (b) reject state-changing requests whose `Origin` is not the app's own origin. These replace the "request came through Tailscale" check. No auth UI is added.
 - **Phone access:** not provided. If wanted later, add Tailscale back as an optional sidecar (ADR-0012 stays as the recipe); nothing else changes.
 - **Speed targets (§6)** are measured on the owner's machine (its CPU/RAM/GPU recorded in the spike report) instead of a 4-vCPU VPS. Torch stays CPU by default; a GPU path is a later option, not a requirement.
-- **Vibe → keywords:** **keyless by default** — the offline keyword table plus owner keyword editing in the editor. The Claude Haiku adapter stays behind the same interface and switches on only if `ANTHROPIC_API_KEY` is set. (Claude Code is the development tool; its login is not an API key for the app.) A `claude -p` adapter is a possible later extra, not in MVP.
+- **Two ways in, one pipeline (owner choice, option 3):** (1) the **web editor** (screens as in UX-SPEC) and (2) a **`saveclock` command-line tool** that calls the same local HTTP API, so Claude Code can drive the whole flow (`new`, `show --json`, `keywords set`, `plan`, `render`, `export`, `status`). There is no second code path: the CLI is a thin API client. A project skill (`.claude/skills/saveclock/`) tells Claude Code how to use it.
+- **Vibe → keywords, no API key needed:** the keyword source order is **explicit keywords** (set by Claude Code through `saveclock keywords set`, or typed in the editor) → Claude Haiku **only if** `ANTHROPIC_API_KEY` is set → the **offline keyword table**. In the normal flow Claude Code reads the analysis summary (`saveclock show <id> --json`: tempo, sections, energy, the owner's vibe text) and writes the keywords. Audio is never sent to Claude; only that summary is visible to it. The app itself never calls `claude`, because the worker runs in a container without the owner's Claude Code login.
 - **Backups:** to a folder or disk the owner chooses on the same machine/external drive (restic or plain copy); restore tested once.
 - **Phase 0 impact:** spike Step 15 (Tailscale) dropped; Step 16 (speed + contended load) runs on the owner's machine; Step 14 (sync canary) plays the exported file on the owner's phone.
 
@@ -127,7 +166,8 @@ Any future feature that cannot meet this rule is rejected or redesigned rather t
 | Tasks, phases, traceability | ROADMAP.md (references thresholds, never restates different numbers) |
 
 ## 9. Changelog
-- **Rev 3.5 (2026-11-26):** §8f local-only edition: runs on the owner's machine, no VPS/Tailscale, ports on 127.0.0.1 with Host/Origin checks, keyless keywords by default, ADR-0014.
+- **Rev 3.6 (2026-11-26):** §8g auto-detected concurrency/threads with overrides; Phase 0 trimmed (no golden set, labels, canary or speed run); FFmpeg pinned to BtbN 9.0.x GPL static by sha256.
+- **Rev 3.5 (2026-11-26):** §8f local-only edition: runs on the owner's machine, no VPS/Tailscale, ports on 127.0.0.1 with Host/Origin checks, keyless keywords by default, ADR-0014. Same day: web editor + `saveclock` CLI for Claude Code, keyword order explicit → Haiku-if-key → offline table.
 - **Rev 3.4 (2026-11-08):** §8e owner design choices: pulse on, sentence case, 540×960 preview, no report button.
 - **Rev 3.3 (2026-11-08):** §8d single-user simplifications (streamed upload, no signed tokens, no op_id, exports folded into renders, one settings endpoint, simple eval script, T-0.16 non-gating, process listed once).
 - **Rev 3.2 (2026-11-08):** §8c — service list incl. worker-maint, owner seeded by migration, mean-based beat gate, Tailscale serve test + Caddy fallback, Settings endpoints.

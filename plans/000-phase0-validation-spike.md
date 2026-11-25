@@ -539,15 +539,15 @@ Everything is in `~/saveclock-spike/`: `rm -rf ~/saveclock-spike` removes the sp
 | 5 | Synthetic frame-accuracy harness (8.1.3) | DONE (render 20/20, remux 20/20, 0 frame errors; 8.1.3 has no libx264) |
 | 6 | Hardening + 8.1.3 vs 9.0.x screen | DONE (G0-25 PASS both; encoder-independent rows PASS; 8.1.x default, re-decide Step 12) |
 | 7 | Licence register draft | DONE (18 rows, 5 marked Phase P) |
-| 8 | Owner inputs collected | TODO |
-| 9 | Golden set + annotation | TODO (OWNER-BLOCKED: tracks, annotation time) |
-| 10 | Beat This golden evaluation | TODO (blocked by 9) |
-| 11 | Pexels availability | TODO (OWNER-BLOCKED: Pexels key) |
-| 12 | Real-clip FFmpeg + source-build pin | TODO (source builds can start now) |
-| 13 | SigLIP 2 + PySceneDetect | TODO (blocked by 11, owner labels, week-later relabel) |
-| 14 | Sync canary | TODO (OWNER-BLOCKED: phone) |
+| 8 | Owner inputs collected | REDUCED (§8g): only the Pexels key outstanding |
+| 9 | Golden set + annotation | DROPPED (§8g) |
+| 10 | Beat This golden evaluation | DROPPED (§8g) |
+| 11 | Pexels availability | PENDING Pexels key |
+| 12 | Real-clip FFmpeg + source-build pin | REPLACED: BtbN 9.0 static pinned by sha256 (§8g); source build deferred to Phase P |
+| 13 | SigLIP 2 + PySceneDetect | REDUCED to a smoke test after the Pexels key (§8g) |
+| 14 | Sync canary | DROPPED (§8g; remux sync measured in Step 5) |
 | 15 | Tailscale + serve verification | DROPPED (Rev 3.5 local-only) |
-| 16 | Speed + contended load on owner machine | TODO (OWNER-BLOCKED: machine specs; run there) |
-| 17 | Capacity/cost + addenda | TODO |
+| 16 | Speed + contended load | DROPPED (§8g; auto-tuning + per-job timings) |
+| 17 | Capacity/cost + addenda | DROPPED (one local user) |
 | 18 | Browser feasibility (non-gating) | TODO (optional) |
-| 19 | ADRs, SPIKE-REPORT, G0 decision | TODO |
+| 19 | ADRs, SPIKE-REPORT, G0 decision | DONE: docs/SPIKE-REPORT.md, G0 = GO |
