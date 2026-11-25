@@ -1,0 +1,6 @@
+mir_eval 0.8.2 (pinned in uv.lock)
+trim_beats default min_beat_time = 5.0 s (NOT used: evaluate() is never called; metrics untrimmed)
+f_measure_threshold = 0.07 s (F_WINDOW_S in spike.metrics)
+cemgil_sigma = 0.04
+continuity_phase_threshold = continuity_period_threshold = 0.175
+information_gain bins = 41 (default; histogram_bin_edges = np.linspace(-0.5, 0.5, bins + 1) -> 41 bins; entropy normaliser log2(41); even bin counts warn)

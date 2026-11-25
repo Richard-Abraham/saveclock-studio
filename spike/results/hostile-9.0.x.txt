@@ -1,0 +1,104 @@
+ffmpeg: ffmpeg version n9.0.2-48-gd4070a14ce-20261108 Copyright (c) 2000-2026 the FFmpeg developers
+listener: 127.0.0.1:39901 (ephemeral)
+sniff evil_hls_http.mp3: rejected unsupported_media
+sniff evil_hls_file.mp3: rejected unsupported_media
+sniff evil_concat.mp3: rejected unsupported_media
+sniff evil_concat_http.mp3: rejected unsupported_media
+sniff evil.m4a: rejected unsupported_media
+sniff control.mp3: mp3
+control.mp3 under production template: OK (rc=0, streams=1, format=mp3)
+wrapper reject [no whitelist]: rejected
+wrapper reject [second -protocol_whitelist file,http]: rejected
+wrapper reject [whitelist widened to file,http]: rejected
+wrapper reject [-protocol_blacklist caller option]: rejected
+wrapper reject [-safe 0 (concat)]: rejected
+wrapper reject [-allowed_extensions ALL]: rejected
+wrapper reject [-i http URL]: rejected
+wrapper reject [-i concat: URL]: rejected
+wrapper reject [joined command string]: rejected
+wrapper reject [ffprobe widened whitelist]: rejected
+negative control (NO whitelist, NO forced -f, plus weakened variants):
+  NC evil_hls_http.mp3      [plan: auto-detect, no flags] ffprobe rc=1   connections=0 content_leak=False
+  NC evil_hls_http.mp3      [plan: auto-detect, no flags] ffmpeg  rc=183 connections=0 content_leak=False
+  NC evil_hls_http.mp3      [auto-detect, .m3u8 name] ffprobe rc=1   connections=0 content_leak=False
+  NC evil_hls_http.mp3      [auto-detect, .m3u8 name] ffmpeg  rc=183 connections=0 content_leak=False
+  NC evil_hls_http.mp3      [forced -f hls, no whitelist arg] ffprobe rc=1   connections=0 content_leak=False
+  NC evil_hls_http.mp3      [forced -f hls, no whitelist arg] ffmpeg  rc=183 connections=0 content_leak=False
+  NC evil_hls_http.mp3      [forced -f hls + whitelist file,http,tcp] ffprobe rc=1   connections=1 content_leak=False
+  NC evil_hls_http.mp3      [forced -f hls + whitelist file,http,tcp] ffmpeg  rc=183 connections=1 content_leak=False
+  NC evil_hls_http.mp3      [forced -f concat -safe 0 + whitelist file,http,tcp] ffprobe rc=1   connections=0 content_leak=False
+  NC evil_hls_http.mp3      [forced -f concat -safe 0 + whitelist file,http,tcp] ffmpeg  rc=183 connections=0 content_leak=False
+  NC evil_hls_file.mp3      [plan: auto-detect, no flags] ffprobe rc=1   connections=0 content_leak=False
+  NC evil_hls_file.mp3      [plan: auto-detect, no flags] ffmpeg  rc=183 connections=0 content_leak=False
+  NC evil_hls_file.mp3      [auto-detect, .m3u8 name] ffprobe rc=1   connections=0 content_leak=False
+  NC evil_hls_file.mp3      [auto-detect, .m3u8 name] ffmpeg  rc=183 connections=0 content_leak=False
+  NC evil_hls_file.mp3      [forced -f hls, no whitelist arg] ffprobe rc=1   connections=0 content_leak=False
+  NC evil_hls_file.mp3      [forced -f hls, no whitelist arg] ffmpeg  rc=183 connections=0 content_leak=False
+  NC evil_hls_file.mp3      [forced -f hls + whitelist file,http,tcp] ffprobe rc=1   connections=0 content_leak=False
+  NC evil_hls_file.mp3      [forced -f hls + whitelist file,http,tcp] ffmpeg  rc=183 connections=0 content_leak=False
+  NC evil_hls_file.mp3      [forced -f concat -safe 0 + whitelist file,http,tcp] ffprobe rc=1   connections=0 content_leak=False
+  NC evil_hls_file.mp3      [forced -f concat -safe 0 + whitelist file,http,tcp] ffmpeg  rc=183 connections=0 content_leak=False
+  NC evil_concat.mp3        [plan: auto-detect, no flags] ffprobe rc=1   connections=0 content_leak=False
+  NC evil_concat.mp3        [plan: auto-detect, no flags] ffmpeg  rc=255 connections=0 content_leak=False
+  NC evil_concat.mp3        [auto-detect, .m3u8 name] ffprobe rc=1   connections=0 content_leak=False
+  NC evil_concat.mp3        [auto-detect, .m3u8 name] ffmpeg  rc=255 connections=0 content_leak=False
+  NC evil_concat.mp3        [forced -f hls, no whitelist arg] ffprobe rc=1   connections=0 content_leak=False
+  NC evil_concat.mp3        [forced -f hls, no whitelist arg] ffmpeg  rc=183 connections=0 content_leak=False
+  NC evil_concat.mp3        [forced -f hls + whitelist file,http,tcp] ffprobe rc=1   connections=0 content_leak=False
+  NC evil_concat.mp3        [forced -f hls + whitelist file,http,tcp] ffmpeg  rc=183 connections=0 content_leak=False
+  NC evil_concat.mp3        [forced -f concat -safe 0 + whitelist file,http,tcp] ffprobe rc=1   connections=0 content_leak=False
+  NC evil_concat.mp3        [forced -f concat -safe 0 + whitelist file,http,tcp] ffmpeg  rc=183 connections=0 content_leak=False
+  NC evil_concat_http.mp3   [plan: auto-detect, no flags] ffprobe rc=1   connections=0 content_leak=False
+  NC evil_concat_http.mp3   [plan: auto-detect, no flags] ffmpeg  rc=255 connections=0 content_leak=False
+  NC evil_concat_http.mp3   [auto-detect, .m3u8 name] ffprobe rc=1   connections=0 content_leak=False
+  NC evil_concat_http.mp3   [auto-detect, .m3u8 name] ffmpeg  rc=255 connections=0 content_leak=False
+  NC evil_concat_http.mp3   [forced -f hls, no whitelist arg] ffprobe rc=1   connections=0 content_leak=False
+  NC evil_concat_http.mp3   [forced -f hls, no whitelist arg] ffmpeg  rc=183 connections=0 content_leak=False
+  NC evil_concat_http.mp3   [forced -f hls + whitelist file,http,tcp] ffprobe rc=1   connections=0 content_leak=False
+  NC evil_concat_http.mp3   [forced -f hls + whitelist file,http,tcp] ffmpeg  rc=183 connections=0 content_leak=False
+  NC evil_concat_http.mp3   [forced -f concat -safe 0 + whitelist file,http,tcp] ffprobe rc=1   connections=1 content_leak=False
+  NC evil_concat_http.mp3   [forced -f concat -safe 0 + whitelist file,http,tcp] ffmpeg  rc=8   connections=1 content_leak=False
+  NC evil.m4a               [plan: auto-detect, no flags] ffprobe rc=1   connections=0 content_leak=False
+  NC evil.m4a               [plan: auto-detect, no flags] ffmpeg  rc=255 connections=0 content_leak=False
+  NC evil.m4a               [auto-detect, .m3u8 name] ffprobe rc=1   connections=0 content_leak=False
+  NC evil.m4a               [auto-detect, .m3u8 name] ffmpeg  rc=255 connections=0 content_leak=False
+  NC evil.m4a               [forced -f hls, no whitelist arg] ffprobe rc=1   connections=0 content_leak=False
+  NC evil.m4a               [forced -f hls, no whitelist arg] ffmpeg  rc=183 connections=0 content_leak=False
+  NC evil.m4a               [forced -f hls + whitelist file,http,tcp] ffprobe rc=1   connections=0 content_leak=False
+  NC evil.m4a               [forced -f hls + whitelist file,http,tcp] ffmpeg  rc=183 connections=0 content_leak=False
+  NC evil.m4a               [forced -f concat -safe 0 + whitelist file,http,tcp] ffprobe rc=1   connections=0 content_leak=False
+  NC evil.m4a               [forced -f concat -safe 0 + whitelist file,http,tcp] ffmpeg  rc=183 connections=0 content_leak=False
+  L1 prod ffprobe            evil_hls_http.mp3      rc=1   conns=0 streams=0 fmt=- ok
+  L1 prod ffmpeg             evil_hls_http.mp3      rc=183 conns=0 streams=0 fmt=- ok
+  L2 whitelist-only ffprobe  evil_hls_http.mp3      rc=1   conns=0 streams=0 fmt=- ok
+  L2 whitelist-only ffmpeg   evil_hls_http.mp3      rc=183 conns=0 streams=0 fmt=- ok
+  L3 forced-f-only ffprobe   evil_hls_http.mp3      rc=1   conns=0 streams=0 fmt=- ok
+  L3 forced-f-only ffmpeg    evil_hls_http.mp3      rc=183 conns=0 streams=0 fmt=- ok
+  L1 prod ffprobe            evil_hls_file.mp3      rc=1   conns=0 streams=0 fmt=- ok
+  L1 prod ffmpeg             evil_hls_file.mp3      rc=183 conns=0 streams=0 fmt=- ok
+  L2 whitelist-only ffprobe  evil_hls_file.mp3      rc=1   conns=0 streams=0 fmt=- ok
+  L2 whitelist-only ffmpeg   evil_hls_file.mp3      rc=183 conns=0 streams=0 fmt=- ok
+  L3 forced-f-only ffprobe   evil_hls_file.mp3      rc=1   conns=0 streams=0 fmt=- ok
+  L3 forced-f-only ffmpeg    evil_hls_file.mp3      rc=183 conns=0 streams=0 fmt=- ok
+  L1 prod ffprobe            evil_concat.mp3        rc=1   conns=0 streams=0 fmt=- ok
+  L1 prod ffmpeg             evil_concat.mp3        rc=183 conns=0 streams=0 fmt=- ok
+  L2 whitelist-only ffprobe  evil_concat.mp3        rc=1   conns=0 streams=0 fmt=- ok
+  L2 whitelist-only ffmpeg   evil_concat.mp3        rc=255 conns=0 streams=0 fmt=- ok
+  L3 forced-f-only ffprobe   evil_concat.mp3        rc=1   conns=0 streams=0 fmt=- ok
+  L3 forced-f-only ffmpeg    evil_concat.mp3        rc=183 conns=0 streams=0 fmt=- ok
+  L1 prod ffprobe            evil_concat_http.mp3   rc=1   conns=0 streams=0 fmt=- ok
+  L1 prod ffmpeg             evil_concat_http.mp3   rc=183 conns=0 streams=0 fmt=- ok
+  L2 whitelist-only ffprobe  evil_concat_http.mp3   rc=1   conns=0 streams=0 fmt=- ok
+  L2 whitelist-only ffmpeg   evil_concat_http.mp3   rc=255 conns=0 streams=0 fmt=- ok
+  L3 forced-f-only ffprobe   evil_concat_http.mp3   rc=1   conns=0 streams=0 fmt=- ok
+  L3 forced-f-only ffmpeg    evil_concat_http.mp3   rc=183 conns=0 streams=0 fmt=- ok
+  L1 prod ffprobe            evil.m4a               rc=1   conns=0 streams=0 fmt=- ok
+  L1 prod ffmpeg             evil.m4a               rc=183 conns=0 streams=0 fmt=- ok
+  L2 whitelist-only ffprobe  evil.m4a               rc=1   conns=0 streams=0 fmt=- ok
+  L2 whitelist-only ffmpeg   evil.m4a               rc=255 conns=0 streams=0 fmt=- ok
+  L3 forced-f-only ffprobe   evil.m4a               rc=1   conns=0 streams=0 fmt=- ok
+  L3 forced-f-only ffmpeg    evil.m4a               rc=183 conns=0 streams=0 fmt=- ok
+negative control: plan control (no whitelist arg, no -f) = 0 connection(s); all weakened variants = 4; content_leak_cases=0
+negative control: the plan's exact control did NOT hit (default local-file whitelist 'file,crypto,data' and the demuxer extension checks block it); only variants with an explicit permissive whitelist hit
+negative control: listener hit (the detector works)
+G0-25 PASS (0 connections)

@@ -1,0 +1,13 @@
+{
+  "beat_this_package": {"source": "PyPI beat-this", "version": "1.1.0", "licence": "MIT", "madmom": false, "dbn": false},
+  "torch": {"version": "2.15.0+cpu", "index": "https://download.pytorch.org/whl/cpu"},
+  "checkpoints": [
+    {"name": "final0", "file": "downloads/models-beat_this/beat_this-final0.ckpt", "bytes": 81058141,
+     "sha256": "8c328b45f59d8dd3dff219253ff6a8d6482be57d0133a29140e2febbf8eb8331",
+     "source_url": "https://cloud.cp.jku.at/public.php/dav/files/7ik4RrBKTS273gp/final0.ckpt"},
+    {"name": "small0", "file": "downloads/models-beat_this/beat_this-small0.ckpt", "bytes": 8451101,
+     "sha256": "6074be2c4d490c5f6101fcc374a1ec72ae93456e23bb6019783b849f5dc7d47b",
+     "source_url": "https://cloud.cp.jku.at/public.php/dav/files/7ik4RrBKTS273gp/small0.ckpt"}
+  ],
+  "notes": "Downloaded with curl (final0 resumed once after a timeout; size matches the server total). Loaded by beat_this with torch.load(weights_only=True). The package licence is MIT; the weights licence is NOT stated in the installed package metadata/README: unverified, check in Step 7."
+}
