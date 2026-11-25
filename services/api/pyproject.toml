@@ -1,0 +1,80 @@
+[project]
+name = "saveclock-api"
+version = "0.1.0"
+description = "SaveClock API and workers"
+requires-python = "==3.12.*"
+dependencies = [
+    "alembic>=1.20.1",
+    "asyncpg>=0.32.0",
+    "dramatiq[redis]>=2,<3",
+    "fastapi>=0.165.0",
+    "pydantic>=2.14,<3",
+    "pydantic-settings>=2.16.3",
+    "redis>=8.2.0",
+    "sqlalchemy[asyncio]>=2.0,<2.1",
+    "structlog>=26.1.0",
+    "uuid-utils>=1.2.0",
+    "uvicorn[standard]>=0.54.0",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/saveclock"]
+
+[dependency-groups]
+dev = [
+    "httpx>=0.28.1",
+    "hypothesis>=6.170.17",
+    "import-linter>=2.17",
+    "mypy>=2.4.1",
+    "pip-audit>=2.10.1",
+    "pytest>=9.2.0",
+    "pytest-asyncio>=1.5.0",
+    "pytest-cov>=7.1.0",
+    "pyyaml>=6.0.4",
+    "ruff>=0.17.6",
+    "types-pyyaml>=6.0.12.20261122",
+]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+src = ["src", "tests"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM", "S", "C4", "PT", "RUF", "ASYNC", "N", "PL", "TCH", "ANN", "DTZ"]
+ignore = [
+  "PLR0913",  # many keyword args are normal for service/repository signatures
+  "PLR0911",  # early returns are clearer than nesting
+  "PLC0415",  # lazy imports are used on purpose in the alembic env and the worker entrypoint
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["S101", "ANN", "PLR2004"]
+
+[tool.mypy]
+strict = true
+plugins = ["pydantic.mypy"]
+warn_unused_ignores = true
+files = ["src", "tests"]
+mypy_path = "src"
+
+[tool.pytest.ini_options]
+markers = [
+  "unit: no I/O",
+  "integration: needs postgres/redis/files",
+  "golden: golden-file tests",
+  "slow: slow tests",
+  "live: hits real external services",
+]
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
+addopts = "--strict-markers"
+testpaths = ["tests"]
+
+[tool.coverage.run]
+branch = true
+source = ["saveclock"]

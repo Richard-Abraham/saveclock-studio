@@ -27,3 +27,13 @@ __pycache__/
 # node
 node_modules/
 .next/
+# plan 001 additions
+!.env.example
+.data/
+infra/docker/cache/*
+!infra/docker/cache/.gitkeep
+.coverage
+htmlcov/
+coverage.json
+.env.derived
+*.part
