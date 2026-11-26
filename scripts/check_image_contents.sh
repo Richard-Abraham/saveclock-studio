@@ -23,8 +23,8 @@ if [ "$kind" = web ]; then
 elif [ "$kind" = api ]; then
   check "no ffmpeg in api image" '! command -v ffmpeg'
   check "no ffprobe in api image" '! command -v ffprobe'
-  # the api image never imports the ML stack (plan 004)
-  for mod in torch scipy soundfile beat_this; do
+  # the api image never imports the ML stack (plan 004) or the footage vetting stack (plan 005)
+  for mod in torch scipy soundfile beat_this transformers scenedetect cv2 PIL; do
     check "no $mod in api image" "! python -c 'import $mod' 2>/dev/null"
   done
 else
@@ -33,11 +33,14 @@ else
   check "ffprobe present" 'command -v ffprobe'
   # the python snippets are single-quoted here and double-quoted inside the container's sh
   torch_ok='python -c "import sys, torch; v = tuple(int(x) for x in torch.__version__.split(\"+\")[0].split(\".\")[:2]); sys.exit(0 if v >= (2, 6) else 1)"'
-  weights_ok='python -c "import hashlib, json; d = \"/opt/models/\"; ms = json.load(open(d + \"models.manifest.json\"))[\"models\"]; assert ms and all(hashlib.sha256(open(d + m[\"file\"], \"rb\").read()).hexdigest() == m[\"sha256\"] for m in ms)"'
+  weights_ok='python -c "import hashlib, json; d = \"/opt/models/\"; ms = json.load(open(d + \"models.manifest.json\"))[\"models\"]; assert ms and all(hashlib.file_digest(open(d + m[\"file\"], \"rb\"), \"sha256\").hexdigest() == m[\"sha256\"] for m in ms)"'
   check "torch >= 2.6 imports in the worker image" "$torch_ok"
   check "beat_this, scipy and soundfile import" 'python -c "import beat_this, scipy, soundfile"'
   check "the weights match the manifest sha256" "$weights_ok"
   check "weights are read-only and root-owned" '[ "$(stat -c %U:%a /opt/models/beat_this-final0.ckpt)" = root:444 ]'
+  check "transformers, pillow and scenedetect import" 'python -c "import transformers, PIL, scenedetect"'
+  check "OpenCV is the headless build (no GUI libraries)" 'python -c "import cv2, importlib.metadata as m; m.version(\"opencv-python-headless\")" && ! python -c "import importlib.metadata as m; m.version(\"opencv-python\")" 2>/dev/null'
+  check "SigLIP weights are safetensors, read-only and root-owned" '[ "$(stat -c %U:%a /opt/models/siglip/model.safetensors)" = root:444 ] && [ -z "$(find /opt/models -name "*.bin" -o -name "*.pt" -o -name "*.pth" -o -name "*.pkl")" ]'
   check "HF_HUB_OFFLINE=1" '[ "$HF_HUB_OFFLINE" = 1 ]'
   check "madmom is not installed" '! python -c "import madmom" 2>/dev/null'
 fi

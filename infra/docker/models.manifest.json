@@ -7,6 +7,76 @@
       "sha256": "8c328b45f59d8dd3dff219253ff6a8d6482be57d0133a29140e2febbf8eb8331",
       "source_url": "https://cloud.cp.jku.at/public.php/dav/files/7ik4RrBKTS273gp/final0.ckpt",
       "licence": "see licence register row Beat This checkpoints; Phase P blocker"
+    },
+    {
+      "name": "siglip2-base-patch16-224:config.json",
+      "group": "siglip2-base-patch16-224",
+      "file": "siglip/config.json",
+      "bytes": 253,
+      "sha256": "fe8b5fe6d5734360678fd71c11c21e1ea3364bd8598d34295d9206335973ffd7",
+      "source_url": "https://huggingface.co/google/siglip2-base-patch16-224/resolve/75de2d55ec2d0b4efc50b3e9ad70dba96a7b2fa2/config.json",
+      "revision": "75de2d55ec2d0b4efc50b3e9ad70dba96a7b2fa2",
+      "licence": "Apache-2.0"
+    },
+    {
+      "name": "siglip2-base-patch16-224:model.safetensors",
+      "group": "siglip2-base-patch16-224",
+      "file": "siglip/model.safetensors",
+      "bytes": 1500800904,
+      "sha256": "612923381c76ec5a9bed335d1c48827e3f2e506ac31b044b63b2031fadee6a0b",
+      "source_url": "https://huggingface.co/google/siglip2-base-patch16-224/resolve/75de2d55ec2d0b4efc50b3e9ad70dba96a7b2fa2/model.safetensors",
+      "revision": "75de2d55ec2d0b4efc50b3e9ad70dba96a7b2fa2",
+      "licence": "Apache-2.0"
+    },
+    {
+      "name": "siglip2-base-patch16-224:preprocessor_config.json",
+      "group": "siglip2-base-patch16-224",
+      "file": "siglip/preprocessor_config.json",
+      "bytes": 394,
+      "sha256": "9b36b57ebaf20f09bf4c22100ccc21877ea6bfe5aead0c00c59f8af8ccefacfc",
+      "source_url": "https://huggingface.co/google/siglip2-base-patch16-224/resolve/75de2d55ec2d0b4efc50b3e9ad70dba96a7b2fa2/preprocessor_config.json",
+      "revision": "75de2d55ec2d0b4efc50b3e9ad70dba96a7b2fa2",
+      "licence": "Apache-2.0"
+    },
+    {
+      "name": "siglip2-base-patch16-224:special_tokens_map.json",
+      "group": "siglip2-base-patch16-224",
+      "file": "siglip/special_tokens_map.json",
+      "bytes": 636,
+      "sha256": "baec30ea10906f16adb8c18af7a34023002c1746542612b8b41c9f09e1351351",
+      "source_url": "https://huggingface.co/google/siglip2-base-patch16-224/resolve/75de2d55ec2d0b4efc50b3e9ad70dba96a7b2fa2/special_tokens_map.json",
+      "revision": "75de2d55ec2d0b4efc50b3e9ad70dba96a7b2fa2",
+      "licence": "Apache-2.0"
+    },
+    {
+      "name": "siglip2-base-patch16-224:tokenizer.json",
+      "group": "siglip2-base-patch16-224",
+      "file": "siglip/tokenizer.json",
+      "bytes": 34363039,
+      "sha256": "cb9140fae3ac5122c972d37adf83e1248471a38147ad76f8215c8872c6fd8322",
+      "source_url": "https://huggingface.co/google/siglip2-base-patch16-224/resolve/75de2d55ec2d0b4efc50b3e9ad70dba96a7b2fa2/tokenizer.json",
+      "revision": "75de2d55ec2d0b4efc50b3e9ad70dba96a7b2fa2",
+      "licence": "Apache-2.0"
+    },
+    {
+      "name": "siglip2-base-patch16-224:tokenizer.model",
+      "group": "siglip2-base-patch16-224",
+      "file": "siglip/tokenizer.model",
+      "bytes": 4241003,
+      "sha256": "61a7b147390c64585d6c3543dd6fc636906c9af3865a5548f27f31aee1d4c8e2",
+      "source_url": "https://huggingface.co/google/siglip2-base-patch16-224/resolve/75de2d55ec2d0b4efc50b3e9ad70dba96a7b2fa2/tokenizer.model",
+      "revision": "75de2d55ec2d0b4efc50b3e9ad70dba96a7b2fa2",
+      "licence": "Apache-2.0"
+    },
+    {
+      "name": "siglip2-base-patch16-224:tokenizer_config.json",
+      "group": "siglip2-base-patch16-224",
+      "file": "siglip/tokenizer_config.json",
+      "bytes": 47164,
+      "sha256": "14afe629fe4959b9e0d51e1852b8d9f7ad074f90a1a7125a4fcdd17f06e78fc8",
+      "source_url": "https://huggingface.co/google/siglip2-base-patch16-224/resolve/75de2d55ec2d0b4efc50b3e9ad70dba96a7b2fa2/tokenizer_config.json",
+      "revision": "75de2d55ec2d0b4efc50b3e9ad70dba96a7b2fa2",
+      "licence": "Apache-2.0"
     }
   ]
 }

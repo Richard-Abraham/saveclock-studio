@@ -23,6 +23,14 @@ ANALYZE_COMPUTE_S = 480
 ANALYZE_LIMIT_S = ANALYZE_WAIT_S + ANALYZE_COMPUTE_S + 60
 HEAVY_TTL_S = 900
 
+# The footage stages run inside plan 006's single draft job and take a heavy slot once per unit of
+# work (one candidate's cut detection, sampling and embedding; one mezzanine encode), never for the
+# whole batch, so a slot is never held longer than its TTL: HEAVY_TTL_S > *_HOLD_S. A hold covers
+# longest child processes it spends (a test asserts it) plus a compute allowance.
+FOOTAGE_WAIT_S = 120  # waiting for a slot: HeavyLockTimeout is retryable
+VET_HOLD_S = 300  # sample (60 s) + scene detection and embeddings (hypothesis: 240 s, unmeasured)
+NORMALIZE_HOLD_S = 300  # one encode (120 s) + the checks that follow (3 x 60 s probes)
+
 
 def _f(
     default: Any,  # noqa: ANN401
@@ -116,6 +124,10 @@ class Settings(BaseSettings):
     fake_stock: bool = _f(False, "local/CI")
     fake_ml: bool = _f(False, "local/CI")
     fake_llm: bool = _f(False, "local/CI")
+    # local/CI only: a directory of generated clips that FAKE_STOCK serves (make fake-stock)
+    fake_stock_dir: str | None = _f(None, "K", doc="plan 005")
+    # SEC-044 alarm: the estimated monthly LLM spend above which one warning is logged
+    llm_monthly_budget_usd: float | None = _f(None, "K", doc="plan 005")
     # Not in ARCH §18 (proposed additions, plan 001 Step 2):
     broker_heartbeat_timeout_s: int = _f(60, "A,K,M", doc="plan 001")
     app_version: str = _f("dev", "all", doc="plan 001")

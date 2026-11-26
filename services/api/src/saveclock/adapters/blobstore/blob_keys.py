@@ -62,6 +62,29 @@ def render_file_key(render_id: UUID, name: str) -> str:
     return f"renders/{render_id}/{name}"
 
 
+_PROVIDERS = frozenset({"pexels", "pixabay"})
+_PROVIDER_ID = re.compile(r"[A-Za-z0-9_-]{1,64}")
+
+
+def _candidate_name(provider: str, provider_id: str, ext: str) -> str:
+    if provider not in _PROVIDERS or not _PROVIDER_ID.fullmatch(provider_id):
+        raise InvalidKey("bad provider or provider id")
+    return f"{provider}_{provider_id}.{ext}"
+
+
+def raw_key(project_id: UUID, provider: str, provider_id: str) -> str:
+    """The downloaded source clip. An intermediate: never served (not in the allowlist)."""
+    return work_key(project_id, "raw", _candidate_name(provider, provider_id, "mp4"))
+
+
+def mezz_key(project_id: UUID, provider: str, provider_id: str) -> str:
+    return work_key(project_id, "mezz", _candidate_name(provider, provider_id, "mp4"))
+
+
+def emb_key(project_id: UUID, provider: str, provider_id: str) -> str:
+    return work_key(project_id, "emb", _candidate_name(provider, provider_id, "npy"))
+
+
 def stub_key(job_id: UUID) -> str:
     # shortcut: stub only, removed with the stub in Phase 2
     return f"renders/{job_id}/stub.txt"

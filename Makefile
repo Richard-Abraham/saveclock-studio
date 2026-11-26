@@ -26,7 +26,7 @@ CHECK_STAGES := $(FAST_STAGES) images image-guards hadolint
 
 .PHONY: help guard secrets banned doctor fmt-check lint types arch pins compose-lint test \
   migrations audit env env-docs env-docs-check contracts contracts-check test-deps-up \
-  test-deps-down ffmpeg-cache ffmpeg-bin models-cache test-ml images image-guards hadolint scan-images up dev down \
+  test-deps-down ffmpeg-cache ffmpeg-bin models-cache test-ml fake-stock images image-guards hadolint scan-images up dev down \
   down-volumes sandbox check-fast check web-install web-env web-lint web-test web-build \
   bundle-scan web-audit-prod measure-rewrite smoke-web web-audit stack-up seed smoke-stub \
   predeploy-scan backup backup-init backup-test restore-proof backup-install-timer backup-timer-uninstall rollback-demo fresh-clone-timing
@@ -91,6 +91,10 @@ test:
 test-ml:
 	MODELS_DIR="$(CURDIR)/infra/docker/cache/models" $(UV) run --extra ml pytest -q -m ml
 
+# the 8 generated stock clips FAKE_STOCK serves (never committed; plan 005)
+fake-stock: ffmpeg-bin
+	$(UV) run python ../../eval/scripts/make_fake_stock.py ../../.data/fake-stock
+
 # alembic check (models == migration) and a downgrade -1 / upgrade head round trip
 migrations:
 	$(UV) run pytest -q -m migration_roundtrip
@@ -127,9 +131,12 @@ ffmpeg-bin: ffmpeg-cache
 	python3 infra/docker/fetch_ffmpeg.py infra/docker/ffmpeg.pin infra/docker/cache .data/ffmpeg
 
 # the Beat This weights from the owner's local download, sha256-checked against the manifest
+# and the SigLIP 2 snapshot from the owner's one-time download at the pinned revision (plan 005)
 MODELS_SRC := $(HOME)/saveclock-spike/downloads/models-beat_this
+SIGLIP_SRC := $(HOME)/saveclock-downloads/siglip2
 models-cache:
-	python3 scripts/fetch_models.py infra/docker/models.manifest.json $(MODELS_SRC) infra/docker/cache/models
+	python3 scripts/fetch_models.py infra/docker/models.manifest.json $(MODELS_SRC) infra/docker/cache/models none
+	python3 scripts/fetch_models.py infra/docker/models.manifest.json $(SIGLIP_SRC) infra/docker/cache/models siglip2-base-patch16-224
 
 images: ffmpeg-cache models-cache
 	$(CONTAINER) build --target api -f infra/docker/Dockerfile.api \

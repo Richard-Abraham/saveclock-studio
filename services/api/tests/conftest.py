@@ -1,3 +1,4 @@
+import socket
 from collections.abc import AsyncIterator
 from dataclasses import replace
 from pathlib import Path
@@ -41,6 +42,24 @@ def client_for(app: FastAPI, host: str = "localhost") -> httpx.AsyncClient:
 async def client() -> AsyncIterator[httpx.AsyncClient]:
     async with client_for(make_app(checks={})) as c:
         yield c
+
+
+LOCAL_HOSTS = frozenset({"127.0.0.1", "::1", "localhost"})
+
+
+@pytest.fixture(autouse=True)
+def _no_outbound_connections(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Plan 005: no test may open a connection that leaves the machine (the database, redis and
+    local TLS servers are loopback; everything else must be mocked)."""
+    real_connect = socket.socket.connect
+
+    def guarded(self: socket.socket, address: object) -> None:
+        if isinstance(address, tuple) and str(address[0]) not in LOCAL_HOSTS:
+            msg = f"test tried to connect outbound: {address[0]}"
+            raise OSError(msg)
+        real_connect(self, address)  # type: ignore[arg-type]
+
+    monkeypatch.setattr(socket.socket, "connect", guarded)
 
 
 FFMPEG_DIR = Path(__file__).resolve().parents[3] / ".data" / "ffmpeg"
