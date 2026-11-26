@@ -16,7 +16,7 @@ confirms the change summary; nothing is ever pushed without an explicit instruct
 | 003  | Bring-up on the owner's machine, nightly backup, restore proof, G1 evidence (`003-skeleton-bringup-backup-g1.md`) | P1 | M | 001, 002 | owner inputs (backup folder, passphrase file, timer OK, second LAN device); ends with the owner's G1 decision | DONE (merged; reviewer re-ran `make check`: 149 + 119 passed, CHECK OK; 2 ponytail-review rounds applied; G1 provisional GO, owner items pending in `003-g1-evidence.md`) |
 | 004  | Phase 2 foundation: migration 0002, audited FFmpeg runner, upload and validation, beat and energy analysis (`004-phase2-foundation-upload-analysis.md`) | P1 | L | 001, G1 = GO (003) | owner "go" for Phase 2; **DB CHANGE notice for `0002_analysis_pipeline` acknowledged before its commit** | DONE (merged; review round 1: analyze time budget, stale uploading, cancel/retry, old source, kill -9 test) |
 | 005  | Footage: keywords, stock search and safe download, scene-cut rejection, SigLIP ranking, top-K mezzanines (`005-phase2-footage-keywords-stock-rank-normalize.md`) | P1 | L | 004 | none (Pexels key optional, only for the live smoke) | DONE (merged a080fc6; review round 1: httpx key logging, busy-slot/poison candidates, bounded cut detection, redelivery) |
-| 006  | Planner, edit-plan contract, plan endpoints and ops, automatic draft, progress SSE (`006-phase2-planner-edit-plan-draft-sse.md`) | P1 | L | 004, 005 | none | TODO |
+| 006  | Planner, edit-plan contract, plan endpoints and ops, automatic draft, progress SSE (`006-phase2-planner-edit-plan-draft-sse.md`) | P1 | L | 004, 005 | none | DONE (merged 84868a5; review round 1: PATCH lost-update guard, SSE subscribe-before-snapshot and pubsub cleanup, a dead replan keeps its plan and keywords, planner errors not retried) |
 | 007  | Render the silent master, verify it, Mode A and Mode B export, downloads (`007-phase2-render-verify-export.md`) | P1 | L | 006 | none | TODO |
 | 008  | Operate: self-tuning wiring, retention and delete, rehydration, settings APIs, stub removal, security pass (`008-phase2-operate-retention-settings-security.md`) | P1 | L | 007 | none | TODO |
 | 009  | `saveclock` CLI, Claude Code skill, dev-only driver, eval script, G2 evidence (`009-phase2-cli-skill-driver-eval-g2.md`) | P1 | L | 008, 002 | owner review sheets, the multi-hour soak, optional Pexels key; ends with the owner's G2 decision | TODO |
@@ -101,6 +101,7 @@ Critical path facts:
 - Confidence model fitting (hand-set weights), ladder step 4 (`phrase_only`, a CHECK value with no producer), +/- 1 beat variation (hypothesis H3), the Lua token bucket, Dramatiq fan-out, the `disk_usage_rollup` actor, the `saveclock jobs requeue-dead` operator command, per-stage peak RSS (QM-083), TransNetV2: each recorded with its upgrade trigger in the plan's maintenance notes.
 - Real-stock evidence (G0-17, live smoke, real-clip OQ-4 numbers): waits for `PEXELS_API_KEY`.
 - Pixabay response mapping: deferred only if its documentation cannot be fetched (plan 005 Step 4).
+- Shot density (plan 006): above the 60-cut cap a higher density level no longer adds cuts, so density is not monotonic there; a test pins this. Upgrade when a song needs more than 60 cuts.
 
 ## Open decisions and risks the owner should know about
 
