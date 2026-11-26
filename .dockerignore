@@ -8,9 +8,10 @@ spike
 docs
 research_notes
 reports
-apps
 plans
-node_modules
+**/node_modules
+**/.next
+apps/web/coverage
 **/.venv
 **/__pycache__
 **/.mypy_cache

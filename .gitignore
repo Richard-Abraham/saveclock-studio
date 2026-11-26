@@ -40,3 +40,6 @@ coverage.json
 
 # local agent worktrees
 .claude/worktrees/
+coverage/
+next-env.d.ts
+*.tsbuildinfo

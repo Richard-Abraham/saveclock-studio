@@ -1,0 +1,42 @@
+FROM docker.io/library/node:22.23.1-slim@sha256:6c74791e557ce11fc957704f6d4fe134a7bc8d6f5ca4403205b2966bd488f6b3 AS base
+ENV NEXT_TELEMETRY_DISABLED=1
+# corepack reads `packageManager` from package.json (the one pin) when pnpm first runs.
+RUN corepack enable
+WORKDIR /app
+
+# Lockfile-driven install of the web app and its workspace dependency only (T-1.17).
+FROM base AS deps
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml .npmrc ./
+COPY apps/web/package.json apps/web/
+COPY packages/contracts/package.json packages/contracts/
+RUN pnpm install --frozen-lockfile --filter @saveclock/web...
+
+# next/font downloads the two Google fonts here, at build time: they end up in the image and the
+# browser never contacts Google (plan 002 W5). the NEXT_PUBLIC_*_ORIGIN values are public; nothing else is
+# passed at build time and no .env is ever copied in.
+FROM deps AS build
+# No defaults: `make images` passes both from .env, and a missing value fails the build.
+ARG NEXT_PUBLIC_APP_ORIGIN
+ARG NEXT_PUBLIC_API_ORIGIN
+RUN test -n "$NEXT_PUBLIC_APP_ORIGIN" && test -n "$NEXT_PUBLIC_API_ORIGIN"
+ENV NEXT_PUBLIC_APP_ORIGIN=${NEXT_PUBLIC_APP_ORIGIN} \
+    NEXT_PUBLIC_API_ORIGIN=${NEXT_PUBLIC_API_ORIGIN}
+COPY apps/web apps/web
+COPY packages/contracts packages/contracts
+RUN pnpm --filter @saveclock/web build
+
+# web: Next standalone output only. 0.0.0.0 is correct inside the container; the HOST binding is
+# the loopback one (compose, SEC-165). Runs as a numeric non-root user with a read-only root.
+FROM docker.io/library/node:22.23.1-slim@sha256:6c74791e557ce11fc957704f6d4fe134a7bc8d6f5ca4403205b2966bd488f6b3 AS web
+ENV NODE_ENV=production \
+    NEXT_TELEMETRY_DISABLED=1 \
+    HOSTNAME=0.0.0.0 \
+    PORT=3000
+WORKDIR /app
+COPY --from=build --chown=10001:10001 /app/apps/web/.next/standalone ./
+COPY --from=build --chown=10001:10001 /app/apps/web/.next/static ./apps/web/.next/static
+# Next writes its runtime cache here; compose mounts a tmpfs over it.
+RUN mkdir -p /app/apps/web/.next/cache && chown 10001:10001 /app/apps/web/.next/cache
+USER 10001
+EXPOSE 3000
+CMD ["node", "apps/web/server.js"]

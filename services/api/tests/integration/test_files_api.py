@@ -33,6 +33,7 @@ async def test_settings_body_shape_and_no_key_material(
         redis_url=REDIS_URL,
         blob_root=str(blob_root),
         disk_low_watermark_gb=0,
+        intermediate_ttl_days=3,
         pexels_key_configured=True,
         pexels_api_key=SECRET,
     )
@@ -49,7 +50,8 @@ async def test_settings_body_shape_and_no_key_material(
     }
     assert body["stock"] == {"pixabay_enabled": False}
     assert body["tuning"] is None  # worker not running: no heartbeat key
-    assert set(body) == {"keys", "stock", "tuning", "disk"}
+    assert set(body) == {"keys", "stock", "tuning", "disk", "intermediate_ttl_days"}
+    assert body["intermediate_ttl_days"] == 3
     assert set(body["disk"]) == {"volume", "by_area", "projects"}
     assert body["disk"]["by_area"] == {"songs": 0, "work": 0, "renders": 0}
     assert body["disk"]["projects"] == []

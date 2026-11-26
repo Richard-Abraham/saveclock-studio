@@ -58,3 +58,4 @@ class SettingsOut(_Model):
     stock: Stock
     tuning: Tuning | None
     disk: Disk
+    intermediate_ttl_days: int

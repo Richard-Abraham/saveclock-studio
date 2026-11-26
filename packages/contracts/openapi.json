@@ -312,6 +312,10 @@
           "disk": {
             "$ref": "#/components/schemas/Disk"
           },
+          "intermediate_ttl_days": {
+            "title": "Intermediate Ttl Days",
+            "type": "integer"
+          },
           "keys": {
             "$ref": "#/components/schemas/Keys"
           },
@@ -333,7 +337,8 @@
           "keys",
           "stock",
           "tuning",
-          "disk"
+          "disk",
+          "intermediate_ttl_days"
         ],
         "title": "SettingsOut",
         "type": "object"

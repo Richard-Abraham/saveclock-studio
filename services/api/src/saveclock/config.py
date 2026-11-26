@@ -63,7 +63,7 @@ class Settings(BaseSettings):
     max_upload_mb: int = _f(100, "A,K")
     min_song_s: int = _f(15, "A,K")
     max_song_s: int = _f(600, "A,K")
-    intermediate_ttl_days: int = _f(7, "M")
+    intermediate_ttl_days: int = _f(7, "A,M")
     sweep_interval_min: int = _f(60, "M")
     disk_low_watermark_gb: float = _f(5, "A,K,M")
     worker_heavy_concurrency: int | None = _f(None, "K")
@@ -95,6 +95,8 @@ class Settings(BaseSettings):
     backup_password_file: str | None = _f(None, "host", secret=True)
     backup_dest_dir: str | None = _f(None, "host", secret=True)
     next_public_app_origin: str | None = _f(None, "W")
+    # Branch B of OQ-26 (plan 002): the browser calls the API directly at this origin.
+    next_public_api_origin: str = _f("http://localhost:8000", "W", example="http://localhost:8000")
     fake_stock: bool = _f(False, "local/CI")
     fake_ml: bool = _f(False, "local/CI")
     fake_llm: bool = _f(False, "local/CI")

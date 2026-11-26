@@ -1,0 +1,19 @@
+{
+  "name": "saveclock",
+  "private": true,
+  "packageManager": "pnpm@10.30.3",
+  "engines": { "node": "22.23.1", "pnpm": "10.30.3" },
+  "scripts": {
+    "contracts:generate": "pnpm --filter @saveclock/contracts generate",
+    "format": "prettier --write apps packages",
+    "format:check": "prettier --check apps packages"
+  },
+  "devDependencies": {
+    "prettier": "3.10.1"
+  },
+  "pnpm": {
+    "overrides": {
+      "sharp": "-"
+    }
+  }
+}
