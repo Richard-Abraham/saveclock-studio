@@ -166,6 +166,11 @@ forbidden_modules = [
   "scipy",
   "torch",
   "soundfile",
+  "transformers",
+  "scenedetect",
+  "cv2",
+  "PIL",
+  "anthropic",
 ]
 
 [tool.uv]

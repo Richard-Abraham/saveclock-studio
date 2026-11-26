@@ -11,6 +11,13 @@ PATHS = (
     "saveclock/domain/",
     "saveclock/adapters/ffmpeg.py",
     "saveclock/services/ingest.py",
+    # plan 005: the adapters that touch the network, the model and the clips, and the keyword rules
+    "saveclock/adapters/safe_http.py",
+    "saveclock/adapters/stock/",
+    "saveclock/adapters/llm.py",
+    "saveclock/adapters/scenedetect.py",
+    "saveclock/adapters/vision.py",
+    "saveclock/services/keywords.py",
 )
 REPORT = Path(__file__).resolve().parent.parent / "services" / "api" / "coverage.json"
 

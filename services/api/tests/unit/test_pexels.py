@@ -22,6 +22,8 @@ from tests.factories.memory_redis import MemoryRedis
 if TYPE_CHECKING:
     from redis import Redis
 
+    pass
+
 FIXTURES = Path(__file__).resolve().parents[1] / "fixtures"
 KEY = "pexels-test-key-0123456789abcdef"
 PIXABAY_KEY = "pixabay-test-key-9876543210"
@@ -308,3 +310,27 @@ def test_a_pixabay_failure_does_not_put_the_key_in_the_error(respx_mock: respx.M
     assert PIXABAY_KEY not in str(info.value)
     assert PIXABAY_KEY not in repr(logs)
     assert info.value.__cause__ is None
+
+
+def test_both_providers_download_through_the_shared_downloader(tmp_path: Path) -> None:
+    from saveclock.adapters.blobstore.filesystem import FilesystemBlobStore
+    from saveclock.adapters.stock.download import Downloader
+
+    calls: list[tuple[str, int]] = []
+
+    class Spy(Downloader):
+        def fetch(self, clip: Any, blobs: Any, key: str, *, max_bytes: int, cancel: Any) -> int:
+            calls.append((clip.provider_id, max_bytes))
+            return 7
+
+    store = FilesystemBlobStore(tmp_path, 0)
+    limiter = cast("FixedWindowLimiter", AlwaysOk())
+    http = ProviderHttp(httpx.Client(), "x", limiter, CircuitBreaker())
+    clip = parse_videos(pexels_json())[0]
+    pexels = PexelsProvider(http, KEY, SearchCache(cast("Redis", MemoryRedis()), "p"), Spy())
+    pixabay = PixabayProvider(
+        http, PIXABAY_KEY, SearchCache(cast("Redis", MemoryRedis()), "q"), Spy()
+    )
+    assert pexels.download(clip, store, "work/x/a.mp4", max_bytes=5, cancel=None) == 7
+    assert pixabay.download(clip, store, "work/x/b.mp4", max_bytes=6, cancel=None) == 7
+    assert calls == [("3001", 5), ("3001", 6)]

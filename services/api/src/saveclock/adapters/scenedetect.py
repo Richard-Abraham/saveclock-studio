@@ -17,6 +17,7 @@ def detect_cuts(path: Path, *, downscale_height: int = 360) -> list[float]:
     manager = SceneManager()
     manager.add_detector(ContentDetector())
     height = int(video.frame_size[1])
+    manager.auto_downscale = False  # the factor below is what is used (360 px high)
     manager.downscale = max(1, height // downscale_height)
     manager.detect_scenes(video, show_progress=False)
     scenes = manager.get_scene_list()

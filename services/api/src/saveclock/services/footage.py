@@ -70,7 +70,17 @@ YIELD_MIN_WIDTH = 1080
 DONE_STATUSES = frozenset({ClipStatus.RANKED, ClipStatus.NORMALIZED, ClipStatus.SELECTED})
 REJECTED_STATUSES = frozenset({ClipStatus.REJECTED_CUT, ClipStatus.REJECTED_QUALITY})
 PERMANENT_DOWNLOAD_REFUSALS = frozenset(
-    {"content_type", "not_mp4", "http_status", "scheme", "host_not_allowed", "address", "port"}
+    {
+        "content_type",
+        "not_mp4",
+        "http_status",
+        "scheme",
+        "host_not_allowed",
+        "address",
+        "port",
+        "redirect",
+        "too_many_redirects",
+    }
 )
 
 

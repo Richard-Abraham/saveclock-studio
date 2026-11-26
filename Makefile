@@ -131,9 +131,12 @@ ffmpeg-bin: ffmpeg-cache
 	python3 infra/docker/fetch_ffmpeg.py infra/docker/ffmpeg.pin infra/docker/cache .data/ffmpeg
 
 # the Beat This weights from the owner's local download, sha256-checked against the manifest
+# and the SigLIP 2 snapshot from the owner's one-time download at the pinned revision (plan 005)
 MODELS_SRC := $(HOME)/saveclock-spike/downloads/models-beat_this
+SIGLIP_SRC := $(HOME)/saveclock-downloads/siglip2
 models-cache:
-	python3 scripts/fetch_models.py infra/docker/models.manifest.json $(MODELS_SRC) infra/docker/cache/models
+	python3 scripts/fetch_models.py infra/docker/models.manifest.json $(MODELS_SRC) infra/docker/cache/models none
+	python3 scripts/fetch_models.py infra/docker/models.manifest.json $(SIGLIP_SRC) infra/docker/cache/models siglip2-base-patch16-224
 
 images: ffmpeg-cache models-cache
 	$(CONTAINER) build --target api -f infra/docker/Dockerfile.api \

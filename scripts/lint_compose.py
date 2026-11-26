@@ -40,7 +40,7 @@ def lint(path: Path) -> list[str]:
         for port in svc.get("ports", []) or []:
             if not isinstance(port, str) or not any(p.fullmatch(port) for p in PORT_OK):
                 problems.append(f"{name}: port {port!r} is not loopback-bound")
-        if path.name == "compose.yml" and name in {"postgres", "redis"} and svc.get("ports"):
+        if path.name == "compose.yml" and name not in {"api", "web"} and svc.get("ports"):
             problems.append(f"{name}: must not publish ports")
         labels = svc.get("labels") or {}
         label_keys = labels if isinstance(labels, list) else list(labels)

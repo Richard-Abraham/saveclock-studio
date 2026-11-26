@@ -278,8 +278,15 @@ def test_the_cap_is_100_mb() -> None:
 def test_a_stream_over_the_cap_without_content_length_is_cut_and_nothing_is_left(
     blobs: FilesystemBlobStore, tmp_path: Path
 ) -> None:
-    body = MP4 + b"y" * 50_000
-    assert refused(blobs, ok(body), max_bytes=10_000) == "too_large"
+    def chunks() -> Iterator[bytes]:  # a generator body has no Content-Length
+        yield MP4
+        for _ in range(50):
+            yield b"y" * 1000
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(200, headers={"content-type": "video/mp4"}, content=chunks())
+
+    assert refused(blobs, handler, max_bytes=10_000) == "too_large"
     assert list((tmp_path / "blobs").rglob("*.part")) == []
 
 
@@ -331,6 +338,24 @@ def test_cancel_and_the_wall_clock_stop_the_download(blobs: FilesystemBlobStore)
     assert refused(blobs, ok(), cancel=lambda: True) == "canceled"
     ticks = iter([0.0, 999.0, 999.0])
     assert refused(blobs, ok(), wall_clock_s=10.0, clock=lambda: next(ticks)) == "timeout"
+
+
+def test_a_client_made_by_the_function_is_closed_again(
+    blobs: FilesystemBlobStore, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    made: list[httpx.Client] = []
+    real = httpx.Client  # the patch below replaces it for the whole httpx module
+
+    def factory(*args: object, **kwargs: object) -> httpx.Client:
+        client = real(transport=httpx.MockTransport(ok()))
+        made.append(client)
+        return client
+
+    monkeypatch.setattr("saveclock.adapters.safe_http.httpx.Client", factory)
+    assert safe_download(
+        URL, blobs, KEY, hosts=HOSTS, max_bytes=10_000, resolver=resolver_to("93.184.216.34")
+    ) == len(MP4)
+    assert made[0].is_closed
 
 
 def test_the_default_resolver_and_address_policy() -> None:
