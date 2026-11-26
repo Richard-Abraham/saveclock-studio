@@ -8,6 +8,7 @@ A heavy slot is taken once per unit of work (one candidate's analysis), never fo
 
 import asyncio
 import io
+import threading
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass, field
 from decimal import Decimal
@@ -21,10 +22,10 @@ from redis import Redis
 
 from saveclock.adapters.blobstore.blob_keys import emb_key, raw_key
 from saveclock.adapters.ffmpeg import FfCanceled, FfError, FfTimeout, probe_stock, sample_frames
-from saveclock.adapters.heavy_lock import HeavyLock
+from saveclock.adapters.heavy_lock import HeavyLock, HeavyLockTimeout
 from saveclock.adapters.models import verified_group
 from saveclock.adapters.safe_http import DownloadRefused
-from saveclock.adapters.scenedetect import detect_cuts
+from saveclock.adapters.scenedetect import DetectionStopped, detect_cuts
 from saveclock.adapters.siglip import FakeRanker, ImageTextRanker, SigLipRanker
 from saveclock.adapters.stock.download import Downloader, allowed_hosts
 from saveclock.adapters.stock.fake import FakeStockProvider
@@ -39,6 +40,7 @@ from saveclock.adapters.stock.pixabay import PixabayProvider
 from saveclock.adapters.stock.port import StockClip, StockProvider
 from saveclock.adapters.vision import laplacian_variance
 from saveclock.config import FOOTAGE_WAIT_S, Settings
+from saveclock.domain.framemath import FPS
 from saveclock.domain.keywords import broaden
 from saveclock.domain.ranking import RankedClip, near_duplicates, rank
 from saveclock.domain.sampling import clip_score, frame_scores, mean_vector, normalize, sample_count
@@ -93,6 +95,7 @@ class FootageDeps:
     cancel: Callable[[], bool] | None = None
     fetch_concurrency: int = 4
     seed: int | str = 0
+    close: Callable[[], None] = lambda: None  # releases the HTTP client the providers share
 
 
 @dataclass(frozen=True)
@@ -300,7 +303,15 @@ def _analyse(
     ctx = deps.ctx
     raw = ctx.blobs.local_path(raw_key(row.project_id, row.provider, row.provider_id))
     with deps.heavy.hold(FOOTAGE_WAIT_S):
-        window = best_window(detect_cuts(raw), duration_s)
+        try:
+            cuts = detect_cuts(raw, cancel=deps.cancel)
+        except DetectionStopped:
+            _canceled(deps)
+            return _Reject(ClipStatus.REJECTED_QUALITY, RejectReason.FFPROBE_FAILED)
+        except Exception:  # a poison clip (e.g. VideoOpenFailure) is rejected once
+            log.warning("footage.detect_failed")
+            return _Reject(ClipStatus.REJECTED_QUALITY, RejectReason.FFPROBE_FAILED)
+        window = best_window(cuts, duration_s)
         if window is None:
             return _Reject(ClipStatus.REJECTED_CUT, RejectReason.NO_CUT_FREE_WINDOW)
         with scratch_dir(ctx.settings.scratch_root, new_id()) as tmp:
@@ -334,7 +345,7 @@ def _stored_ranked(deps: FootageDeps, row: ClipCandidate) -> RankedClip:
         data = np.load(io.BytesIO(b"".join(deps.ctx.blobs.open(key))), allow_pickle=False)
         mean = mean_vector([normalize([float(x) for x in v]) for v in data])
     frames = int(row.mezz_frames or 0)
-    window = Window(float(row.window_start_s or 0), frames / 30)
+    window = Window(float(row.window_start_s or 0), frames / FPS)
     frame_scores_json = row.frame_scores if isinstance(row.frame_scores, dict) else {}
     return RankedClip(
         row.provider,
@@ -440,6 +451,9 @@ async def vet_and_rank(
             except DownloadRefused as exc:  # a transient network failure: try again next run
                 log.warning("footage.download_skipped", reason=exc.reason)
                 return None
+            except HeavyLockTimeout:  # no slot in time: this candidate waits for the next run
+                log.warning("footage.slot_timeout")
+                return None
 
     outcomes = await asyncio.gather(*(guarded(r) for r in todo))
     ranked = [o for o in outcomes if isinstance(o, RankedClip)]
@@ -466,7 +480,7 @@ async def effective_pixabay(ctx: WorkerContext, user_id: UUID) -> bool:
 
 
 def build_providers(
-    settings: Settings, redis: Redis, *, pixabay_on: bool
+    settings: Settings, redis: Redis, *, pixabay_on: bool, http: httpx.Client | None = None
 ) -> tuple[StockProvider, ...]:
     """Fake clips under FAKE_STOCK, else Pexels (when a key exists) and Pixabay (only when its
     switch is on AND a key exists: otherwise it is not even constructed)."""
@@ -481,7 +495,7 @@ def build_providers(
         if pixabay_on and settings.pixabay_api_key
         else None
     )
-    http = httpx.Client(timeout=httpx.Timeout(20.0, connect=10.0))
+    http = http or httpx.Client(timeout=httpx.Timeout(20.0, connect=10.0))
     downloader = Downloader(allowed_hosts(settings.stock_host_allowlist, pixabay=bool(pixabay_key)))
     providers: list[StockProvider] = []
     if pexels_key:
@@ -510,18 +524,21 @@ def build_providers(
 
 
 _RANKERS: dict[tuple[bool, str], ImageTextRanker] = {}
+_RANKERS_LOCK = threading.Lock()
 
 
 def get_ranker(settings: Settings) -> ImageTextRanker:
     """One ranker per process, built on first use (not at import); weights verified first."""
     key = (settings.fake_ml, settings.siglip_model)
-    if key not in _RANKERS:
-        if settings.fake_ml:
-            _RANKERS[key] = FakeRanker()
-        else:
-            directory = verified_group(settings.models_dir, SIGLIP_GROUP)  # ModelIntegrityError
-            _RANKERS[key] = SigLipRanker(directory, effective(settings, host_facts()).torch_threads)
-    return _RANKERS[key]
+    with _RANKERS_LOCK:
+        if key not in _RANKERS:
+            if settings.fake_ml:
+                _RANKERS[key] = FakeRanker()
+            else:
+                directory = verified_group(settings.models_dir, SIGLIP_GROUP)  # ModelIntegrityError
+                threads = effective(settings, host_facts()).torch_threads
+                _RANKERS[key] = SigLipRanker(directory, threads)
+        return _RANKERS[key]
 
 
 def build_footage_deps(
@@ -533,12 +550,20 @@ def build_footage_deps(
     seed: int | str = 0,
 ) -> FootageDeps:
     tuning = effective(ctx.settings, host_facts())
+    http = httpx.Client(timeout=httpx.Timeout(20.0, connect=10.0))
+    try:
+        providers = build_providers(ctx.settings, redis, pixabay_on=pixabay_on, http=http)
+        ranker = get_ranker(ctx.settings)
+    except BaseException:
+        http.close()
+        raise
     return FootageDeps(
         ctx,
-        build_providers(ctx.settings, redis, pixabay_on=pixabay_on),
-        get_ranker(ctx.settings),
+        providers,
+        ranker,
         HeavyLock(redis, tuning.heavy, ctx.settings.heavy_ttl_s),
         cancel,
         tuning.fetch_concurrency,
         seed,
+        http.close,  # the caller closes it when the job ends
     )

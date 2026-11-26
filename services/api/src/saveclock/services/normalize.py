@@ -15,7 +15,9 @@ import structlog
 
 from saveclock.adapters.blobstore.blob_keys import mezz_key, raw_key
 from saveclock.adapters.ffmpeg import FfCanceled, FfError, FfTimeout, build_mezz, probe_video
+from saveclock.adapters.heavy_lock import HeavyLockTimeout
 from saveclock.config import FOOTAGE_WAIT_S
+from saveclock.domain.framemath import FPS
 from saveclock.domain.ranking import RankedClip, top_k_count
 from saveclock.domain.stock_rules import RejectReason
 from saveclock.domain.video_checks import video_checks
@@ -76,11 +78,27 @@ def _encode_and_check(deps: FootageDeps, project_id: UUID, clip: RankedClip) -> 
 async def _normalize(
     deps: FootageDeps, user_id: UUID, project_id: UUID, clip: RankedClip
 ) -> NormalizedClip | None:
+    async with deps.ctx.sessionmaker() as session:
+        row = await CandidateRepository(session).get_by_provider_id(
+            user_id=user_id,
+            project_id=project_id,
+            provider=clip.provider,
+            provider_id=clip.provider_id,
+        )
+    if (
+        row is not None
+        and row.status == ClipStatus.NORMALIZED.value
+        and row.mezz_frames
+        and deps.ctx.blobs.exists(mezz_key(project_id, clip.provider, clip.provider_id))
+    ):  # a redelivered job: the stored result is the answer
+        return NormalizedClip(
+            clip.provider, clip.provider_id, clip.query, clip.score, row.mezz_frames
+        )
     try:
         outcome = await asyncio.to_thread(_encode_and_check, deps, project_id, clip)
     except FfCanceled as exc:
         raise JobCanceled from exc
-    except FfTimeout:
+    except (FfTimeout, HeavyLockTimeout):
         return None  # transient: stays `ranked`, the next clip takes its place
     if isinstance(outcome, RejectReason):
         await mark_candidate(
@@ -127,7 +145,8 @@ async def normalize_topk(
     while len(done) < k and queue:
         batch, queue = queue[: k - len(done)], queue[k - len(done) :]
         done += [r for r in await asyncio.gather(*(one(c) for c in batch)) if r is not None]
-    done.sort(key=lambda n: [c.provider_id for c in ranked].index(n.provider_id))
+    order = [(c.provider, c.provider_id) for c in ranked]
+    done.sort(key=lambda n: order.index((n.provider, n.provider_id)))
     log.info("footage.normalize", wanted=k, normalized=len(done), tried=len(ranked) - len(queue))
     return done
 
@@ -151,7 +170,7 @@ async def normalize_one(
         provider_id,
         row.query,
         float(row.score or 0.0),
-        Window(float(Decimal(row.window_start_s)), row.mezz_frames / 30),
+        Window(float(Decimal(row.window_start_s)), row.mezz_frames / FPS),
     )
     normalized = await _normalize(deps, user_id, project_id, clip)
     if normalized is None:

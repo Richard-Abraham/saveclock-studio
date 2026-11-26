@@ -95,7 +95,7 @@ def _chunks(
     clock: Callable[[], float],
 ) -> Iterator[bytes]:
     head = b""
-    for chunk in response.iter_bytes(CHUNK):
+    for chunk in response.iter_bytes():
         if clock() > deadline:
             raise DownloadRefused("timeout")
         if cancel is not None and cancel():
@@ -140,7 +140,7 @@ def safe_download(
             request = http.build_request(
                 "GET",
                 _ip_url(address, port, path),
-                headers={"Host": host, "Accept": "video/*"},
+                headers={"Host": host, "Accept": "video/*", "Accept-Encoding": "identity"},
                 extensions={"sni_hostname": host},
             )
             response = http.send(request, stream=True, follow_redirects=False)

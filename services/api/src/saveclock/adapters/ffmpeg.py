@@ -20,6 +20,7 @@ from pathlib import Path
 from typing import Any
 
 from saveclock.domain.audio_rules import AudioProbe, StreamInfo
+from saveclock.domain.framemath import FPS
 from saveclock.domain.video_checks import moov_before_mdat
 from saveclock.domain.windows import Window
 
@@ -259,7 +260,7 @@ SAMPLE_TIMEOUT_S = 60
 MEZZ_TIMEOUT_S = 120
 SAMPLE_VF = "fps=1,scale=224:-2"
 MEZZ_VF = (
-    "fps=30,scale=1080:1920:force_original_aspect_ratio=increase:flags=bicubic,"
+    f"fps={FPS},scale=1080:1920:force_original_aspect_ratio=increase:flags=bicubic,"
     "crop=1080:1920,setsar=1,format=yuv420p"
 )
 # x264 only: the libopenh264 fallback of the spike is not ported
@@ -350,7 +351,7 @@ def mezz_cmd(tools: Tools, src: Path, window: Window, out: Path) -> list[str]:
         *("-map", "0:v:0", "-an", "-sn", "-dn"),
         *("-ss", f"{window.start_s}", "-t", f"{window.len_s}"),
         *("-vf", MEZZ_VF),
-        *("-r", "30", "-fps_mode", "cfr"),
+        *("-r", str(FPS), "-fps_mode", "cfr"),
         *MEZZ_ENCODE,
         *("-video_track_timescale", "30000", "-movflags", "+faststart", str(out)),
     )
