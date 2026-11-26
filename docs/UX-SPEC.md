@@ -138,9 +138,11 @@ Shortcuts do not fire inside inputs. Setting "Single-key shortcuts" can be turne
 | LCP | ≤ 2.0 s (good threshold is 2.5 s) | ≤ 2.5 s | ≤ 2.5 s (shell), preview poster ≤ 3 s |
 | INP | ≤ 200 ms (p75) | ≤ 200 ms | ≤ 200 ms for taps; playhead/scrub frame ≤ 16 ms (main thread) |
 | CLS | ≤ 0.05 | ≤ 0.1 | ≤ 0.1 |
-| JS per route (gzip, first load) | ≤ 90 KB | ≤ 150 KB | ≤ 280 KB, waveform + player lazy-loaded; no heavy chart libs |
+| JS per route (gzip, first load) | ≤ 200 KB | ≤ 230 KB | ≤ 350 KB, waveform + player lazy-loaded; no heavy chart libs |
 | CSS (gzip) | ≤ 20 KB | | |
 | Fonts | ≤ 70 KB | | |
+
+> **Rev 3.6 budget note (2026-11-26):** the JS rows were raised from 90/150/280 KB. They had been set for a phone loading over a tailnet. The app is now local-only (DECISIONS §8f), and the Next 16 + React framework chunks alone measured about 187 KB gzip on an empty shell (plan 002, Lighthouse 13.6). The new caps sit just above that baseline, so app code stays nearly flat; treat them as a ratchet and never raise them again without a measured reason. The font and CSS budgets are unchanged.
 | Images | hero is SVG/CSS; thumbnails ≤ 20 KB WebP; explicit width/height | | |
 - Waveform peaks sent as ≤ 2000 samples (≈ 4 KB); beat times as JSON array; no raw audio decode in the main thread (Web Worker if decoding is needed for preview).
 - Preview uses a proxy, not the 1080×1920 render: **540×960** (DECISIONS §8e); 360×640 only if playback stutters (T-3.4b).

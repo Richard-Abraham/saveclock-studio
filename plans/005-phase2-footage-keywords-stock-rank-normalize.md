@@ -308,7 +308,7 @@ ALL must hold:
 - [ ] `make test` last line `N passed`; coverage floors `ok` for `saveclock/domain/` (>= 95 %) and overall >= 85 %.
 - [ ] `make test-ml` passes (real Beat This and SigLIP) on a machine with the weights cache.
 - [ ] `make images image-guards hadolint sandbox` exit 0; `make compose-lint` exit 0 and shows `egress` on `worker` only.
-- [ ] The offline suite (every test except `-m live`) passes with **no network access and no provider key** (run it once with `PEXELS_API_KEY= ANTHROPIC_API_KEY=` unset and say so).
+- [ ] The offline suite (every test except `-m live`) passes with **no network access and no provider key** (run it once with both provider-key variables unset in the environment and say so).
 - [ ] Each gate in the table was demonstrated failing on three classes of injected change and passing after revert, exit codes reported.
 - [ ] `grep -rn "api.pexels.com" services/api/src` shows the host only in `adapters/stock/` constants; `grep -rn "torch.load\|pickle.load" services/api/src` -> no match; `grep -rn "shell=True" services/api/src` -> no match.
 - [ ] `make contracts-check` exits 0 and `git diff packages/contracts/openapi.json` is empty (no endpoint changed).
