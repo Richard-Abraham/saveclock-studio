@@ -16,7 +16,8 @@ const securityHeaders = [
   { key: "Referrer-Policy", value: "no-referrer" },
   { key: "X-Frame-Options", value: "DENY" },
   { key: "Permissions-Policy", value: "camera=(), microphone=(), geolocation=()" },
-  // Report-only soak (plan 002 W8); the nonce-based strict policy is Phase 3. No HSTS on purpose.
+  // Report-only: the Phase 1 soak is a manual browser-console check (no report endpoint). The strict
+  // nonce policy is Phase 3 (plan 002 W8). No HSTS on purpose.
   {
     key: "Content-Security-Policy-Report-Only",
     value:

@@ -16,6 +16,7 @@ const display = Bricolage_Grotesque({
   subsets: ["latin"],
   display: "swap",
   variable: "--font-bricolage",
+  // latin-ext dropped to meet the 70 KB font budget (latin only above).
   // shortcut: one static weight (600) instead of the variable file: 22 KB vs 41 KB, so fonts fit the 70 KB budget
   // (DESIGN §3.2 budgets "Bricolage 600"). h1 is 600 not 650; upgrade if the budget allows the variable file.
   weight: "600",

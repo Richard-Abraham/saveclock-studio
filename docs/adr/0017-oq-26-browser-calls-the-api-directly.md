@@ -28,6 +28,8 @@ Branch B. The browser calls the API directly at its own localhost origin for the
 - Next.js server-side code calls the API over the internal network (`API_INTERNAL_URL`).
 - The Host allowlist stays at the web edge (`src/proxy.ts`) and on the rewrite (plan 002 W14).
 - `experimental.proxyClientMaxBodySize` is not used.
+- The web edge sends `Content-Security-Policy-Report-Only`. The Phase 1 soak is a manual check of the browser console; there is no report endpoint.
+- Fonts: `latin-ext` was dropped (latin only, one static Bricolage weight) to meet the 70 KB font budget.
 
 ## Measurements after the decision (`make measure-rewrite`, same stack)
 ```
