@@ -1,0 +1,13 @@
+node_modules
+.next
+coverage
+pnpm-lock.yaml
+packages/contracts/src/schema.d.ts
+packages/contracts/openapi.json
+services
+docs
+plans
+spike
+research_notes
+reports
+infra
