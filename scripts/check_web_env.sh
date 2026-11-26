@@ -10,6 +10,9 @@ platform='NODE_ENV NEXT_RUNTIME'  # set by Node/Next themselves, not by us
 src="$(find apps/web/src apps/web/next.config.ts -type f \( -name '*.ts' -o -name '*.tsx' \) ! -name '*.test.*' 2>/dev/null)"
 # shellcheck disable=SC2086
 used="$(grep -ohE 'process\.env\.[A-Za-z_][A-Za-z0-9_]*' $src | sed 's/^process\.env\.//' | sort -u)"
+# names declared in the Zod schema of lib/server-env.ts (it parses process.env as a whole)
+schema_names="$(grep -ohE '^[[:space:]]+[A-Z][A-Z0-9_]+: z\.' apps/web/src/lib/server-env.ts | tr -d ' :z.' )"
+used="$(printf '%s\n%s\n' "$used" "$schema_names" | sort -u | grep .)"
 # any NEXT_PUBLIC_ name mentioned anywhere in the app source (bracket access, strings, comments)
 # shellcheck disable=SC2086
 public="$(grep -ohE 'NEXT_PUBLIC_[A-Za-z0-9_]*' $src | sort -u)"

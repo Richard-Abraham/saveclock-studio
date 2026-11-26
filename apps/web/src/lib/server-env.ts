@@ -14,18 +14,8 @@ export type ServerEnv = {
   allowedHosts: string[];
 };
 
-type RawEnv = { API_INTERNAL_URL: string | undefined; ALLOWED_HOSTS: string | undefined };
-
-export function readServerEnv(
-  raw: RawEnv = {
-    API_INTERNAL_URL: process.env.API_INTERNAL_URL,
-    ALLOWED_HOSTS: process.env.ALLOWED_HOSTS,
-  },
-): ServerEnv {
-  const parsed = schema.parse({
-    API_INTERNAL_URL: raw.API_INTERNAL_URL || undefined,
-    ALLOWED_HOSTS: raw.ALLOWED_HOSTS || undefined,
-  });
+export function readServerEnv(): ServerEnv {
+  const parsed = schema.parse(process.env);
   return {
     apiOrigin: new URL(parsed.API_INTERNAL_URL).origin,
     allowedHosts: parseAllowedHosts(parsed.ALLOWED_HOSTS),
