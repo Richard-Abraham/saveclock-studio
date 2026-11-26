@@ -117,7 +117,7 @@ Monorepo: `apps/web`, `services/api` (two Docker targets), `packages/contracts` 
     - It also rejects `Sec-Fetch-Site: cross-site`.
     - Browsers always send `Origin` on cross-site POSTs, so this blocks other tabs.
   - **SECURITY OQ-1.** Loopback bind plus the Host/Origin checks is enough for a single-user machine, so there is no CLI token.
-  - **OQ-26 (single origin through a Next.js rewrite).** The Phase 1 walking skeleton verifies that SSE and a 100 MB upload stream through the rewrite without buffering. If they don't, the API gets its own localhost origin with CORS allowing only `APP_ORIGIN`.
+  - **OQ-26 (single origin through a Next.js rewrite).** The Phase 1 walking skeleton verifies that SSE and a 100 MB upload stream through the rewrite without buffering. If they don't, the API gets its own localhost origin with CORS allowing only `APP_ORIGIN`. **Measured 2026-11-26 (plan 002 Step 7): SSE passed, and the 100 MB upload failed (Next 16.4.6 rewrites cut request bodies at 10 MB; `experimental.proxyClientMaxBodySize` would buffer the body in the web process). So Branch B applies: the browser calls the API directly at `http://localhost:8000`, with CORS allowing only `APP_ORIGIN`, no credentials, and the API's Host/Origin/Sec-Fetch guard unchanged. Next.js server-side code calls the API over the internal network.**
   - **RQ-5.** G2's golden-set numbers become "not measured" (§8g). G0-19 (TransNetV2) stays open, and G0-26 is not applicable.
 
 ## 8f. Local-only edition (Rev 3.5, owner directive 2026-11-26) — overrides §3, §8c, §8d where they mention the VPS or Tailscale
