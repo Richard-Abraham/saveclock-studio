@@ -48,8 +48,17 @@ def node_tag_offenders() -> list[str]:
     )
 
 
+def restic_pin_offenders() -> list[str]:
+    """infra/backup/restic.pin is the one owner of the restic image; it must be a digest."""
+    pin = ROOT / "infra" / "backup" / "restic.pin"
+    if not pin.is_file():
+        return ["infra/backup/restic.pin: missing"]
+    image = next((ln[6:] for ln in pin.read_text().splitlines() if ln.startswith("IMAGE=")), "")
+    return [] if PINNED.search(image) else [f"infra/backup/restic.pin: IMAGE={image!r} is not a digest"]
+
+
 def main() -> int:
-    offenders: list[str] = node_tag_offenders()
+    offenders: list[str] = node_tag_offenders() + restic_pin_offenders()
     for dockerfile in sorted((ROOT / "infra" / "docker").glob("Dockerfile*")):
         offenders += dockerfile_offenders(dockerfile)
     for compose in sorted((ROOT / "infra" / "compose").glob("*.yml")):

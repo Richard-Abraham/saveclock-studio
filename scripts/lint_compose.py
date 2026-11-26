@@ -9,7 +9,9 @@ import yaml
 ROOT = Path(__file__).resolve().parent.parent
 LOOPBACK_ENV = {"127.0.0.1", "::1", "localhost"}
 PORT_OK = (
-    re.compile(r"\$\{BIND_ADDR:-127\.0\.0\.1\}:\d+:\d+"),
+    # the only two patterns: the port numbers are variables so the restore scratch stack can run beside
+    re.compile(r"\$\{BIND_ADDR:-127\.0\.0\.1\}:\$\{API_PORT:-8000\}:8000"),
+    re.compile(r"\$\{BIND_ADDR:-127\.0\.0\.1\}:\$\{WEB_PORT:-3000\}:3000"),
     re.compile(r"127\.0\.0\.1:\d+:\d+"),
 )
 EXPECTED = {
