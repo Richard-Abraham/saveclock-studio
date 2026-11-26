@@ -121,8 +121,12 @@ describe("ProjectsContent (the S9 body, rendered from real API responses)", () =
     expect(screen.queryByText(EMPTY)).not.toBeInTheDocument();
     const retry = screen.getByRole("button", { name: "Retry" });
     expect(retry).toHaveAccessibleDescription("We couldn’t load your projects.");
+    expect(screen.getByRole("status")).toBeEmptyDOMElement();
     await userEvent.click(retry);
     expect(refresh).toHaveBeenCalledTimes(1);
+    // the refresh mock changes nothing, so the error is still here: the retry failed
+    expect(await screen.findByText("Still couldn’t load. Try again.")).toBeInTheDocument();
+    expect(screen.getByRole("status")).toHaveTextContent("Still couldn’t load. Try again.");
     await expectNoSeriousViolations(container);
   });
 
