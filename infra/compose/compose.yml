@@ -161,8 +161,10 @@ services:
     networks: [back]
     user: "10001:10001"
     read_only: true
-    # per-job decode scratch (SEC-023); the maintenance worker never decodes, so it has none
-    tmpfs: ["/tmp:size=64m", "/scratch:size=1g,mode=0700,uid=10001,gid=10001,noexec,nosuid,nodev"]
+    # per-job decode scratch (SEC-023: each job dir is created 0700 by the app); podman has no
+    # uid= tmpfs option, so the mount is sticky and world-writable like /tmp. The maintenance
+    # worker never decodes, so it has none
+    tmpfs: ["/tmp:size=64m", "/scratch:size=1g,mode=1777,noexec,nosuid,nodev"]
     cap_drop: [ALL]
     security_opt: ["no-new-privileges:true"]
     mem_limit: 4g

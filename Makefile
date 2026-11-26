@@ -89,7 +89,7 @@ test:
 
 # the real Beat This model on a generated click track; needs the worker's ml extra and the weights
 test-ml:
-	MODELS_DIR=$(CURDIR)/infra/docker/cache/models $(UV) run --extra ml pytest -q -m ml
+	MODELS_DIR="$(CURDIR)/infra/docker/cache/models" $(UV) run --extra ml pytest -q -m ml
 
 # alembic check (models == migration) and a downgrade -1 / upgrade head round trip
 migrations:
