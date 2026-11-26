@@ -120,10 +120,9 @@ services:
       DATABASE_URL: "postgresql+asyncpg://app_rw:${POSTGRES_APP_PASSWORD}@postgres:5432/saveclock"
       REDIS_URL: "redis://:${REDIS_PASSWORD}@redis:6379/0"
       BLOB_ROOT: /data/blobs
+      # Phase 2 adds FFMPEG_THREADS / TORCH_THREADS / OMP_NUM_THREADS when something reads them; an
+      # empty OMP_NUM_THREADS would be passed to libraries as a bad value.
       WORKER_HEAVY_CONCURRENCY: "${WORKER_HEAVY_CONCURRENCY:-}"
-      FFMPEG_THREADS: "${FFMPEG_THREADS:-}"
-      TORCH_THREADS: "${TORCH_THREADS:-}"
-      OMP_NUM_THREADS: "${OMP_NUM_THREADS:-}"
       FETCH_CONCURRENCY: "${FETCH_CONCURRENCY:-}"
       TUNING_PUBLISHER: "true"
     volumes:
