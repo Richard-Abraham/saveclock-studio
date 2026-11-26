@@ -5,10 +5,15 @@ from saveclock.config import (
     ANALYZE_COMPUTE_S,
     ANALYZE_LIMIT_S,
     ANALYZE_WAIT_S,
+    DRAFT_LIMIT_S,
+    FOOTAGE_WAIT_S,
     HEAVY_TTL_S,
+    NORMALIZE_HOLD_S,
+    VET_HOLD_S,
     Settings,
 )
 from saveclock.workers import analysis as analysis_worker
+from saveclock.workers import draft as draft_worker
 from saveclock.workers import ingest as ingest_worker
 
 MAX_SONG_S = 600
@@ -31,3 +36,14 @@ def test_the_compute_allowance_covers_the_longest_song_at_the_slowest_speed() ->
 def test_the_validate_limit_covers_every_ffmpeg_timeout_it_can_spend() -> None:
     spent = 2 * PROBE_TIMEOUT_S + CANONICALIZE_TIMEOUT_S  # probe, attached-picture probe, decode
     assert spent * 1000 < ingest_worker.TIME_LIMIT_MS
+
+
+def test_the_draft_limit_sits_between_the_slot_wait_and_the_slot_ttl() -> None:
+    """HEAVY_TTL_S > DRAFT_LIMIT_S > FOOTAGE_WAIT_S: a wait for a slot fits inside the actor's
+    limit, and a live worker never loses a slot it holds to the TTL."""
+    assert HEAVY_TTL_S > DRAFT_LIMIT_S > FOOTAGE_WAIT_S
+
+
+def test_the_draft_actor_uses_the_limit_and_a_hold_never_outlives_the_slot() -> None:
+    assert draft_worker.TIME_LIMIT_MS == DRAFT_LIMIT_S * 1000
+    assert max(VET_HOLD_S, NORMALIZE_HOLD_S) < HEAVY_TTL_S

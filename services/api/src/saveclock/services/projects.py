@@ -7,8 +7,10 @@ from enum import StrEnum
 from typing import Any
 from uuid import UUID
 
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from saveclock.adapters.events import EventPublisher
 from saveclock.adapters.queue import Enqueuer
 from saveclock.domain.states import RETRYABLE_FROM
 from saveclock.errors import BadRequest, Conflict, ConflictReason, NotFound
@@ -16,8 +18,11 @@ from saveclock.ids import new_id
 from saveclock.models import Analysis, JobQueue, JobStage, Project, ProjectStatus, Song
 from saveclock.repositories.analyses import AnalysisRepository
 from saveclock.repositories.jobs import JobRepository
+from saveclock.repositories.plans import PlanRepository
 from saveclock.repositories.projects import ProjectRepository
 from saveclock.repositories.songs import SongRepository
+from saveclock.services import project_state
+from saveclock.services.plans import PlanSummary, summary_of
 
 DEFAULT_LIMIT = 20
 MAX_LIMIT = 100
@@ -112,16 +117,18 @@ async def create_project(
 
 async def get_detail(
     session: AsyncSession, user_id: UUID, project_id: UUID
-) -> tuple[Project, Song | None, Analysis | None]:
-    """Project, song and analysis; opening a project counts as activity (ARCH §4 retention)."""
+) -> tuple[Project, Song | None, Analysis | None, PlanSummary | None]:
+    """Project, song, analysis and the plan summary; opening a project counts as activity
+    (ARCH §4 retention)."""
     await ProjectRepository(session).touch(user_id=user_id, project_id=project_id)
     project = await _owned(session, user_id, project_id)
     song = await SongRepository(session).get_by_project(user_id=user_id, project_id=project_id)
     analysis = await AnalysisRepository(session).get_by_project(
         user_id=user_id, project_id=project_id
     )
+    latest = await PlanRepository(session).latest(user_id=user_id, project_id=project_id)
     await session.commit()
-    return project, song, analysis
+    return project, song, analysis, summary_of(latest) if latest is not None else None
 
 
 async def patch_project(
@@ -149,49 +156,100 @@ async def patch_project(
     return project
 
 
-async def cancel(session: AsyncSession, user_id: UUID, project_id: UUID) -> Project:
-    """validating | analyzing | planning -> canceled; running jobs see `cancel_requested`."""
+async def cancel(
+    session: AsyncSession,
+    user_id: UUID,
+    project_id: UUID,
+    publisher: EventPublisher | None = None,
+) -> Project:
+    """validating | analyzing | planning -> canceled; running jobs see `cancel_requested`.
+
+    Planning with a plan already stored goes back to `draft_ready` instead (ARCH §4, P6-10): the
+    owner keeps the plan they had.
+    """
     project = await _owned(session, user_id, project_id)
-    if not await ProjectRepository(session).transition(
+    sources: tuple[str, ...] = CANCELABLE
+    to = ProjectStatus.CANCELED.value
+    if (
+        project.status == ProjectStatus.PLANNING.value
+        and await PlanRepository(session).latest(user_id=user_id, project_id=project_id) is not None
+    ):
+        sources, to = (ProjectStatus.PLANNING.value,), ProjectStatus.DRAFT_READY.value
+    if not await project_state.transition(
+        session,
+        publisher,
         user_id=user_id,
         project_id=project_id,
-        from_=CANCELABLE,
-        to=ProjectStatus.CANCELED.value,
+        from_=sources,
+        to=to,
+        commit=False,
     ):
         raise Conflict(ConflictReason.WRONG_STATE)
     await JobRepository(session).request_cancel(user_id=user_id, project_id=project_id)
     await session.commit()
+    await project_state.announce_pending(session, publisher)
     await session.refresh(project)
     return project
 
 
 async def retry(
-    session: AsyncSession, user_id: UUID, project_id: UUID, enqueuer: Enqueuer
+    session: AsyncSession,
+    user_id: UUID,
+    project_id: UUID,
+    enqueuer: Enqueuer,
+    publisher: EventPublisher | None = None,
 ) -> Project:
-    """failed_analysis | canceled -> validating, at most 3 manual retries per project."""
+    """failed_analysis | canceled -> validating; failed_plan -> planning (a fresh draft job).
+    At most 3 manual retries per project."""
     project = await _owned(session, user_id, project_id)
     projects = ProjectRepository(session)
-    if not await projects.transition(
+    if project.status == ProjectStatus.FAILED_PLAN.value:
+        to, stage, queue, actor = (
+            ProjectStatus.PLANNING.value,
+            JobStage.DRAFT,
+            JobQueue.FETCH,
+            "build_draft",
+        )
+        sources = [ProjectStatus.FAILED_PLAN.value]
+    else:
+        to, stage, queue, actor = (
+            ProjectStatus.VALIDATING.value,
+            JobStage.VALIDATE,
+            JobQueue.ANALYSIS,
+            "validate_audio",
+        )
+        sources = sorted(RETRYABLE_FROM)
+    if not await project_state.transition(
+        session,
+        publisher,
         user_id=user_id,
         project_id=project_id,
-        from_=sorted(RETRYABLE_FROM),
-        to=ProjectStatus.VALIDATING.value,
+        from_=sources,
+        to=to,
+        commit=False,
     ):
         raise Conflict(ConflictReason.WRONG_STATE)
     if not await projects.take_manual_retry(
         user_id=user_id, project_id=project_id, limit=MAX_MANUAL_RETRIES
     ):
         await session.rollback()  # leave the project in the state it was in
+        session.info.pop(project_state.PENDING, None)
         raise Conflict(ConflictReason.RETRY_LIMIT)
     job_id = new_id()
-    await JobRepository(session).create(
-        user_id=user_id,
-        project_id=project_id,
-        job_id=job_id,
-        stage=JobStage.VALIDATE.value,
-        queue=JobQueue.ANALYSIS.value,
-    )
-    await session.commit()  # the worker must see the rows before the message exists
-    await asyncio.to_thread(enqueuer.send, "validate_audio", str(job_id), str(user_id))
+    try:
+        await JobRepository(session).create(
+            user_id=user_id,
+            project_id=project_id,
+            job_id=job_id,
+            stage=stage.value,
+            queue=queue.value,
+        )
+        await session.commit()  # the worker must see the rows before the message exists
+    except IntegrityError:  # uq_jobs_active: a draft, replan or render is still running
+        await session.rollback()
+        session.info.pop(project_state.PENDING, None)
+        raise Conflict(ConflictReason.JOB_ACTIVE) from None
+    await project_state.announce_pending(session, publisher)
+    await asyncio.to_thread(enqueuer.send, actor, str(job_id), str(user_id))
     await session.refresh(project)
     return project

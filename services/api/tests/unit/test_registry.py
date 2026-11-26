@@ -12,7 +12,7 @@ from saveclock.config import Settings
 from saveclock.errors import RETRYABLE, ErrorCode
 from saveclock.workers.analysis import register_analyze_actor
 from saveclock.workers.broker import build_broker
-from saveclock.workers.draft_placeholder import register_draft_placeholder
+from saveclock.workers.draft import register_draft_actors
 from saveclock.workers.ingest import register_validate_actor
 from saveclock.workers.pipeline import FAILED_ACTOR, register_failure_hook
 
@@ -34,7 +34,7 @@ def registered(tmp_path: Path) -> dramatiq.Broker:
     register_failure_hook(broker, settings)
     register_validate_actor(broker, settings)
     register_analyze_actor(broker, settings)
-    register_draft_placeholder(broker, settings)
+    register_draft_actors(broker, settings)
     return broker
 
 
@@ -46,7 +46,8 @@ def test_the_worker_registers_exactly_the_registry(tmp_path: Path) -> None:
 
 def test_every_actor_has_explicit_limits(tmp_path: Path) -> None:
     for actor in registered(tmp_path).actors.values():
-        assert actor.options["max_retries"] <= 2
+        limit = 3 if actor.actor_name in {"build_draft", "replan"} else 2  # ARCH §8 fetch queue
+        assert actor.options["max_retries"] <= limit
         assert actor.options["time_limit"] > 0
         assert "min_backoff" in actor.options
         assert "max_backoff" in actor.options
@@ -55,9 +56,10 @@ def test_every_actor_has_explicit_limits(tmp_path: Path) -> None:
         assert broker.actors[name].options["on_retry_exhausted"] == FAILED_ACTOR
 
 
-def test_the_draft_placeholder_is_greppable_and_named() -> None:
-    source = Path(__file__).resolve().parents[2] / "src/saveclock/workers/draft_placeholder.py"
-    assert "PLACEHOLDER" in source.read_text()
+def test_there_is_no_placeholder_left_in_the_worker_sources() -> None:
+    root = Path(__file__).resolve().parents[2] / "src/saveclock"
+    assert not (root / "workers/draft_placeholder.py").exists()
+    assert [p for p in root.rglob("*.py") if "placeholder" in p.read_text().lower()] == []
 
 
 def test_the_enqueuer_sends_raw_ids_only_messages() -> None:

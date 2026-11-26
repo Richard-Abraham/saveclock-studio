@@ -57,5 +57,6 @@ async def upload_song(  # noqa: PLR0917 - FastAPI dependencies and headers
         blobs=deps.blobs,
         enqueuer=deps.enqueuer,
         settings=settings,
+        publisher=deps.publisher,
     )
     return UploadAccepted(job_id=result.job_id, ui_status=result.ui_status)

@@ -12,12 +12,13 @@ from saveclock.api.middleware import (
     RequestIdMiddleware,
     SecurityHeadersMiddleware,
 )
-from saveclock.api.v1 import analysis, health, projects, stub, upload
+from saveclock.api.v1 import analysis, events, health, plan, projects, stub, upload
 from saveclock.api.v1 import settings as settings_router
 from saveclock.config import Settings
 from saveclock.container import STUB_ENVS, build_deps
 from saveclock.deps import Deps
 from saveclock.observability.logging import configure_logging
+from saveclock.services.events import StreamLimits
 
 API_PREFIX = "/api/v1"
 
@@ -43,11 +44,14 @@ def create_app(settings: Settings | None = None, deps: Deps | None = None) -> Fa
     )
     app.state.settings = settings
     app.state.deps = deps
+    app.state.stream_limits = StreamLimits()
     register_error_handlers(app)
     app.include_router(health.router, prefix=API_PREFIX)
     app.include_router(projects.router, prefix=API_PREFIX)
     app.include_router(upload.router, prefix=API_PREFIX)
     app.include_router(analysis.router, prefix=API_PREFIX)
+    app.include_router(plan.router, prefix=API_PREFIX)
+    app.include_router(events.router, prefix=API_PREFIX)
     app.include_router(settings_router.router, prefix=API_PREFIX)
     if settings.app_env in STUB_ENVS:
         app.include_router(stub.router, prefix=API_PREFIX)

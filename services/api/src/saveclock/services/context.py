@@ -9,6 +9,7 @@ from uuid import UUID
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from saveclock.adapters.blobstore.port import BlobStore
+from saveclock.adapters.events import EventPublisher
 from saveclock.adapters.ffmpeg import Tools
 from saveclock.adapters.queue import Enqueuer
 from saveclock.config import Settings
@@ -26,6 +27,7 @@ class WorkerContext:
     tools: Tools
     enqueuer: Enqueuer
     settings: Settings
+    publisher: EventPublisher | None = None
 
 
 async def hand_off(

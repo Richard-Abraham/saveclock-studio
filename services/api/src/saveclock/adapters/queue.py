@@ -17,7 +17,8 @@ from saveclock.models import JobQueue
 ACTORS: dict[str, JobQueue] = {
     "validate_audio": JobQueue.ANALYSIS,
     "analyze_song": JobQueue.ANALYSIS,
-    "build_draft": JobQueue.FETCH,  # a named placeholder until plan 006
+    "build_draft": JobQueue.FETCH,
+    "replan": JobQueue.FETCH,
 }
 
 

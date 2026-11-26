@@ -31,6 +31,11 @@ FOOTAGE_WAIT_S = 120  # waiting for a slot: HeavyLockTimeout is retryable
 VET_HOLD_S = 300  # sample (60 s) + scene detection and embeddings (hypothesis: 240 s, unmeasured)
 NORMALIZE_HOLD_S = 300  # one encode (120 s) + the checks that follow (3 x 60 s probes)
 
+# The draft job (plan 006) runs those stages in sequence. Its actor limit is the 180 s of ARCH §8
+# for the fetch queue; a slot wait (FOOTAGE_WAIT_S) must fit inside it and the slot TTL outlives
+# it, so a live worker never loses a slot it holds: HEAVY_TTL_S > DRAFT_LIMIT_S > FOOTAGE_WAIT_S.
+DRAFT_LIMIT_S = 180
+
 
 def _f(
     default: Any,  # noqa: ANN401

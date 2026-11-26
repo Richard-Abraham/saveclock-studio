@@ -31,13 +31,16 @@ from saveclock.models import Analysis, Fallback, JobQueue, JobStage, Project, Pr
 from saveclock.repositories.analyses import AnalysisRepository
 from saveclock.repositories.jobs import JobRepository
 from saveclock.repositories.projects import ProjectRepository
+from saveclock.services import project_state
 from saveclock.services.autotune import effective, host_facts
 from saveclock.services.context import WorkerContext, cancel_probe, end_unwanted, hand_off
+from saveclock.services.events import ProgressEmitter, ProgressTicker
 
 log = structlog.get_logger()
 
 CONFIDENCE_VERSION = 1  # bump when the weights change (P4-10)
 LOW_CONFIDENCE = 0.5
+ANALYZE_EXPECTED_S = 30.0  # a typical song's beat tracking; only the tick's pace depends on it
 
 
 class JobCanceled(Exception):  # a signal, not an error
@@ -178,17 +181,21 @@ async def _end_failed(
     ctx: WorkerContext, user_id: UUID, job_id: UUID, project_id: UUID, reason: str
 ) -> None:
     async with ctx.sessionmaker() as session:
-        await ProjectRepository(session).transition(
+        await project_state.transition(
+            session,
+            ctx.publisher,
             user_id=user_id,
             project_id=project_id,
             from_=ProjectStatus.ANALYZING.value,
             to=ProjectStatus.FAILED_ANALYSIS.value,
             reason=reason,
+            commit=False,
         )
         await JobRepository(session).fail(
             user_id=user_id, job_id=job_id, error_code="internal_error"
         )
         await session.commit()
+        await project_state.announce_pending(session, ctx.publisher)
 
 
 async def analyze_project(ctx: WorkerContext, job_id: UUID, user_id: UUID) -> None:
@@ -213,11 +220,17 @@ async def analyze_project(ctx: WorkerContext, job_id: UUID, user_id: UUID) -> No
         await end_unwanted(ctx, user_id, job_id)
         return
     cancel = cancel_probe(ctx, user_id, job_id)
+    emitter = ProgressEmitter(ctx.publisher, project_id)
     try:
         await asyncio.to_thread(get_model, ctx.settings)  # fail fast on a bad weights file
-        result = await asyncio.to_thread(
-            _compute_blocking, ctx, project_id, int(project.options.get("duration", 30)), cancel
-        )
+        with ProgressTicker(emitter, "finding_beat", expected_s=ANALYZE_EXPECTED_S):
+            result = await asyncio.to_thread(
+                _compute_blocking,
+                ctx,
+                project_id,
+                int(project.options.get("duration", 30)),
+                cancel,
+            )
     except JobCanceled:
         await end_unwanted(ctx, user_id, job_id)
         return
@@ -228,6 +241,7 @@ async def analyze_project(ctx: WorkerContext, job_id: UUID, user_id: UUID) -> No
     except NoBeatsFound:
         await _end_failed(ctx, user_id, job_id, project_id, "no_beats_found")
         return
+    await emitter.aemit("finding_beat", 1.0, force=True)
     async with ctx.sessionmaker() as session:
         projects = ProjectRepository(session)
         await AnalysisRepository(session).upsert(
@@ -241,13 +255,17 @@ async def analyze_project(ctx: WorkerContext, job_id: UUID, user_id: UUID) -> No
             project_id=project_id,
             values={"flags": {**project.flags, "low_confidence": result.low_confidence}},
         )
-        moved = await projects.transition(
+        moved = await project_state.transition(
+            session,
+            ctx.publisher,
             user_id=user_id,
             project_id=project_id,
             from_=ProjectStatus.ANALYZING.value,
             to=ProjectStatus.PLANNING.value,
+            commit=False,
         )
         await session.commit()
+        await project_state.announce_pending(session, ctx.publisher)
         current = await projects.get(user_id=user_id, project_id=project_id)
     if not moved and (current is None or current.status == ProjectStatus.CANCELED.value):
         await end_unwanted(ctx, user_id, job_id)

@@ -8,6 +8,7 @@ from redis.asyncio import Redis
 
 from saveclock.adapters.blobstore.filesystem import FilesystemBlobStore
 from saveclock.adapters.db import create_engine, create_sessionmaker, ping_db
+from saveclock.adapters.events import EventPublisher
 from saveclock.adapters.queue import DramatiqEnqueuer
 from saveclock.config import Settings
 from saveclock.deps import Deps
@@ -45,6 +46,7 @@ def build_deps(settings: Settings) -> Deps:
         blobs=blobs,
         enqueuer=DramatiqEnqueuer(broker),
         enqueue_stub=enqueue_stub,
+        publisher=EventPublisher(aio=redis),
         checks={
             "postgres": partial(ping_db, sessionmaker),
             "redis": ping_redis,

@@ -1,10 +1,10 @@
-from collections.abc import Sequence
+from collections.abc import Collection, Sequence
 from dataclasses import dataclass
 from decimal import Decimal
 from typing import Any
 from uuid import UUID
 
-from sqlalchemy import literal, select, update
+from sqlalchemy import func, literal, select, update
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -160,3 +160,43 @@ class CandidateRepository:
         )
         result = await self.session.execute(stmt)
         return int(getattr(result, "rowcount", 0) or 0)
+
+    async def list_pool(self, *, user_id: UUID, project_id: UUID) -> list[ClipCandidate]:
+        """The clips a plan may use: normalized (ready) or already selected, best score first."""
+        stmt = (
+            select(ClipCandidate)
+            .where(
+                ClipCandidate.project_id == project_id,
+                ClipCandidate.status.in_(["normalized", "selected"]),
+                ClipCandidate.mezz_frames.is_not(None),
+                self._owned(user_id),
+            )
+            .order_by(
+                ClipCandidate.score.desc().nulls_last(),
+                ClipCandidate.provider,
+                ClipCandidate.provider_id,
+            )
+        )
+        return list((await self.session.scalars(stmt)).all())
+
+    async def mark_selected(
+        self, *, user_id: UUID, project_id: UUID, keys: Collection[tuple[str, str]]
+    ) -> None:
+        """`selected` = used by the working plan; a dropped clip goes back to `normalized`."""
+        used = [f"{provider}\x1f{provider_id}" for provider, provider_id in keys]
+        joined = func.concat(ClipCandidate.provider, "\x1f", ClipCandidate.provider_id)
+        base = (
+            update(ClipCandidate)
+            .where(ClipCandidate.project_id == project_id, self._owned(user_id))
+            .execution_options(synchronize_session=False)
+        )
+        await self.session.execute(
+            base.where(ClipCandidate.status == "normalized", joined.in_(used)).values(
+                status="selected"
+            )
+        )
+        await self.session.execute(
+            base.where(ClipCandidate.status == "selected", joined.not_in(used)).values(
+                status="normalized"
+            )
+        )
