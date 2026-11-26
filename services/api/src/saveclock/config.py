@@ -63,7 +63,7 @@ class Settings(BaseSettings):
     sentry_env: str | None = _f(None, "all")
     database_url: SecretStr = _f(..., "A,K,M", secret=True)
     redis_url: SecretStr = _f(..., "A,K,M", secret=True)
-    allowed_hosts: CsvList = _f(["localhost", "127.0.0.1"], "A")
+    allowed_hosts: CsvList = _f(["localhost", "127.0.0.1"], "A,W")
     bind_addr: str = _f("127.0.0.1", "compose", example="127.0.0.1")
     saveclock_api_url: str = _f("http://127.0.0.1:8000", "CLI")
     pexels_key_configured: bool = _f(False, "A", example="false")

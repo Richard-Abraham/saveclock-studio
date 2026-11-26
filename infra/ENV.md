@@ -11,7 +11,7 @@
 | `SENTRY_ENV` | `str | None` | `` | no | no | all | ARCH §18 |
 | `DATABASE_URL` | `pydantic.types.SecretStr` | `` | yes | yes | A,K,M | ARCH §18 |
 | `REDIS_URL` | `pydantic.types.SecretStr` | `` | yes | yes | A,K,M | ARCH §18 |
-| `ALLOWED_HOSTS` | `list[str]` | `localhost,127.0.0.1` | no | no | A | ARCH §18 |
+| `ALLOWED_HOSTS` | `list[str]` | `localhost,127.0.0.1` | no | no | A,W | ARCH §18 |
 | `BIND_ADDR` | `str` | `127.0.0.1` | no | no | compose | ARCH §18 |
 | `SAVECLOCK_API_URL` | `str` | `http://127.0.0.1:8000` | no | no | CLI | ARCH §18 |
 | `PEXELS_KEY_CONFIGURED` | `bool` | `False` | no | no | A | ARCH §18 |
