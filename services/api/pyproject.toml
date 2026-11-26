@@ -66,13 +66,17 @@ target-version = "py312"
 src = ["src", "tests"]
 
 [tool.ruff.lint]
-select = ["E", "F", "I", "UP", "B", "SIM", "S", "C4", "PT", "RUF", "ASYNC", "N", "PL", "TCH", "ANN", "DTZ"]
+select = ["E", "F", "I", "UP", "B", "SIM", "S", "C4", "PT", "RUF", "ASYNC", "N", "PL", "TCH", "ANN", "DTZ", "TID251"]
 ignore = [
   "PLR0913",  # many keyword args are normal for service/repository signatures
   "PLR0911",  # early returns are clearer than nesting
   "PLC0415",  # lazy imports are used on purpose in the alembic env and the worker entrypoint
   "N818",  # error classes follow the plan names (NotFound, Forbidden, ...) without an Error suffix
 ]
+
+# ruff 0.17 has no S614 (unsafe torch.load), so the ban is spelled out here (plan 004 Step 9)
+[tool.ruff.lint.flake8-tidy-imports.banned-api]
+"torch.load".msg = "torch.load unpickles: weights are loaded by beat_this with weights_only=True"
 
 [tool.ruff.lint.per-file-ignores]
 "tests/**" = ["S101", "ANN", "PLR2004"]
