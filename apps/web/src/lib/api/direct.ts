@@ -1,5 +1,4 @@
 import { apiOrigin } from "../config";
-import { createApi } from "./client";
 
 /**
  * Base URL for the two capabilities that cannot go through the Next rewrite: SSE and the 100 MB
@@ -8,8 +7,4 @@ import { createApi } from "./client";
  */
 export function directApiBase(): string {
   return apiOrigin.replace(/\/$/, "");
-}
-
-export function createDirectApi() {
-  return createApi(directApiBase());
 }
