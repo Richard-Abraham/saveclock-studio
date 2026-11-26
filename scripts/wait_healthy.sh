@@ -5,13 +5,11 @@ project="$1"; timeout="${2:-90}"
 CONTAINER="${CONTAINER:-$(command -v docker >/dev/null 2>&1 && echo docker || echo podman)}"
 end=$((SECONDS + timeout))
 while [ "$SECONDS" -lt "$end" ]; do
-  names="$($CONTAINER ps -a --filter "label=io.podman.compose.project=$project" --filter "label=com.docker.compose.project=$project" --format '{{.Names}}' 2>/dev/null || true)"
-  if [ -z "$names" ]; then
-    names="$($CONTAINER ps -a --filter "label=io.podman.compose.project=$project" --format '{{.Names}}' 2>/dev/null || true)"
-  fi
-  if [ -z "$names" ]; then
-    names="$($CONTAINER ps -a --filter "label=com.docker.compose.project=$project" --format '{{.Names}}' 2>/dev/null || true)"
-  fi
+  names=""
+  for label in io.podman.compose.project com.docker.compose.project; do  # podman-compose | docker compose
+    names="$names $($CONTAINER ps -a --filter "label=$label=$project" --format '{{.Names}}' 2>/dev/null || true)"
+  done
+  names="$(echo $names | tr " " "\n" | sort -u)"
   ok=1
   [ -n "$names" ] || ok=0
   for n in $names; do
