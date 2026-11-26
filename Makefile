@@ -2,6 +2,9 @@ SHELL := /bin/bash
 .DEFAULT_GOAL := help
 # compose project name; override to keep a second checkout's volumes apart (PROJECT=saveclock-x make dev)
 PROJECT ?= saveclock
+# host ports (compose reads the same names); the restore proof and the fresh-clone timing use 18000/13000
+API_PORT ?= 8000
+WEB_PORT ?= 3000
 API := services/api
 UV := uv --directory $(API)
 COMPOSE_BIN := $(shell command -v docker >/dev/null 2>&1 && echo "docker compose" || echo "podman compose")
@@ -25,7 +28,9 @@ CHECK_STAGES := $(FAST_STAGES) images image-guards hadolint
   migrations audit env env-docs env-docs-check contracts contracts-check test-deps-up \
   test-deps-down ffmpeg-cache images image-guards hadolint scan-images up dev down \
   down-volumes sandbox check-fast check web-install web-env web-lint web-test web-build \
-  bundle-scan web-audit-prod measure-rewrite smoke-web web-audit
+  bundle-scan web-audit-prod measure-rewrite smoke-web web-audit stack-up seed smoke-stub smoke-propagation \
+  predeploy-scan backup backup-test restore-proof backup-timer-install backup-timer-uninstall \
+  backup-install-timer rollback-demo fresh-clone-timing
 
 help:
 	@echo "targets: check-fast check dev down sandbox images scan-images env env-docs contracts"
@@ -149,6 +154,10 @@ scan-images:
 up:
 	scripts/sync_env_flags.sh
 	$(MAKE) images
+	$(MAKE) stack-up
+
+# the compose half of `up` (no image build): the rollback demo runs it with IMAGE_TAG=<tag>
+stack-up:
 	$(COMPOSE) up -d postgres redis
 	CONTAINER=$(CONTAINER) scripts/wait_healthy.sh $(PROJECT) 120
 	$(COMPOSE) run --rm migrate
@@ -156,11 +165,11 @@ up:
 
 dev: up
 	@for i in $$(seq 1 60); do \
-	  code=$$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:8000/api/v1/health/ready); \
+	  code=$$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:$(API_PORT)/api/v1/health/ready); \
 	  [ "$$code" = 200 ] && { echo "ready: $$code"; exit 0; }; sleep 2; done; \
 	echo "api did not become ready"; exit 1
 	@for i in $$(seq 1 60); do \
-	  code=$$(curl -s -o /dev/null -w '%{http_code}' http://localhost:3000/healthz); \
+	  code=$$(curl -s -o /dev/null -w '%{http_code}' http://localhost:$(WEB_PORT)/healthz); \
 	  [ "$$code" = 200 ] && { echo "web ready: $$code"; exit 0; }; sleep 2; done; \
 	echo "web did not become ready"; exit 1
 
@@ -226,6 +235,56 @@ web-audit: guard
 	    --chrome-flags="--headless=new --no-sandbox" || exit 1; \
 	done; \
 	python3 scripts/check_lighthouse.py .data/lighthouse
+
+# --- bring-up, backup, restore, rollback (plan 003) --------------------------------------
+# These need the running stack. PROJECT=<name> picks the compose project; API_PORT/WEB_PORT the ports.
+STACK_ENV = PROJECT=$(PROJECT) CONTAINER=$(CONTAINER) COMPOSE="$(COMPOSE)" API_PORT=$(API_PORT) WEB_PORT=$(WEB_PORT)
+
+seed:
+	python3 scripts/smoke_stub.py --seed --web http://localhost:$(WEB_PORT) --api http://127.0.0.1:$(API_PORT)
+
+smoke-stub:
+	PROJECT=$(PROJECT) CONTAINER=$(CONTAINER) python3 scripts/smoke_stub.py --web http://localhost:$(WEB_PORT) \
+	  --api http://127.0.0.1:$(API_PORT)
+
+# Fails today: the app code does not carry the request id into the logs of the api or the worker hops.
+smoke-propagation:
+	PROJECT=$(PROJECT) CONTAINER=$(CONTAINER) python3 scripts/smoke_stub.py --propagation \
+	  --web http://localhost:$(WEB_PORT) --api http://127.0.0.1:$(API_PORT)
+
+predeploy-scan:
+	scripts/predeploy_scan.sh .
+
+backup:
+	$(STACK_ENV) bash infra/backup/backup.sh
+
+backup-test:
+	$(STACK_ENV) bash infra/backup/test_backup.sh
+
+restore-proof:
+	$(STACK_ENV) bash infra/backup/restore_proof.sh
+
+# Writes to ~/.config/systemd/user and enables the timer: run it on the machine that should back up.
+backup-timer-install:
+	@mkdir -p $(HOME)/.config/systemd/user
+	@for u in saveclock-backup.service saveclock-backup.timer; do \
+	  sed -e 's|@REPO@|$(CURDIR)|' -e 's|@PROJECT@|$(PROJECT)|' infra/backup/systemd/$$u > $(HOME)/.config/systemd/user/$$u; done
+	systemctl --user daemon-reload
+	systemctl --user enable --now saveclock-backup.timer
+	systemctl --user list-timers saveclock-backup.timer --no-pager
+
+backup-install-timer: backup-timer-install
+
+backup-timer-uninstall:
+	-systemctl --user disable --now saveclock-backup.timer
+	rm -f $(HOME)/.config/systemd/user/saveclock-backup.service $(HOME)/.config/systemd/user/saveclock-backup.timer
+	systemctl --user daemon-reload
+
+rollback-demo:
+	$(STACK_ENV) bash scripts/rollback_demo.sh
+
+fresh-clone-timing:
+	CONTAINER=$(CONTAINER) bash scripts/fresh_clone_timing.sh
 
 # --- gates -------------------------------------------------------------------------------
 # run_stages <stage...>: one runner for both gates; stops at the first failure and names it.

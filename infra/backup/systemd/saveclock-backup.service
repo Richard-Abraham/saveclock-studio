@@ -1,0 +1,11 @@
+[Unit]
+Description=SaveClock nightly backup (restic, plan 003)
+
+[Service]
+Type=oneshot
+# make backup-timer-install replaces @REPO@ and @PROJECT@ with this checkout's path and compose project.
+WorkingDirectory=@REPO@
+Environment=PROJECT=@PROJECT@
+ExecStart=/usr/bin/env bash infra/backup/backup.sh
+StandardOutput=journal
+StandardError=journal

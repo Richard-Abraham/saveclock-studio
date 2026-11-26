@@ -1,0 +1,10 @@
+[Unit]
+Description=SaveClock nightly backup at 02:30 (a missed run fires at the next wake or login)
+
+[Timer]
+OnCalendar=*-*-* 02:30:00
+Persistent=true
+RandomizedDelaySec=5m
+
+[Install]
+WantedBy=timers.target
