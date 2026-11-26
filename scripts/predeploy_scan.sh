@@ -11,12 +11,17 @@ item() { # name, evidence (empty = NOT FOUND)
 }
 
 # 1. the config-injection guard in deep mode: outgoing diff, tree, long lines, createRequire, committed refs
-"$here/check-config-malware.sh" --deep "$dir" || found=1
+guard_found=0
+"$here/check-config-malware.sh" --deep "$dir" || { found=1; guard_found=1; }
 
 # 2. secret scanner over history and tree (values redacted)
 if command -v gitleaks >/dev/null 2>&1; then
-  item "6 gitleaks git (history)" "$(cd "$dir" && gitleaks git --no-banner --redact 2>&1 | grep -E 'leaks found|Finding' )"
-  item "7 gitleaks dir (tree)" "$(cd "$dir" && gitleaks dir . --no-banner --redact 2>&1 | grep -E 'leaks found|Finding')"
+  item "6 gitleaks git (history)" "$(cd "$dir" && gitleaks git --no-banner --redact 2>&1 | grep -E 'WRN.*leaks found' )"
+  # the tree = the tracked files, copied out: git-ignored build output (apps/web/.next holds Next preview keys) is not part of what is pushed
+  snap="$(mktemp -d)"
+  (cd "$dir" && git ls-files -z | xargs -0 cp --parents -t "$snap" 2>/dev/null)
+  item "7 gitleaks dir (tracked files)" "$(gitleaks dir "$snap" --no-banner --redact 2>&1 | grep -E 'WRN.*leaks found')"
+  rm -rf "$snap"
 else
   echo "SKIPPED (gitleaks not installed): 6 and 7 secret scan"
 fi
@@ -31,8 +36,8 @@ echo "SKIPPED (no host recorded in docs/SECURITY.md): 11 known C2 host"
 
 # 5. dependency audits: offline is SKIPPED, never silently green (a vulnerability is not a malware finding)
 (cd "$dir" && "$here/audit.sh") || { echo "FAILED: 12 pip-audit reported vulnerabilities"; found=1; }
-if [ "$found" != 0 ]; then
-  echo "SKIPPED (a FOUND item above: no node tooling runs until the owner has looked): 13 pnpm audit --prod"
+if [ "$guard_found" != 0 ]; then
+  echo "SKIPPED (config malware FOUND above: no node tooling runs until the owner has looked): 13 pnpm audit --prod"
 elif curl -sfI --max-time 8 https://registry.npmjs.org/ >/dev/null 2>&1; then
   (cd "$dir" && pnpm audit --prod >/dev/null 2>&1) && echo "NOT FOUND: 13 pnpm audit --prod" \
     || { echo "FAILED: 13 pnpm audit --prod reported vulnerabilities"; found=1; }
