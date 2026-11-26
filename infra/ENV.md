@@ -49,9 +49,13 @@
 | `LLM_MAX_TOKENS` | `int` | `300` | no | no | K | ARCH §18 |
 | `LLM_DAILY_CALL_CAP` | `int | None` | `` | no | no | K | ARCH §18 |
 | `LLM_COST_CAP_USD_PER_VIDEO` | `float | None` | `` | no | no | K | ARCH §18 |
-| `BACKUP_REPO_PATH` | `str | None` | `` | no | yes | host | ARCH §18 |
-| `BACKUP_PASSWORD_FILE` | `str | None` | `` | no | yes | host | ARCH §18 |
-| `BACKUP_DEST_DIR` | `str | None` | `` | no | yes | host | ARCH §18 |
+| `BACKUP_REPO` | `str | None` | `` | no | no | host | ARCH §18 |
+| `BACKUP_PASSWORD_FILE` | `str | None` | `` | no | no | host | ARCH §18 |
+| `BACKUP_STAGING_DIR` | `str | None` | `` | no | no | host | plan 003; default .data/backup-staging |
+| `BACKUP_KEEP_DAILY` | `int` | `7` | no | no | host | ARCH §18 |
+| `BACKUP_KEEP_WEEKLY` | `int` | `4` | no | no | host | ARCH §18 |
+| `BACKUP_KEEP_MONTHLY` | `int` | `6` | no | no | host | ARCH §18 |
+| `BACKUP_ALLOW_SAME_DISK` | `Literal['yes', 'no']` | `no` | no | no | host | ARCH §23; plan 003 B5 |
 | `NEXT_PUBLIC_APP_ORIGIN` | `str | None` | `` | no | no | W | ARCH §18 |
 | `NEXT_PUBLIC_API_ORIGIN` | `str` | `http://localhost:8000` | no | no | W | ARCH §18 |
 | `FAKE_STOCK` | `bool` | `False` | no | no | local/CI | ARCH §18 |
@@ -67,3 +71,6 @@
 | `POSTGRES_APP_PASSWORD` | `str` | `` | yes | yes | compose | password of role app_rw |
 | `POSTGRES_MIGRATOR_PASSWORD` | `str` | `` | yes | yes | compose | password of role migrator |
 | `REDIS_PASSWORD` | `str` | `` | yes | yes | compose | requirepass for redis |
+| `API_PORT` | `str` | `8000` | no | no | compose | host port of the api (default 8000; the restore scratch stack uses 18000) |
+| `WEB_PORT` | `str` | `3000` | no | no | compose | host port of the web shell (default 3000; the scratch stack uses 13000) |
+| `IMAGE_TAG` | `str` | `local` | no | no | compose | tag of the saveclock-* images compose runs (default local; rollback: sha-<commit>) |

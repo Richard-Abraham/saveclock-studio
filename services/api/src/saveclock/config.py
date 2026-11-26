@@ -91,9 +91,14 @@ class Settings(BaseSettings):
     llm_daily_call_cap: int | None = _f(None, "K")
     llm_cost_cap_usd_per_video: float | None = _f(None, "K")
     # BACKUP_*: read by the host backup script, never by an app container (ARCH §23).
-    backup_repo_path: str | None = _f(None, "host", secret=True)
-    backup_password_file: str | None = _f(None, "host", secret=True)
-    backup_dest_dir: str | None = _f(None, "host", secret=True)
+    # The password FILE path is not a secret; its content is never read by Settings (plan 003).
+    backup_repo: str | None = _f(None, "host")
+    backup_password_file: str | None = _f(None, "host")
+    backup_staging_dir: str | None = _f(None, "host", doc="plan 003; default .data/backup-staging")
+    backup_keep_daily: int = _f(7, "host")
+    backup_keep_weekly: int = _f(4, "host")
+    backup_keep_monthly: int = _f(6, "host")
+    backup_allow_same_disk: Literal["yes", "no"] = _f("no", "host", doc="ARCH §23; plan 003 B5")
     next_public_app_origin: str | None = _f(None, "W")
     # Branch B of OQ-26 (plan 002): the browser calls the API directly at this origin.
     next_public_api_origin: str = _f("http://localhost:8000", "W", example="http://localhost:8000")
@@ -140,6 +145,9 @@ class MigrateSettings(BaseSettings):
 class ComposeVar(BaseModel):
     name: str
     doc: str
+    default: str | None = (
+        None  # None = a required secret (CHANGE_ME in .env.example); else an optional setting
+    )
 
 
 # Compose-only variables (C10, SEC-133): read by compose, never by Settings.
@@ -148,4 +156,19 @@ COMPOSE_ONLY = (
     ComposeVar(name="POSTGRES_APP_PASSWORD", doc="password of role app_rw"),
     ComposeVar(name="POSTGRES_MIGRATOR_PASSWORD", doc="password of role migrator"),
     ComposeVar(name="REDIS_PASSWORD", doc="requirepass for redis"),
+    ComposeVar(
+        name="API_PORT",
+        doc="host port of the api (default 8000; the restore scratch stack uses 18000)",
+        default="8000",
+    ),
+    ComposeVar(
+        name="WEB_PORT",
+        doc="host port of the web shell (default 3000; the scratch stack uses 13000)",
+        default="3000",
+    ),
+    ComposeVar(
+        name="IMAGE_TAG",
+        doc="tag of the saveclock-* images compose runs (default local; rollback: sha-<commit>)",
+        default="local",
+    ),
 )

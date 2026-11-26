@@ -1,0 +1,3 @@
+# The one pin of the restic image (plan 003). Resolved with: podman pull docker.io/restic/restic:latest
+# (restic 0.20.0 at the time). A new restic major needs a new digest here and a fresh restore proof.
+IMAGE=docker.io/restic/restic@sha256:c6d6b4616e3980854c0cbb929c8a063549d5b61ee5ba422c0a4d3c3724b6ca91

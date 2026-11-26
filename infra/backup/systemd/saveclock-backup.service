@@ -1,0 +1,11 @@
+[Unit]
+Description=SaveClock nightly backup (restic, plan 003)
+
+[Service]
+Type=oneshot
+# make backup-install-timer replaces @REPO@ and @PROJECT@ with this checkout's path and compose project.
+# make supplies CONTAINER and COMPOSE, so the unit and a hand-run `make backup` behave the same.
+WorkingDirectory=@REPO@
+ExecStart=/usr/bin/make --no-print-directory backup PROJECT=@PROJECT@
+StandardOutput=journal
+StandardError=journal

@@ -71,7 +71,7 @@ services:
   api:
     image: saveclock-api:${IMAGE_TAG:-local}
     ports:
-      - "${BIND_ADDR:-127.0.0.1}:8000:8000"
+      - "${BIND_ADDR:-127.0.0.1}:${API_PORT:-8000}:8000"
     environment:
       APP_ENV: "${APP_ENV:-local}"
       APP_VERSION: "${IMAGE_TAG:-local}"
@@ -113,7 +113,7 @@ services:
   web:
     image: saveclock-web:${IMAGE_TAG:-local}
     ports:
-      - "${BIND_ADDR:-127.0.0.1}:3000:3000"
+      - "${BIND_ADDR:-127.0.0.1}:${WEB_PORT:-3000}:3000"
     environment:
       API_INTERNAL_URL: "http://api:8000/api/v1"
       ALLOWED_HOSTS: "localhost" # W14: the web layer checks Host itself; 127.0.0.1 is another origin (CORS)

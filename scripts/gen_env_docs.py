@@ -41,7 +41,7 @@ def env_example() -> str:
         "# compose-only secrets (C10)",
     ]
     for c in COMPOSE_ONLY:
-        out += [f"# {c.doc}", f"{c.name}=CHANGE_ME"]
+        out += [f"# {c.doc}", f"{c.name}=CHANGE_ME" if c.default is None else f"# {c.name}={c.default}"]
     for model in (Settings, MigrateSettings):
         out.append("")
         out.append(f"# {model.__name__}")
@@ -71,7 +71,10 @@ def env_md() -> str:
                 f"{extra.get('svc', '')} | {extra.get('doc', '')} |"
             )
     for c in COMPOSE_ONLY:
-        out.append(f"| `{c.name}` | `str` | `` | yes | yes | compose | {c.doc} |")
+        if c.default is None:
+            out.append(f"| `{c.name}` | `str` | `` | yes | yes | compose | {c.doc} |")
+        else:
+            out.append(f"| `{c.name}` | `str` | `{c.default}` | no | no | compose | {c.doc} |")
     return "\n".join(out) + "\n"
 
 
