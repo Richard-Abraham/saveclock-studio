@@ -22,7 +22,7 @@
 | `MAX_UPLOAD_MB` | `int` | `100` | no | no | A,K | ARCH §18 |
 | `MIN_SONG_S` | `int` | `15` | no | no | A,K | ARCH §18 |
 | `MAX_SONG_S` | `int` | `600` | no | no | A,K | ARCH §18 |
-| `INTERMEDIATE_TTL_DAYS` | `int` | `7` | no | no | M | ARCH §18 |
+| `INTERMEDIATE_TTL_DAYS` | `int` | `7` | no | no | A,M | ARCH §18 |
 | `SWEEP_INTERVAL_MIN` | `int` | `60` | no | no | M | ARCH §18 |
 | `DISK_LOW_WATERMARK_GB` | `float` | `5` | no | no | A,K,M | ARCH §18 |
 | `WORKER_HEAVY_CONCURRENCY` | `int | None` | `` | no | no | K | ARCH §18 |

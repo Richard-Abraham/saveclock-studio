@@ -63,4 +63,5 @@ async def settings_view(
         "stock": {"pixabay_enabled": pixabay_enabled},
         "tuning": json.loads(raw) if raw else None,
         "disk": {"volume": {"total": total, "free": free}, "by_area": by_area, "projects": []},
+        "intermediate_ttl_days": settings.intermediate_ttl_days,
     }

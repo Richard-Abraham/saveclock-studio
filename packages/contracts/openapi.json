@@ -312,6 +312,10 @@
           "disk": {
             "$ref": "#/components/schemas/Disk"
           },
+          "intermediate_ttl_days": {
+            "title": "Intermediate Ttl Days",
+            "type": "integer"
+          },
           "keys": {
             "$ref": "#/components/schemas/Keys"
           },
@@ -333,7 +337,8 @@
           "keys",
           "stock",
           "tuning",
-          "disk"
+          "disk",
+          "intermediate_ttl_days"
         ],
         "title": "SettingsOut",
         "type": "object"
@@ -522,6 +527,40 @@
         ],
         "title": "UiStatus",
         "type": "string"
+      },
+      "UploadSinkOut": {
+        "additionalProperties": false,
+        "properties": {
+          "bytes": {
+            "title": "Bytes",
+            "type": "integer"
+          },
+          "first_chunk_at_ms": {
+            "title": "First Chunk At Ms",
+            "type": "integer"
+          },
+          "first_chunk_ms": {
+            "title": "First Chunk Ms",
+            "type": "integer"
+          },
+          "last_chunk_ms": {
+            "title": "Last Chunk Ms",
+            "type": "integer"
+          },
+          "sha256": {
+            "title": "Sha256",
+            "type": "string"
+          }
+        },
+        "required": [
+          "bytes",
+          "sha256",
+          "first_chunk_ms",
+          "last_chunk_ms",
+          "first_chunk_at_ms"
+        ],
+        "title": "UploadSinkOut",
+        "type": "object"
       },
       "Volume": {
         "additionalProperties": false,
@@ -776,6 +815,152 @@
           }
         },
         "summary": "Download",
+        "tags": [
+          "stub"
+        ]
+      }
+    },
+    "/api/v1/_stub/sse": {
+      "get": {
+        "operationId": "stub_sse",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "events",
+            "required": false,
+            "schema": {
+              "default": 30,
+              "maximum": 120,
+              "minimum": 1,
+              "title": "Events",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "interval_ms",
+            "required": false,
+            "schema": {
+              "default": 1000,
+              "maximum": 5000,
+              "minimum": 100,
+              "title": "Interval Ms",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "forbidden; details.reason is one of host_not_allowed, origin_mismatch, cross_site"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "not found"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "validation_error (details.fields)"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "internal_error"
+          }
+        },
+        "summary": "Sse",
+        "tags": [
+          "stub"
+        ]
+      }
+    },
+    "/api/v1/_stub/upload-sink": {
+      "post": {
+        "operationId": "stub_upload_sink",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UploadSinkOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "forbidden; details.reason is one of host_not_allowed, origin_mismatch, cross_site"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "not found"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "validation_error (details.fields)"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "internal_error"
+          }
+        },
+        "summary": "Upload Sink",
         "tags": [
           "stub"
         ]

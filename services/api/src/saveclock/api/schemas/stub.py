@@ -35,3 +35,13 @@ class StubChain(BaseModel):
     job_id: UUID
     project_id: UUID
     hops: list[StubHop]
+
+
+class UploadSinkOut(BaseModel):
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    bytes: int
+    sha256: str
+    first_chunk_ms: int
+    last_chunk_ms: int
+    first_chunk_at_ms: int  # unix ms, so a client on the same clock can tell if a proxy buffered

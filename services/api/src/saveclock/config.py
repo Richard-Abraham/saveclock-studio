@@ -63,7 +63,7 @@ class Settings(BaseSettings):
     max_upload_mb: int = _f(100, "A,K")
     min_song_s: int = _f(15, "A,K")
     max_song_s: int = _f(600, "A,K")
-    intermediate_ttl_days: int = _f(7, "M")
+    intermediate_ttl_days: int = _f(7, "A,M")
     sweep_interval_min: int = _f(60, "M")
     disk_low_watermark_gb: float = _f(5, "A,K,M")
     worker_heavy_concurrency: int | None = _f(None, "K")
