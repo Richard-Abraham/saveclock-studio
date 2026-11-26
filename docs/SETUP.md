@@ -2,7 +2,7 @@
 
 This guide takes a fresh PC from `git clone` to a running, tested app. Every command here comes from the repo's own files (`Makefile`, `scripts/`, `infra/`). If a command and this guide disagree, the repo wins; fix the guide.
 
-**Status of the app.** Phase 1 (the walking skeleton) is built: web shell, API, workers, Postgres, Redis, backups. The real pipeline (upload, beat analysis, stock clips, render) is **not built yet (Phase 2)**. Today `make smoke-stub` pushes a stub job through every hop. Sections marked "not built yet (Phase 2)" will be completed as Phase 2 lands.
+**Status of the app.** Phase 1 (the walking skeleton) is built: web shell, API, workers, Postgres, Redis, backups. Phase 2 has started: song upload, validation and Beat This beat analysis are built (plan 004). Stock clips, the planner, render and the CLI are **not built yet (Phase 2)**. Today `make smoke-stub` pushes a stub job through every hop. Sections marked "not built yet (Phase 2)" will be completed as Phase 2 lands.
 
 ## 1. What you need on the PC
 
@@ -93,9 +93,21 @@ It checks the SHA-256, refuses a mismatch (`REFUSING: source tarball does not ma
 3. Run `make check`, `make images` and `make image-guards`.
 4. Per `infra/UPDATING.md`, FFmpeg bumps are manual reviews: re-run the G0-25 hostile-input tests before you rely on the new build.
 
-### 2b. Model weights (updated as Phase 2 lands)
+### 2b. Model weights (Beat This, required since plan 004)
 
-Not built yet (Phase 2). The Beat This checkpoints are not needed for the Phase 1 stack. When plan 004 lands, they will be fetched from their official URL and checked by SHA-256 against `spike/results/model-manifest.json`, which already lists each checkpoint's URL, size and hash. The make target name is not final, so this section is filled in then. Until then, nothing to do.
+The worker image contains the Beat This checkpoint `beat_this-final0.ckpt` (about 81 MB). It is not in git. `make images` runs `make models-cache`, which copies it from a folder and refuses it unless its size and SHA-256 match `infra/docker/models.manifest.json`. The manifest is never edited to match a file.
+
+Either copy the file from the laptop (it is in `~/saveclock-spike/downloads/models-beat_this/`), or download it from its official URL into a new empty folder:
+
+```sh
+mkdir -p ~/saveclock-models && cd ~/saveclock-models
+curl -fL -o beat_this-final0.ckpt https://cloud.cp.jku.at/public.php/dav/files/7ik4RrBKTS273gp/final0.ckpt
+sha256sum beat_this-final0.ckpt   # must print 8c328b45f59d8dd3dff219253ff6a8d6482be57d0133a29140e2febbf8eb8331
+cd -   # back to the repo
+make models-cache MODELS_SRC=$HOME/saveclock-models
+```
+
+Expected: `OK beat_this-final0.ckpt sha256 verified`. After that the copy lives in `infra/docker/cache/models/` (git-ignored) and `MODELS_SRC` is not needed again. The worker image is about 1.9 GB because it carries CPU-only torch.
 
 ### 2c. The backup passphrase
 
