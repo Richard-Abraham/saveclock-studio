@@ -14,12 +14,11 @@ export async function ProjectsContent() {
   const [projects, settings] = await Promise.all([loadProjects(), loadSettings()]);
 
   if (!projects.ok || !settings.ok) {
-    const error = projects.ok ? (settings.ok ? null : settings.error) : projects.error;
-    return error ? (
+    return (
       <div className="mt-6">
         <LoadError message="We couldn’t load your projects." id="projects-error" />
       </div>
-    ) : null;
+    );
   }
 
   const { volume } = settings.data.disk;

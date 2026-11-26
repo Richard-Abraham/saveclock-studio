@@ -3,13 +3,13 @@ import { fileURLToPath } from "node:url";
 
 import type { NextConfig } from "next";
 
+import { apiOrigin } from "./src/lib/config";
 import { readServerEnv } from "./src/lib/server-env";
 
 // shortcut: Next bakes `rewrites()` into the build, so API_INTERNAL_URL and ALLOWED_HOSTS are read
 // when the image is built (their defaults match compose); upgrade to a runtime proxy only if the
 // api ever moves off http://api:8000.
 const { apiOrigin: apiInternalOrigin } = readServerEnv();
-const apiOrigin = process.env.NEXT_PUBLIC_API_ORIGIN ?? "http://localhost:8000"; // what the browser may call
 
 const securityHeaders = [
   { key: "X-Content-Type-Options", value: "nosniff" },
