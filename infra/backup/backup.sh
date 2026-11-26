@@ -7,6 +7,7 @@
 # env (from make): PROJECT (compose project), CONTAINER (podman|docker), COMPOSE (compose command),
 #      BACKUP_DRY=1 (print the restic argument lists and stop), BACKUP_STATE_DIR (default .data/backup)
 set -Eeuo pipefail
+umask 077  # the dump holds the whole database: staging 700, files 600
 cd "$(dirname "$0")/../.."
 
 : "${PROJECT:?run through make backup}" "${CONTAINER:?run through make backup}" "${COMPOSE:?run through make backup}"
@@ -43,11 +44,14 @@ ERR=""
 SNAPSHOT=""
 BYTES=0
 mkdir -p "$STATE_DIR"
+chmod 700 "$STATE_DIR"
+exec 9> "$STATE_DIR/lock"  # one run at a time; the lock goes with the process
+flock -n 9 || { echo "FAIL: backup already running" >&2; exit 1; }
 trap 'ERR="${ERR:-command failed at line $LINENO}"' ERR
 record() { # status
   local err="${ERR//[\"\\]/}"
   printf '{"ts":"%s","status":"%s","snapshot_id":"%s","bytes_added":%s,"duration_s":%s,"error":"%s"}\n' \
-    "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$1" "$SNAPSHOT" "$BYTES" "$((SECONDS - START))" "$err" > "$STATE_DIR/last_run.json"
+    "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$1" "$SNAPSHOT" "${BYTES:-0}" "$((SECONDS - START))" "$err" > "$STATE_DIR/last_run.json"
   cat "$STATE_DIR/last_run.json" >> "$STATE_DIR/backup.log"
 }
 finish() {
@@ -67,11 +71,22 @@ MOUNTS=()
 
 # --- 1. preflight (messages name the VARIABLE, never a value) ---------------------------------
 [ -n "$REPO" ] || fail "BACKUP_REPO is not set"
+[ "${BACKUP_INIT:-}" != 1 ] || mkdir -p "$REPO"  # make backup-init: an absent folder is created
 [ -d "$REPO" ] && [ -w "$REPO" ] || fail "BACKUP_REPO is not an existing writable directory"
 [ -n "$PWFILE" ] || fail "BACKUP_PASSWORD_FILE is not set"
 [ -f "$PWFILE" ] || fail "BACKUP_PASSWORD_FILE is not a regular file"
 [ "$(stat -c %a "$PWFILE")" = 600 ] || fail "BACKUP_PASSWORD_FILE must have mode 600"
 [ -s "$PWFILE" ] || fail "BACKUP_PASSWORD_FILE is empty"
+# A typo or an unmounted drive must never silently start a new repository: only `make backup-init`
+# (BACKUP_INIT=1) creates one, and only in an empty folder.
+if [ "${BACKUP_INIT:-}" = 1 ]; then
+  if [ -e "$REPO/config" ]; then echo "repo already initialised at $REPO"; exit 0; fi
+  [ -z "$(ls -A "$REPO")" ] || fail "BACKUP_REPO is not empty and holds no repository: refusing to initialise it"
+  restic init >/dev/null
+  echo "BACKUP REPO INITIALISED at $REPO"
+  exit 0
+fi
+[ -e "$REPO/config" ] || fail "repo not initialised at $REPO (first run: make backup-init)"
 BLOBS_VOLUME="${PROJECT}_blobs"
 "$CONTAINER" volume inspect "$BLOBS_VOLUME" >/dev/null 2>&1 || fail "the blob volume of PROJECT does not exist"
 MOUNTPOINT="$("$CONTAINER" volume inspect "$BLOBS_VOLUME" --format '{{.Mountpoint}}')"
@@ -90,6 +105,7 @@ free_kb="$(df -Pk "$REPO" | awk 'NR==2 {print $4}')"
 
 # --- 2. dump (a dump that cannot be listed is a failure; set -e carries every check below) ----
 mkdir -p "$STAGING"
+chmod 700 "$STAGING"
 STAMP="$(date -u +%Y%m%dT%H%M%SZ)"
 $COMPOSE exec -T postgres pg_dump -U postgres -Fc saveclock > "$STAGING/saveclock.dump.part"
 [ -s "$STAGING/saveclock.dump.part" ]
@@ -100,6 +116,7 @@ ls -1t "$STAGING"/saveclock-*.dump | tail -n +4 | while read -r old; do rm -f "$
 # --- 3. manifest and counts, computed from the live files (work/ is excluded by construction) --
 "$CONTAINER" run --rm --security-opt label=disable --entrypoint sh \
   -e AREAS="$AREAS" -v "$BLOBS_VOLUME":/data/blobs:ro -v "$STAGING":/staging "$IMAGE" -c '
+  umask 077
   cd /data/blobs
   dirs=""; for d in $AREAS; do [ -d "$d" ] && dirs="$dirs $d"; done
   : > /staging/manifest.sha256
@@ -111,13 +128,12 @@ DIRS="$(cat "$STAGING/.dirs")"
 rm -f "$STAGING/.dirs"
 
 # --- 4. backup (only the permanent areas that exist), then retention, then structure check ------
-[ -e "$REPO/config" ] || restic init >/dev/null
 MOUNTS=(-v "$STAGING":/staging:ro -v "$BLOBS_VOLUME":/data/blobs:ro)
 paths=(/staging)
 for d in $DIRS; do paths+=("/data/blobs/$d"); done
 out="$(restic backup --json --host saveclock --tag nightly "${paths[@]}")"
 SNAPSHOT="$(printf '%s\n' "$out" | jq -r 'select(.message_type=="summary") | .snapshot_id' | head -c 8)"
-BYTES="$(printf '%s\n' "$out" | jq -r 'select(.message_type=="summary") | .data_added')"
+BYTES="$(printf '%s\n' "$out" | jq -r 'select(.message_type=="summary") | .data_added // 0')"
 [ -n "$SNAPSHOT" ]
 restic "${FORGET_ARGS[@]}" >/dev/null
 restic "${CHECK_ARGS[@]}" >/dev/null

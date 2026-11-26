@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # make backup-test: the backup script's CLI against the REAL running stack and a throwaway restic
 # repository (mktemp, its own generated passphrase). Never touches the owner's repository.
+# NOTE: it creates one stub job (one project) in the live stack and removes only its work/ file.
 # Seam: the script's exit codes and output, last_run.json, and the repository it writes.
 # env: PROJECT, CONTAINER, COMPOSE (from make), WEB_PORT
 set -uo pipefail
@@ -45,7 +46,18 @@ snaps() { rs snapshots --json | jq length; }
 last_status() { jq -r .status "$STATE/last_run.json"; }
 no_passphrase() { ! grep -qF -- "$(cat "$PW")" "$@"; }
 
-echo "== 1 happy path"
+echo "== 1 the repository is never created by a normal run"
+out="$(backup)"; rc=$?
+[ "$rc" != 0 ] && ok "empty folder, no init: non-zero exit" || bad "empty folder, no init: non-zero exit"
+printf '%s' "$out" | grep -qF "repo not initialised at" && ok "says: repo not initialised at <path>" || bad "says: repo not initialised at <path>"
+[ -z "$(ls -A "$REPO")" ] && ok "nothing was created in the folder" || bad "nothing was created in the folder"
+mkdir "$TMP/notempty"; echo x > "$TMP/notempty/file"
+out="$(backup BACKUP_INIT=1 BACKUP_REPO="$TMP/notempty")"; rc=$?
+[ "$rc" != 0 ] && ok "init refuses a non-empty folder without a repository" || bad "init refuses a non-empty folder without a repository"
+out="$(backup BACKUP_INIT=1)"; rc=$?
+[ "$rc" = 0 ] && [ -e "$REPO/config" ] && ok "init on the empty folder creates the repository" || bad "init on the empty folder creates the repository"
+
+echo "== 2 happy path"
 resp="$(curl -s -X POST "http://localhost:$WEB_PORT/api/v1/_stub/jobs" -H "Origin: http://localhost:$WEB_PORT" \
   -H 'Content-Type: application/json' -d '{"sleep_s":0}')"
 job="$(printf '%s' "$resp" | jq -r .job_id)"
@@ -63,6 +75,10 @@ for want in ".dump" "manifest.sha256" "counts.json" "renders/$job/stub.txt"; do
 done
 printf '%s\n' "$listing" | grep -q '/work' && bad "snapshot has no work/" || ok "snapshot has no work/"
 [ "$(last_status)" = ok ] && ok "last_run.json says ok" || bad "last_run.json says ok"
+[ "$(stat -c %a "$STAGING")" = 700 ] && ok "staging dir is 700" || bad "staging dir is 700"
+[ -z "$(find "$STAGING" -type f ! -perm 600)" ] && ok "dump, manifest and counts are 600" || bad "dump, manifest and counts are 600"
+[ "$(stat -c %a "$STATE/last_run.json")" = 600 ] && ok "last_run.json is 600" || bad "last_run.json is 600"
+jq -e . "$STATE/last_run.json" >/dev/null && ok "last_run.json is valid JSON" || bad "last_run.json is valid JSON"
 
 echo "== 3 a failing dump leaves no snapshot (postgres stays up; the compose call for pg_dump crashes)"
 cat > "$TMP/badcompose" <<EOF
@@ -76,8 +92,28 @@ out="$(backup COMPOSE="$TMP/badcompose")"; rc=$?
 [ "$rc" != 0 ] && ok "failing dump: non-zero exit (rc=$rc)" || bad "failing dump: non-zero exit"
 [ "$(snaps)" = "$before" ] && ok "failing dump: 0 new snapshots" || bad "failing dump: 0 new snapshots"
 [ "$(last_status)" = failed ] && ok "failing dump: last_run.json says failed" || bad "failing dump: last_run.json says failed"
+jq -e . "$STATE/last_run.json" >/dev/null && ok "failing dump: last_run.json is valid JSON" || bad "failing dump: last_run.json is valid JSON"
 
-echo "== 2 preflight failures"
+echo "== 4 a restic run with no summary line still leaves valid JSON"
+cat > "$TMP/badcontainer" <<EOF
+#!/bin/bash
+for a in "\$@"; do [ "\$a" = backup ] && { echo '{"message_type":"status"}'; exit 0; }; done
+exec $CONTAINER "\$@"
+EOF
+chmod +x "$TMP/badcontainer"
+out="$(backup CONTAINER="$TMP/badcontainer")"; rc=$?
+[ "$rc" != 0 ] && ok "no summary: non-zero exit" || bad "no summary: non-zero exit"
+jq -e . "$STATE/last_run.json" >/dev/null && ok "no summary: last_run.json is valid JSON" || bad "no summary: last_run.json is valid JSON"
+
+echo "== 5 a second run at the same time is refused"
+backup > "$TMP/first.out" &
+first=$!
+sleep 3
+out="$(backup)"; rc=$?
+[ "$rc" != 0 ] && printf '%s' "$out" | grep -qF "backup already running" && ok "concurrent run: refused with 'backup already running'" || bad "concurrent run: refused with 'backup already running'"
+wait "$first" && ok "the first run still succeeds" || bad "the first run still succeeds"
+
+echo "== 6 preflight failures"
 preflight() { # label, expected variable name, env assignments...
   local label="$1" var="$2"; shift 2
   out="$(backup "$@")"; rc=$?
@@ -89,15 +125,22 @@ preflight() { # label, expected variable name, env assignments...
 preflight "missing password file" BACKUP_PASSWORD_FILE BACKUP_PASSWORD_FILE="$TMP/does-not-exist"
 cp "$PW" "$TMP/pw644"; chmod 644 "$TMP/pw644"
 preflight "password file mode 644" BACKUP_PASSWORD_FILE BACKUP_PASSWORD_FILE="$TMP/pw644"
+backup BACKUP_INIT=1 BACKUP_REPO="$SAME" >/dev/null  # a real repository on the same disk
 preflight "same disk without the override" BACKUP_REPO BACKUP_REPO="$SAME" BACKUP_ALLOW_SAME_DISK=no
 
-echo "== 6 second run reuses the repository"
+echo "== 7 second run reuses the repository"
 out="$(backup)"; rc=$?
 [ "$rc" = 0 ] && ok "second backup exits 0" || bad "second backup exits 0"
-[ "$(snaps)" = 2 ] && ok "2 snapshots" || bad "2 snapshots"
+[ "$(snaps)" -ge 2 ] && ok "the repository holds at least 2 snapshots (retention may merge same-day ones)" || bad "the repository holds at least 2 snapshots"
 [ "$(find "$REPO" -maxdepth 1 -name config | wc -l)" = 1 ] && ok "one repository config" || bad "one repository config"
 
-echo "== 4 no secret on a command line or in the log; 5 retention flags"
+echo "== 8 an unmounted drive (an empty folder that is not the repository) never starts a new repository"
+mkdir "$TMP/unmounted"
+out="$(backup BACKUP_REPO="$TMP/unmounted")"; rc=$?
+[ "$rc" != 0 ] && printf '%s' "$out" | grep -qF "repo not initialised at" && ok "empty folder after real use: refused" || bad "empty folder after real use: refused"
+[ -z "$(ls -A "$TMP/unmounted")" ] && ok "the folder is still empty" || bad "the folder is still empty"
+
+echo "== 9 no secret on a command line or in the log; retention flags"
 want_dry=$'restic backup --host saveclock --tag nightly /staging /data/blobs/songs /data/blobs/renders\nrestic forget --keep-daily 7 --keep-weekly 4 --keep-monthly 6 --prune\nrestic check'
 dry="$(backup BACKUP_DRY=1)"
 [ "$dry" = "$want_dry" ] && ok "dry-run argument lists equal the literal" || { bad "dry-run argument lists equal the literal"; echo "$dry"; }

@@ -6,6 +6,16 @@ Nightly: `infra/backup/backup.sh` (also `make backup`). It writes a `pg_dump`, a
 `BACKUP_ALLOW_SAME_DISK` (leave `no` on the real machine). Needs `podman` or `docker`, `jq`, `curl`.
 Result of each run: `.data/backup/last_run.json` and `.data/backup/backup.log`.
 
+First run on a new folder: `make backup-init` creates the empty restic repository (and the folder, if it is
+absent). A normal `make backup` never does that: when `BACKUP_REPO` holds no repository it fails with
+`repo not initialised at <path>`. That is on purpose, so a typo or an unmounted drive (an empty folder) can
+never silently start a second repository. `make backup-init` itself refuses a folder that has files in it
+but no repository. Only one backup runs at a time (`.data/backup/lock`; a second one fails with
+`backup already running`). The dump, manifest and `last_run.json` are mode 600, the staging folder 700.
+
+`make backup-test` runs against the live stack and a throwaway repository, and adds one stub project
+(one stub job) to the live database; it removes only its own `work/` file.
+
 Timer: `make backup-install-timer` (writes `~/.config/systemd/user/`, enables it), `make backup-timer-uninstall`.
 A laptop asleep at 02:30 runs the job at the next wake (`Persistent=true`).
 

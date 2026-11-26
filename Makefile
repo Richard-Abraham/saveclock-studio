@@ -29,7 +29,7 @@ CHECK_STAGES := $(FAST_STAGES) images image-guards hadolint
   test-deps-down ffmpeg-cache images image-guards hadolint scan-images up dev down \
   down-volumes sandbox check-fast check web-install web-env web-lint web-test web-build \
   bundle-scan web-audit-prod measure-rewrite smoke-web web-audit stack-up seed smoke-stub \
-  predeploy-scan backup backup-test restore-proof backup-install-timer backup-timer-uninstall rollback-demo fresh-clone-timing
+  predeploy-scan backup backup-init backup-test restore-proof backup-install-timer backup-timer-uninstall rollback-demo fresh-clone-timing
 
 help:
 	@echo "targets: check-fast check dev down sandbox images scan-images env env-docs contracts"
@@ -251,6 +251,10 @@ predeploy-scan:
 
 backup:
 	$(STACK_ENV) bash infra/backup/backup.sh
+
+# first run on a new backup folder: creates the (empty) restic repository, nothing else
+backup-init:
+	$(STACK_ENV) BACKUP_INIT=1 bash infra/backup/backup.sh
 
 backup-test:
 	$(STACK_ENV) bash infra/backup/test_backup.sh
