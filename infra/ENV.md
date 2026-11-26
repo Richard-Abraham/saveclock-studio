@@ -61,6 +61,8 @@
 | `FAKE_STOCK` | `bool` | `False` | no | no | local/CI | ARCH §18 |
 | `FAKE_ML` | `bool` | `False` | no | no | local/CI | ARCH §18 |
 | `FAKE_LLM` | `bool` | `False` | no | no | local/CI | ARCH §18 |
+| `FAKE_STOCK_DIR` | `str | None` | `` | no | no | K | plan 005 |
+| `LLM_MONTHLY_BUDGET_USD` | `float | None` | `` | no | no | K | plan 005 |
 | `BROKER_HEARTBEAT_TIMEOUT_S` | `int` | `60` | no | no | A,K,M | plan 001 |
 | `APP_VERSION` | `str` | `dev` | no | no | all | plan 001 |
 | `TUNING_PUBLISHER` | `bool` | `False` | no | no | K | plan 001 |

@@ -26,7 +26,7 @@ CHECK_STAGES := $(FAST_STAGES) images image-guards hadolint
 
 .PHONY: help guard secrets banned doctor fmt-check lint types arch pins compose-lint test \
   migrations audit env env-docs env-docs-check contracts contracts-check test-deps-up \
-  test-deps-down ffmpeg-cache ffmpeg-bin models-cache test-ml images image-guards hadolint scan-images up dev down \
+  test-deps-down ffmpeg-cache ffmpeg-bin models-cache test-ml fake-stock images image-guards hadolint scan-images up dev down \
   down-volumes sandbox check-fast check web-install web-env web-lint web-test web-build \
   bundle-scan web-audit-prod measure-rewrite smoke-web web-audit stack-up seed smoke-stub \
   predeploy-scan backup backup-init backup-test restore-proof backup-install-timer backup-timer-uninstall rollback-demo fresh-clone-timing
@@ -90,6 +90,10 @@ test:
 # the real Beat This model on a generated click track; needs the worker's ml extra and the weights
 test-ml:
 	MODELS_DIR="$(CURDIR)/infra/docker/cache/models" $(UV) run --extra ml pytest -q -m ml
+
+# the 8 generated stock clips FAKE_STOCK serves (never committed; plan 005)
+fake-stock: ffmpeg-bin
+	$(UV) run python ../../eval/scripts/make_fake_stock.py ../../.data/fake-stock
 
 # alembic check (models == migration) and a downgrade -1 / upgrade head round trip
 migrations:

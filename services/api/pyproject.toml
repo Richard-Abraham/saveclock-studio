@@ -5,9 +5,11 @@ description = "SaveClock API and workers"
 requires-python = "==3.12.*"
 dependencies = [
     "alembic>=1.20.1",
+    "anthropic>=2.14.0",
     "asyncpg>=0.32.0",
     "dramatiq[redis]>=2,<3",
     "fastapi>=0.165.0",
+    "httpx>=0.28.1",
     "numpy>=2.5.4",
     "pydantic>=2.14,<3",
     "pydantic-settings>=2.16.3",
@@ -26,6 +28,10 @@ ml = [
     "torchaudio>=2.11.1",
     "soundfile>=0.14.0",
     "scipy>=1.18.1",
+    "transformers>=5.24.1",
+    "pillow>=13.0.0",
+    "scenedetect>=0.7.3",
+    "opencv-python-headless>=5.1.0.95",
 ]
 
 [[tool.uv.index]]
@@ -46,7 +52,6 @@ packages = ["src/saveclock"]
 
 [dependency-groups]
 dev = [
-    "httpx>=0.28.1",
     "import-linter>=2.17",
     "mypy>=2.4.1",
     "pip-audit>=2.10.1",
@@ -54,6 +59,7 @@ dev = [
     "pytest-asyncio>=1.5.0",
     "pytest-cov>=7.1.0",
     "pyyaml>=6.0.4",
+    "respx>=0.23.1",
     "ruff>=0.17.6",
     "scipy>=1.18.1",  # the unit tests run FakeBeatModel and the DSP without the ml extra
     "soundfile>=0.14.0",
@@ -157,3 +163,8 @@ forbidden_modules = [
   "torch",
   "soundfile",
 ]
+
+[tool.uv]
+# scenedetect 0.7.3 hard-requires opencv-python (the GUI build, which bundles Qt). The headless build
+# ships the same cv2 module, so the worker image swaps it in (plan 005 Step 1; judgement call).
+override-dependencies = ["opencv-python ; sys_platform == 'never'", "opencv-python-headless>=4.10"]

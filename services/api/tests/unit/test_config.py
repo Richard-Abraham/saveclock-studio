@@ -106,6 +106,8 @@ def test_inventory_parity_with_arch_18() -> None:
         "SCRATCH_ROOT",  # plan 004
         "HEAVY_TTL_S",  # plan 004
         "MODELS_DIR",  # plan 004
+        "FAKE_STOCK_DIR",  # plan 005
+        "LLM_MONTHLY_BUDGET_USD",  # plan 005
         "NEXT_PUBLIC_API_ORIGIN",  # plan 002 Branch B (OQ-26)
         # plan 003: the host backup script's variables (ARCH §18 only says BACKUP_*)
         "BACKUP_REPO",

@@ -116,6 +116,10 @@ class Settings(BaseSettings):
     fake_stock: bool = _f(False, "local/CI")
     fake_ml: bool = _f(False, "local/CI")
     fake_llm: bool = _f(False, "local/CI")
+    # local/CI only: a directory of generated clips that FAKE_STOCK serves (make fake-stock)
+    fake_stock_dir: str | None = _f(None, "K", doc="plan 005")
+    # SEC-044 alarm: the estimated monthly LLM spend above which one warning is logged
+    llm_monthly_budget_usd: float | None = _f(None, "K", doc="plan 005")
     # Not in ARCH §18 (proposed additions, plan 001 Step 2):
     broker_heartbeat_timeout_s: int = _f(60, "A,K,M", doc="plan 001")
     app_version: str = _f("dev", "all", doc="plan 001")
