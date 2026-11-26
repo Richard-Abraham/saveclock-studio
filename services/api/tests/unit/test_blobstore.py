@@ -9,6 +9,7 @@ import pytest
 
 from saveclock.adapters.blobstore.blob_keys import (
     InvalidKey,
+    canonical_key,
     is_servable,
     render_file_key,
     song_incoming_key,
@@ -75,6 +76,7 @@ def test_key_builders() -> None:
     assert work_key(PID, "raw", "pexels_1.mp4") == f"work/{PID}/raw/pexels_1.mp4"
     assert render_file_key(PID, "master.mp4") == f"renders/{PID}/master.mp4"
     assert stub_key(PID) == f"renders/{PID}/stub.txt"
+    assert canonical_key(PID) == f"work/{PID}/canonical.flac"
     with pytest.raises(InvalidKey):
         song_source_key(PID, "../x")
     with pytest.raises(InvalidKey):
@@ -324,3 +326,32 @@ def test_usage_ignores_part_files_and_vanishing_files(
 
     monkeypatch.setattr(FilesystemBlobStore, "_files", with_a_ghost)
     assert store.usage() == 3
+
+
+@pytest.mark.unit
+def test_rename_moves_a_blob_atomically(store: BlobStore, tmp_path: Path) -> None:
+    store.put("songs/p/incoming.bin", iter([b"abc"]), max_bytes=10)
+    store.rename("songs/p/incoming.bin", "songs/p/source.wav")
+    assert not store.exists("songs/p/incoming.bin")
+    assert b"".join(store.open("songs/p/source.wav")) == b"abc"
+    store.put("work/q/a.bin", iter([b"zz"]), max_bytes=10)
+    store.rename("work/q/a.bin", "work/q/deeper/b.bin")  # the destination directory is created
+    assert b"".join(store.open("work/q/deeper/b.bin")) == b"zz"
+
+
+@pytest.mark.unit
+def test_rename_refuses_a_missing_source_and_bad_keys(store: BlobStore, tmp_path: Path) -> None:
+    with pytest.raises(NotFound):
+        store.rename("songs/p/none.bin", "songs/p/x.bin")
+    store.put("songs/p/a.bin", iter([b"a"]), max_bytes=10)
+    for bad in ("../x", "/etc/x", "a/../../x"):
+        with pytest.raises(InvalidKey):
+            store.rename("songs/p/a.bin", bad)
+        with pytest.raises(InvalidKey):
+            store.rename(bad, "songs/p/b.bin")
+    assert store.exists("songs/p/a.bin")
+    (tmp_path / "outside").mkdir()
+    (tmp_path / "root" / "link").symlink_to(tmp_path / "outside")
+    with pytest.raises(InvalidKey):
+        store.rename("songs/p/a.bin", "link/x.bin")
+    assert not (tmp_path / "outside" / "x.bin").exists()

@@ -3,10 +3,8 @@
 import asyncio
 import os
 import signal
-import subprocess
-import sys
 import time
-from collections.abc import AsyncIterator, Callable, Iterator
+from collections.abc import AsyncIterator, Callable
 from pathlib import Path
 from typing import Any
 from uuid import UUID
@@ -14,7 +12,6 @@ from uuid import UUID
 import asyncpg
 import httpx
 import pytest
-from redis.asyncio import Redis
 
 from saveclock.config import Settings
 from saveclock.models import JobQueue
@@ -22,75 +19,13 @@ from saveclock.services.stub import chain_ids
 from saveclock.workers.broker import build_broker
 from saveclock.workers.stub import StubActors, register_stub_actors
 from tests.conftest import client_for, make_app
-from tests.integration.conftest import API_DIR, REDIS_URL, Db
+from tests.integration.conftest import REDIS_URL, Db, Harness
 
 pytestmark = pytest.mark.integration
 
 OWNER = UUID("00000000-0000-4000-8000-000000000001")
 OTHER = UUID("00000000-0000-4000-8000-0000000000bb")
 MAIN_QUEUES = ["analysis", "fetch", "render"]
-
-
-class Harness:
-    def __init__(self, db: Db, blob_root: Path, tmp_path: Path) -> None:
-        self.db, self.blob_root, self.tmp_path = db, blob_root, tmp_path
-        self.procs: list[subprocess.Popen[bytes]] = []
-
-    def env(self, **extra: str) -> dict[str, str]:
-        env = {
-            k: v
-            for k, v in os.environ.items()
-            if k not in {"OWNER_DISPLAY_NAME", "FETCH_CONCURRENCY"}
-        }
-        env.update(
-            APP_ENV="ci",
-            APP_ORIGIN="http://localhost:3000",
-            DATABASE_URL=self.db.url("app_rw"),
-            REDIS_URL=REDIS_URL,
-            BLOB_ROOT=str(self.blob_root),
-            DISK_LOW_WATERMARK_GB="0",
-        )
-        env.update(extra)
-        return env
-
-    def start_worker(self, queues: list[str], **extra_env: str) -> subprocess.Popen[bytes]:
-        log = (self.tmp_path / f"worker{len(self.procs)}.log").open("wb")
-        proc = subprocess.Popen(  # noqa: S603 - fixed argument list, no shell
-            [
-                sys.executable,
-                "-m",
-                "dramatiq",
-                "saveclock.workers.main",
-                "--processes",
-                "1",
-                "--threads",
-                "2",
-                "--queues",
-                *queues,
-            ],
-            cwd=API_DIR,
-            env=self.env(**extra_env),
-            stdout=log,
-            stderr=subprocess.STDOUT,
-            start_new_session=True,
-        )
-        self.procs.append(proc)
-        return proc
-
-    def kill_all(self) -> None:
-        for proc in self.procs:
-            if proc.poll() is None:
-                os.killpg(proc.pid, signal.SIGKILL)
-            proc.wait(timeout=10)
-
-
-@pytest.fixture
-def harness(
-    migrated_db: Db, blob_root: Path, tmp_path: Path, redis_client: Redis
-) -> Iterator[Harness]:
-    h = Harness(migrated_db, blob_root, tmp_path)
-    yield h
-    h.kill_all()
 
 
 @pytest.fixture

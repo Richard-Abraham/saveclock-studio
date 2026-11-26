@@ -7,8 +7,13 @@ import dramatiq
 
 from saveclock.config import Settings
 from saveclock.observability.logging import configure_logging
+from saveclock.services.scratch import sweep_stale
+from saveclock.workers.analysis import register_analyze_actor
 from saveclock.workers.broker import build_broker
+from saveclock.workers.draft_placeholder import register_draft_placeholder
 from saveclock.workers.heartbeat import TuningHeartbeat
+from saveclock.workers.ingest import register_validate_actor
+from saveclock.workers.pipeline import register_failure_hook
 from saveclock.workers.stub import register_stub_actors
 
 settings = Settings()
@@ -20,3 +25,8 @@ if settings.tuning_publisher:
     broker.add_middleware(TuningHeartbeat(settings))
 dramatiq.set_broker(broker)
 actors = register_stub_actors(broker, settings)
+register_failure_hook(broker, settings)
+register_validate_actor(broker, settings)
+register_analyze_actor(broker, settings)
+register_draft_placeholder(broker, settings)  # plan 006 replaces it
+sweep_stale(settings.scratch_root)  # scratch left behind by a killed worker (SEC-023)

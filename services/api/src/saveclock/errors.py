@@ -6,6 +6,8 @@
 from enum import StrEnum
 from typing import Any
 
+from saveclock.domain.audio_rules import FileRejectReason
+
 
 class ErrorCode(StrEnum):
     VALIDATION_ERROR = "validation_error"
@@ -55,6 +57,37 @@ class ForbiddenReason(StrEnum):
     CROSS_SITE = "cross_site"
 
 
+class UnsupportedMediaReason(StrEnum):
+    UNSNIFFABLE = "unsniffable"
+    EXTENSION_MISMATCH = "extension_mismatch"
+    MIME_MISMATCH = "mime_mismatch"
+
+
+class BadRequestReason(StrEnum):
+    CONTENT_LENGTH_REQUIRED = "content_length_required"
+    BAD_FILENAME = "bad_filename"
+
+
+class ConflictReason(StrEnum):
+    NOT_READY = "not_ready"
+    WRONG_STATE = "wrong_state"
+    UPLOAD_IN_PROGRESS = "upload_in_progress"
+    RETRY_LIMIT = "retry_limit"
+
+
+# ARCH §7: which codes a client (or the job runner) may retry; derived from the code, no column.
+RETRYABLE = frozenset(
+    {
+        ErrorCode.CONFLICT,
+        ErrorCode.INSUFFICIENT_STORAGE,
+        ErrorCode.STOCK_UNAVAILABLE,
+        ErrorCode.VERIFICATION_FAILED,
+        ErrorCode.UPSTREAM_UNAVAILABLE,
+        ErrorCode.INTERNAL_ERROR,
+    }
+)
+
+
 class AppError(Exception):
     code: ErrorCode = ErrorCode.INTERNAL_ERROR
     status_override: int | None = None  # for the rare status the catalogue does not map (416)
@@ -90,6 +123,27 @@ class Forbidden(AppError):
     code = ErrorCode.FORBIDDEN
 
     def __init__(self, reason: ForbiddenReason, message: str = "forbidden") -> None:
+        super().__init__(message, {"reason": reason.value})
+
+
+class Conflict(AppError):
+    code = ErrorCode.CONFLICT
+
+    def __init__(self, reason: ConflictReason, message: str = "conflict") -> None:
+        super().__init__(message, {"reason": reason.value})
+
+
+class UnsupportedMedia(AppError):
+    code = ErrorCode.UNSUPPORTED_MEDIA
+
+    def __init__(self, reason: UnsupportedMediaReason, message: str = "unsupported media") -> None:
+        super().__init__(message, {"reason": reason.value})
+
+
+class FileRejected(AppError):
+    code = ErrorCode.FILE_REJECTED
+
+    def __init__(self, reason: FileRejectReason, message: str = "file rejected") -> None:
         super().__init__(message, {"reason": reason.value})
 
 

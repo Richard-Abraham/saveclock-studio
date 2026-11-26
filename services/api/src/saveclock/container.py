@@ -8,6 +8,7 @@ from redis.asyncio import Redis
 
 from saveclock.adapters.blobstore.filesystem import FilesystemBlobStore
 from saveclock.adapters.db import create_engine, create_sessionmaker, ping_db
+from saveclock.adapters.queue import DramatiqEnqueuer
 from saveclock.config import Settings
 from saveclock.deps import Deps
 from saveclock.workers.broker import build_broker
@@ -32,15 +33,17 @@ def build_deps(settings: Settings) -> Deps:
     async def blob_volume() -> None:
         await asyncio.to_thread(blobs.probe)
 
+    broker = build_broker(settings)  # no connection until the first send
     enqueue_stub: Enqueue | None = None
     if settings.app_env in STUB_ENVS:
-        enqueue_stub = register_stub_actors(build_broker(settings), settings).send_first
+        enqueue_stub = register_stub_actors(broker, settings).send_first
 
     return Deps(
         engine=engine,
         sessionmaker=sessionmaker,
         redis=redis,
         blobs=blobs,
+        enqueuer=DramatiqEnqueuer(broker),
         enqueue_stub=enqueue_stub,
         checks={
             "postgres": partial(ping_db, sessionmaker),

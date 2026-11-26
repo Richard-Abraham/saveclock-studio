@@ -114,6 +114,13 @@ class FilesystemBlobStore:
     def delete(self, key: str) -> None:
         self._resolve(key).unlink(missing_ok=True)
 
+    def rename(self, src_key: str, dst_key: str) -> None:
+        src, dst = self._resolve(src_key), self._resolve(dst_key)
+        if not src.is_file():
+            raise NotFound
+        self._mkdirs(dst.parent)
+        os.replace(src, dst)
+
     def delete_prefix(self, prefix: str) -> int:
         """Returns bytes freed. An empty prefix (the root) is refused by `validate_key`."""
         target = self._resolve(prefix)

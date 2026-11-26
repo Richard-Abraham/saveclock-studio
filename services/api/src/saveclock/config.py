@@ -110,6 +110,8 @@ class Settings(BaseSettings):
     app_version: str = _f("dev", "all", doc="plan 001")
     # true only on the worker that serves the heavy queues, so one process owns settings:tuning
     tuning_publisher: bool = _f(False, "K", doc="plan 001")
+    scratch_root: str = _f("/scratch", "K", doc="plan 004; per-job scratch directories")
+    models_dir: str = _f("/opt/models", "K", doc="plan 004; model weights and their manifest")
 
     @field_validator("allowed_hosts", "stock_host_allowlist", mode="before")
     @classmethod

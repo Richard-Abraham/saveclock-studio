@@ -87,10 +87,13 @@ def signals(
     return {"s1": s1, "s2": s2, "s3": s3, "s4": s4, "s5": s5, "s8": audio_condition}
 
 
+def band_of(total: float) -> str:
+    return "high" if total >= HIGH else "medium" if total >= MEDIUM else "low"
+
+
 def score(sig: dict[str, float]) -> Confidence:
     total = round(sum(WEIGHTS[k] * sig[k] for k in WEIGHTS), 4)
-    band = "high" if total >= HIGH else "medium" if total >= MEDIUM else "low"
-    return Confidence(total, band, [REASONS[k] for k in WEIGHTS if sig[k] < REASON_BELOW])
+    return Confidence(total, band_of(total), [REASONS[k] for k in WEIGHTS if sig[k] < REASON_BELOW])
 
 
 def low_confidence_ranges(beats: list[float]) -> list[tuple[float, float]]:
