@@ -15,8 +15,10 @@ RUN pnpm install --frozen-lockfile --filter @saveclock/web...
 # browser never contacts Google (plan 002 W5). the NEXT_PUBLIC_*_ORIGIN values are public; nothing else is
 # passed at build time and no .env is ever copied in.
 FROM deps AS build
-ARG NEXT_PUBLIC_APP_ORIGIN=http://localhost:3000
-ARG NEXT_PUBLIC_API_ORIGIN=http://localhost:8000
+# No defaults: `make images` passes both from .env, and a missing value fails the build.
+ARG NEXT_PUBLIC_APP_ORIGIN
+ARG NEXT_PUBLIC_API_ORIGIN
+RUN test -n "$NEXT_PUBLIC_APP_ORIGIN" && test -n "$NEXT_PUBLIC_API_ORIGIN"
 ENV NEXT_PUBLIC_APP_ORIGIN=${NEXT_PUBLIC_APP_ORIGIN} \
     NEXT_PUBLIC_API_ORIGIN=${NEXT_PUBLIC_API_ORIGIN}
 COPY apps/web apps/web

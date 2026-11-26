@@ -15,6 +15,9 @@ if [ "$kind" = web ]; then
   check "node is the pinned $(tr -d '[:space:]' < .nvmrc)" "[ \"\$(node --version)\" = v$(tr -d '[:space:]' < .nvmrc) ]"
   check "no .env file in /app" '[ -z "$(find /app -name ".env*" -not -path "*/node_modules/*" 2>/dev/null)" ]'
   check "no source maps in the client bundle" '[ -z "$(find /app/apps/web/.next/static -name "*.map" 2>/dev/null)" ]'
+  # the origins the browser bundle and the CSP were built with must be the ones in .env (build args)
+  check "CSP connect-src carries the API origin from .env (${EXPECT_API_ORIGIN:?})" "grep -qF \"connect-src 'self' $EXPECT_API_ORIGIN;\" /app/apps/web/.next/routes-manifest.json"
+  check "the app origin from .env is in the server bundle (${EXPECT_APP_ORIGIN:?})" "grep -rqF \"$EXPECT_APP_ORIGIN\" /app/apps/web/.next/server"
   check "standalone server is present" '[ -f /app/apps/web/server.js ]'
   check "no pnpm or corepack in the runtime image" '! command -v pnpm'
 elif [ "$kind" = api ]; then

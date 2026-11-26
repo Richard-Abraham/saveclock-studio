@@ -9,6 +9,8 @@ CONTAINER := $(shell command -v docker >/dev/null 2>&1 && echo docker || echo po
 COMPOSE = $(COMPOSE_BIN) -p $(PROJECT) --env-file .env -f infra/compose/compose.yml
 COMPOSE_TEST = $(COMPOSE_BIN) -p saveclock-test -f infra/compose/compose.test.yml
 GIT_SHA := $(shell git rev-parse --short HEAD 2>/dev/null || echo unknown)
+# value of a variable in .env (empty when absent): the one source of the web image's public origins
+envval = $(shell sed -n 's/^$(1)=//p' .env 2>/dev/null | tail -1)
 FFMPEG_SRC := $(HOME)/saveclock-spike/downloads/ffmpeg-9.0.x-static
 HADOLINT := docker.io/hadolint/hadolint@sha256:9a3944b7fddcb947d1ffd90829ac1a6e5c30479223358f249d8b96c7d0019e27
 TRIVY := ghcr.io/aquasecurity/trivy@sha256:6e7f515a46af13a01d534734c666261de65c6e6fe389fa2309e9e2d07470f3a8
@@ -118,12 +120,15 @@ images: ffmpeg-cache
 	$(CONTAINER) build --target worker -f infra/docker/Dockerfile.api \
 	  --build-arg APP_VERSION=sha-$(GIT_SHA) -t saveclock-worker:sha-$(GIT_SHA) -t saveclock-worker:local .
 	$(CONTAINER) build --target web -f infra/docker/Dockerfile.web \
+	  --build-arg NEXT_PUBLIC_APP_ORIGIN=$(call envval,APP_ORIGIN) \
+	  --build-arg NEXT_PUBLIC_API_ORIGIN=$(call envval,NEXT_PUBLIC_API_ORIGIN) \
 	  -t saveclock-web:sha-$(GIT_SHA) -t saveclock-web:local .
 
 image-guards:
 	CONTAINER=$(CONTAINER) scripts/check_image_contents.sh saveclock-api:sha-$(GIT_SHA) api
 	CONTAINER=$(CONTAINER) scripts/check_image_contents.sh saveclock-worker:sha-$(GIT_SHA) worker
-	CONTAINER=$(CONTAINER) scripts/check_image_contents.sh saveclock-web:sha-$(GIT_SHA) web
+	EXPECT_APP_ORIGIN=$(call envval,APP_ORIGIN) EXPECT_API_ORIGIN=$(call envval,NEXT_PUBLIC_API_ORIGIN) \
+	  CONTAINER=$(CONTAINER) scripts/check_image_contents.sh saveclock-web:sha-$(GIT_SHA) web
 	@echo "IMAGE GUARDS OK"
 
 hadolint:
