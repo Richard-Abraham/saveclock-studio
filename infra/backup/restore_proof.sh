@@ -94,8 +94,15 @@ manifest_ok() {
     -v "${SCRATCH}_blobs":/data/blobs:ro -v "$STAGING_DIR":/staging:ro "$IMAGE" \
     -c 'cd /data/blobs && sha256sum -c /staging/manifest.sha256' > "$WORK/manifest.out" 2>&1
 }
-projects_json="$(curl -s http://127.0.0.1:18000/api/v1/projects)"
-got_projects="$(printf '%s' "$projects_json" | jq '.items | length')"
+projects_json="$(curl -s 'http://127.0.0.1:18000/api/v1/projects?limit=100')"
+got_projects=0
+page="$projects_json"
+while :; do  # follow the cursor: the list is paged (100 per page at most)
+  got_projects=$((got_projects + $(printf '%s' "$page" | jq '.items | length')))
+  cursor="$(printf '%s' "$page" | jq -r '.next_cursor // empty')"
+  [ -n "$cursor" ] || break
+  page="$(curl -s -G --data-urlencode "cursor=$cursor" 'http://127.0.0.1:18000/api/v1/projects?limit=100')"
+done
 title="$(printf '%s' "$projects_json" | jq -r '.items[0].title // empty')"
 stub="$(grep -o 'renders/[0-9a-f-]*/stub.txt' "$STAGING_DIR/manifest.sha256" | head -1 || true)"
 stub_id="$(basename "$(dirname "${stub:-x/none/y}")")"
