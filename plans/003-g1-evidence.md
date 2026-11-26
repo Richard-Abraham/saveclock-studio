@@ -41,3 +41,18 @@ Run on the owner's laptop, 2026-11-26, compose project `saveclock-w003` (the old
 | `restore-proof` (on a COPY of the repository) | one byte flipped in each pack: rc 2 (`ciphertext verification failed`, `repository contains errors`) | snapshot without the dump: rc 2 (`FAIL: the snapshot holds no database dump`) | one byte appended to a restored blob: rc 2 (`FAIL sha256sum -c manifest.sha256`, `renders/<id>/stub.txt: FAILED`); green `RESTORE PROOF OK elapsed=34`. The owner's repository was unchanged (2 snapshots before and after) |
 
 Final `make check`: run twice in a row with `apps/web/.next` left in place between the runs; both ended `CHECK OK`.
+
+## Review round 2 (red before, green after)
+
+| Item | Red before the fix | Green after |
+|---|---|---|
+| predeploy scan decides gitleaks items by exit code (`--exit-code 2` = FOUND, 0 = NOT FOUND, anything else = FAILED) and item 7 reuses `make secrets` | with a broken gitleaks config the old scan printed `NOT FOUND: 6`, `NOT FOUND: 7`, `PREDEPLOY SCAN CLEAN`, rc 0 | broken config: `FAILED: 6 gitleaks git exited 1 (not a clean result)`, `FOUND: 7 secrets in the tree ...`, rc 2; real config: `PREDEPLOY SCAN CLEAN`, rc 0 |
+| `umask 077`: staging 700, dump/manifest/counts and `last_run.json` 600 | `FAIL staging dir is 700`, `FAIL dump, manifest and counts are 600`, `FAIL last_run.json is 600` | `BACKUP TESTS PASSED` |
+| no auto-init: `make backup-init` is the only way to create a repository; an empty or unmounted folder fails with `repo not initialised at <path>` and stays empty | `FAIL empty folder, no init: non-zero exit`, `FAIL empty folder after real use: refused`, `FAIL the folder is still empty` | `BACKUP TESTS PASSED` (also: init refuses a non-empty folder without a repository) |
+| `last_run.json` valid JSON after a forced failure (`${BYTES:-0}`, `.data_added // 0`) | `FAIL no summary: last_run.json is valid JSON` | `BACKUP TESTS PASSED` |
+| `flock -n` on `.data/backup/lock` | `FAIL concurrent run: refused with 'backup already running'` | refused, and the first run still succeeds |
+| restore proof checks `blob_files` >= 1 and equal to the OK lines | counts.json edited to 99: `FAIL counts.json blob_files (99) is >= 1 and equals the OK lines of sha256sum -c (12)`, rc 2 | `PASS counts.json blob_files (12) ... (12)`, `RESTORE PROOF OK elapsed=35` |
+| rollback demo trap | earlier class-3 run left the stack on the demo tag | `ROLLBACK_TAG=sha-demo-b`: FAIL, rc 2, and afterwards the api runs `sha-ed9e4df`, no demo tags, `:local` equals the original id; green: `ROLLBACK OK` |
+| contextvars cleared after a message | clear removed: `1 failed, 2 passed` | `3 passed` |
+
+Unit files after the change (service runs `make backup`): `systemd-analyze --user verify` rc 0. Timer name is `make backup-install-timer` (alias removed). Final runs on `saveclock-w003`: `make check` `CHECK OK`; `make smoke-stub` `STUB SMOKE OK`; `make backup-test` `BACKUP TESTS PASSED`; `make backup` `BACKUP OK 24ec2b20`; `make restore-proof` `RESTORE PROOF OK elapsed=35`; `make rollback-demo` `ROLLBACK OK`; `make predeploy-scan` `PREDEPLOY SCAN CLEAN` rc 0; `make down`.
