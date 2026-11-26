@@ -81,18 +81,21 @@ class PlanRepository:
         user_id: UUID,
         project_id: UUID,
         plan_id: UUID,
+        expected_hash: bytes,
         plan: dict[str, Any],
         content_hash: bytes,
         created_by: str,
     ) -> bool:
-        """Overwrite the working version in place. False: it is frozen (or not the user's), so
-        the caller inserts version N + 1 instead."""
+        """Overwrite the working version in place, only if it still holds `expected_hash` (the
+        version number does not move on an in-place write, so the hash is the lost-update guard).
+        False: it is frozen, changed since the read, or not the user's."""
         stmt = (
             update(EditPlan)
             .where(
                 EditPlan.id == plan_id,
                 EditPlan.project_id == project_id,
                 EditPlan.frozen_at.is_(None),
+                EditPlan.content_hash == expected_hash,
                 self._owned(user_id),
             )
             .values(

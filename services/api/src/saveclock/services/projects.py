@@ -22,7 +22,7 @@ from saveclock.repositories.plans import PlanRepository
 from saveclock.repositories.projects import ProjectRepository
 from saveclock.repositories.songs import SongRepository
 from saveclock.services import project_state
-from saveclock.services.plans import PlanSummary, summary_of
+from saveclock.services.plans import PlanSummary, restore_keywords_override, summary_of
 
 DEFAULT_LIMIT = 20
 MAX_LIMIT = 100
@@ -185,6 +185,8 @@ async def cancel(
         commit=False,
     ):
         raise Conflict(ConflictReason.WRONG_STATE)
+    if to == ProjectStatus.DRAFT_READY.value:  # a replan was cancelled: its keywords go with it
+        await restore_keywords_override(session, user_id, project_id)
     await JobRepository(session).request_cancel(user_id=user_id, project_id=project_id)
     await session.commit()
     await project_state.announce_pending(session, publisher)

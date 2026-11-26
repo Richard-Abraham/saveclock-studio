@@ -158,7 +158,7 @@ async def test_the_first_event_is_the_current_state_and_headers_say_no_buffering
     ):
         assert r.status_code == 200
         assert r.headers["content-type"].startswith("text/event-stream")
-        assert "no-store" in r.headers["cache-control"]
+        assert r.headers["cache-control"] == "private, no-store"
         assert r.headers["x-accel-buffering"] == "no"
         frames = Frames(r)
         await frames.wait(lambda: bool(frames.events))
@@ -302,3 +302,49 @@ async def test_a_stream_ends_at_its_maximum_age(api: ApiEnv, live: Any) -> None:
     async with server.client() as client, stream(client, pid) as frames:
         await asyncio.wait_for(frames.closed.wait(), 3.0)
     assert server.limits.open_streams == 0
+
+
+async def _subscribers(redis: Redis, pid: UUID) -> int:
+    counts = await redis.pubsub_numsub(channel(pid))
+    return int(counts[0][1])
+
+
+async def test_a_disconnect_unsubscribes_the_stream_from_redis(
+    api: ApiEnv,
+    live: Any,
+    redis_client: Redis,
+) -> None:
+    server, pid = live(), await new_project(api)
+    async with server.client() as client:
+        async with stream(client, pid) as frames:
+            await frames.wait(lambda: bool(frames.events))
+            assert await _subscribers(redis_client, pid) == 1
+        deadline = time.monotonic() + 5
+        while await _subscribers(redis_client, pid) != 0:
+            assert time.monotonic() < deadline, "the subscription outlived the client"
+            await asyncio.sleep(0.05)
+
+
+async def test_an_event_published_while_the_snapshot_is_read_is_still_delivered(
+    api: ApiEnv,
+    live: Any,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from saveclock.repositories.projects import ProjectRepository
+
+    real_get = ProjectRepository.get
+
+    async def get_then_publish(self: ProjectRepository, **kw: Any) -> Any:
+        found = await real_get(self, **kw)
+        publisher = Redis.from_url(REDIS_URL)
+        try:  # the project moves on right after the read that the snapshot is made of
+            await publish(publisher, kw["project_id"], ev.ProgressEvent("finding_beat", 42, "k"))
+        finally:
+            await publisher.aclose()
+        return found
+
+    server, pid = live(), await new_project(api)
+    monkeypatch.setattr(ProjectRepository, "get", get_then_publish)
+    async with server.client() as client, stream(client, pid) as frames:
+        await frames.wait(lambda: len(frames.events) >= 2)
+    assert [k for k, _ in frames.events[:2]] == ["state", "progress"]

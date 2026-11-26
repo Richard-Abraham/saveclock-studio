@@ -21,8 +21,10 @@ from saveclock.adapters.queue import DramatiqEnqueuer
 from saveclock.config import Settings
 from saveclock.models import JobQueue, ProjectStatus
 from saveclock.repositories.jobs import JobRepository
+from saveclock.repositories.plans import PlanRepository
 from saveclock.services import project_state
 from saveclock.services.context import WorkerContext
+from saveclock.services.plans import restore_keywords_override
 
 log = structlog.get_logger()
 
@@ -96,12 +98,22 @@ def register_failure_hook(broker: dramatiq.Broker, settings: Settings) -> None:
                     job = await jobs.get(user_id=user_id, job_id=job_id)
                     await jobs.mark_dead(user_id=user_id, job_id=job_id)
                     if job is not None and job.project_id is not None:
+                        planned = (
+                            await PlanRepository(session).latest(
+                                user_id=user_id, project_id=job.project_id
+                            )
+                            is not None
+                        )
+                        # a replan that dies keeps the plan the owner had (and drops its keywords)
+                        planning_to = (
+                            ProjectStatus.DRAFT_READY if planned else ProjectStatus.FAILED_PLAN
+                        )
                         for from_, to in (
                             (ProjectStatus.VALIDATING, ProjectStatus.FAILED_ANALYSIS),
                             (ProjectStatus.ANALYZING, ProjectStatus.FAILED_ANALYSIS),
-                            (ProjectStatus.PLANNING, ProjectStatus.FAILED_PLAN),  # the draft job
+                            (ProjectStatus.PLANNING, planning_to),  # the draft job
                         ):
-                            await project_state.transition(
+                            moved = await project_state.transition(
                                 session,
                                 publisher,
                                 user_id=user_id,
@@ -111,6 +123,8 @@ def register_failure_hook(broker: dramatiq.Broker, settings: Settings) -> None:
                                 reason="retries_exhausted",
                                 commit=False,
                             )
+                            if moved and planned and to is ProjectStatus.DRAFT_READY:
+                                await restore_keywords_override(session, user_id, job.project_id)
                     await session.commit()
                     await project_state.announce_pending(session, publisher)
             finally:

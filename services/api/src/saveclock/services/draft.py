@@ -24,10 +24,11 @@ from saveclock.adapters.llm import AnthropicLlm, HashLlm, LlmClient
 from saveclock.domain import edit_plan as ep
 from saveclock.domain.clip_assign import LockConflict, NoUsableClips, matches
 from saveclock.domain.events import FailedEvent
+from saveclock.domain.grid import GridError
 from saveclock.domain.keywords import KeywordSource, summary_from_analysis
 from saveclock.domain.plan_hash import content_hash, with_hash
 from saveclock.domain.plan_ops import ReplanState
-from saveclock.domain.planner import BuiltPlan
+from saveclock.domain.planner import BuiltPlan, PlanError
 from saveclock.domain.ranking import RankedClip, top_k_count
 from saveclock.errors import StockUnavailable
 from saveclock.ids import new_id
@@ -150,10 +151,21 @@ async def run_draft(ctx: WorkerContext, job_id: UUID, user_id: UUID, *, mode: Mo
         await _back_to_draft(run, "lock_conflict", "lock_conflict")
         if ctx.publisher is not None:
             await ctx.publisher.publish(project_id, FailedEvent("replan", "lock_conflict", False))
-    except (StockUnavailable, NoUsableClips) as exc:
-        reason = "no_usable_clips" if isinstance(exc, NoUsableClips) else "stock_unavailable"
-        if mode == "replan":  # the previous plan is untouched: the owner keeps editing it
-            await _back_to_draft(run, "stock_unavailable", reason)
+    except (StockUnavailable, NoUsableClips, PlanError, GridError) as exc:
+        # the planner's own errors are deterministic: a retry would only fail again
+        reason = (
+            "no_usable_clips"
+            if isinstance(exc, NoUsableClips)
+            else "stock_unavailable"
+            if isinstance(exc, StockUnavailable)
+            else "plan_failed"
+        )
+        if mode == "replan" or await _has_plan(run):  # the previous plan is untouched
+            await _back_to_draft(
+                run,
+                project_state.failure_code(ProjectStatus.FAILED_PLAN.value, reason).value,
+                reason,
+            )
         else:
             await _fail_plan(run, reason)
 
@@ -299,14 +311,17 @@ async def _persist(
         payload = plan.model_dump(mode="json")
         digest = content_hash(plan)
         if latest is not None and reuse:
-            assert await repo.replace_working(  # noqa: S101 - nobody freezes a planning project
+            if not await repo.replace_working(
                 user_id=user_id,
                 project_id=project_id,
                 plan_id=latest.id,
+                expected_hash=bytes(latest.content_hash),  # nobody edits a planning project
                 plan=payload,
                 content_hash=digest,
                 created_by="planner",
-            )
+            ):
+                msg = "the working plan changed while the draft job held the project"
+                raise RuntimeError(msg)
         else:
             await repo.insert(
                 user_id=user_id,
@@ -324,6 +339,8 @@ async def _persist(
             keys={(c.clip.provider, c.clip.provider_id) for c in plan.cuts},
         )
         project = await ProjectRepository(session).get(user_id=user_id, project_id=project_id)
+        # shortcut: the flags are written back whole, so a concurrent flag writer can lose a key;
+        # upgrade to a jsonb partial update when a second writer exists
         flags = {
             **(project.flags if project is not None else {}),
             "pool_exhausted": built.pool_exhausted,
@@ -353,8 +370,16 @@ async def _persist(
     return version
 
 
+async def _has_plan(run: _Run) -> bool:
+    async with run.ctx.sessionmaker() as session:
+        latest = await PlanRepository(session).latest(
+            user_id=run.user_id, project_id=run.project_id
+        )
+    return latest is not None
+
+
 async def _fail_plan(run: _Run, reason: str) -> None:
-    """planning -> failed_plan; the job's error is the catalogue's `stock_unavailable`."""
+    """planning -> failed_plan; the job's error is the catalogue code for `reason`."""
     async with run.ctx.sessionmaker() as session:
         await project_state.transition(
             session,
@@ -367,7 +392,9 @@ async def _fail_plan(run: _Run, reason: str) -> None:
             commit=False,
         )
         await JobRepository(session).fail(
-            user_id=run.user_id, job_id=run.job_id, error_code="stock_unavailable"
+            user_id=run.user_id,
+            job_id=run.job_id,
+            error_code=project_state.failure_code(ProjectStatus.FAILED_PLAN.value, reason).value,
         )
         await session.commit()
         await project_state.announce_pending(session, run.ctx.publisher)
@@ -376,6 +403,7 @@ async def _fail_plan(run: _Run, reason: str) -> None:
 async def _back_to_draft(run: _Run, error_code: str, reason: str) -> None:
     """A replan that could not finish: the previous plan stays (planning -> draft_ready)."""
     async with run.ctx.sessionmaker() as session:
+        await plans.restore_keywords_override(session, run.user_id, run.project_id)
         await project_state.transition(
             session,
             run.ctx.publisher,

@@ -1,3 +1,4 @@
+import asyncio
 import time
 from collections.abc import AsyncIterator
 from typing import Annotated, Any
@@ -21,7 +22,7 @@ from saveclock.services.projects import ui_status
 router = APIRouter(prefix="/projects", tags=["events"], responses=ERROR_RESPONSES)
 
 HEADERS = {
-    "Cache-Control": "no-store",
+    "Cache-Control": "private, no-store",
     "X-Accel-Buffering": "no",  # a reverse proxy must not hold the stream back
 }
 
@@ -46,21 +47,33 @@ async def stream_events(
     `Last-Event-ID` is ignored (the snapshot is authoritative). At most 5 streams at once: the
     sixth is 409 `conflict` with `details.reason = too_many_streams`."""
     limits = request.app.state.stream_limits
-    async with deps.sessionmaker() as session:
-        project = await ProjectRepository(session).get(user_id=user.id, project_id=project_id)
-        if project is None:
-            raise NotFound
-        snapshot = ev.StateEvent(
-            project.status, ui_status(project.status).value, dict(project.flags)
-        )
     token = limits.acquire()
     if token is None:
         raise Conflict(ConflictReason.TOO_MANY_STREAMS)
     pubsub = deps.redis.pubsub()
-    try:
-        await pubsub.subscribe(channel(project_id))  # before the snapshot goes out: no gap
-    except BaseException:
+    closed = False
+
+    async def cleanup() -> None:  # idempotent: the generator's finally and the background task
+        nonlocal closed
+        if closed:
+            return
+        closed = True
         limits.release(token)
+        await asyncio.shield(_close(pubsub, channel(project_id)))  # aclose runs even if cancelled
+
+    try:
+        # subscribe first, read the snapshot after: an event published in between is queued
+        # on the subscription and delivered after the snapshot, never lost
+        await pubsub.subscribe(channel(project_id))
+        async with deps.sessionmaker() as session:
+            project = await ProjectRepository(session).get(user_id=user.id, project_id=project_id)
+            if project is None:
+                raise NotFound
+            snapshot = ev.StateEvent(
+                project.status, ui_status(project.status).value, dict(project.flags)
+            )
+    except BaseException:
+        await cleanup()
         raise
 
     async def frames() -> AsyncIterator[bytes]:
@@ -84,14 +97,13 @@ async def stream_events(
                 if kind in ev.TERMINAL:
                     return
         finally:
-            limits.release(token)
-            await _close(pubsub, channel(project_id))
+            await cleanup()
 
     return StreamingResponse(
         frames(),
         media_type="text/event-stream",
         headers=HEADERS,
-        background=BackgroundTask(limits.release, token),  # also when the body never started
+        background=BackgroundTask(cleanup),  # also when the body never started
     )
 
 

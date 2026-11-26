@@ -468,11 +468,13 @@ async def _local_edit(
         user_id=user_id,
         project_id=project.id,
         plan_id=latest.id,
+        expected_hash=bytes(latest.content_hash),
         plan=payload,
         content_hash=digest,
         created_by="user",
     ):
-        raise PlanVersionConflict(latest.version)  # frozen between our read and our write
+        # frozen, or edited by another request, between our read and our write
+        raise PlanVersionConflict(latest.version)
     await CandidateRepository(session).mark_selected(
         user_id=user_id,
         project_id=project.id,
@@ -481,6 +483,8 @@ async def _local_edit(
     await ProjectRepository(session).update_fields(
         user_id=user_id,
         project_id=project.id,
+        # shortcut: the flags are written back whole, so a concurrent flag writer can lose a key;
+        # upgrade to a jsonb partial update when a second writer exists
         values={"flags": {**project.flags, "pool_exhausted": built.pool_exhausted}},
     )
     moved = False
@@ -553,5 +557,23 @@ async def _fetch_edit(
         session.info.pop(project_state.PENDING, None)
         raise Conflict(ConflictReason.JOB_ACTIVE) from None
     await project_state.announce_pending(session, publisher)
+    # shortcut: a Redis-down send leaves the project planning with an active job (recover with
+    # cancel); upgrade: an enqueue failure triggers the cancel recovery itself
     await asyncio.to_thread(enqueuer.send, "replan", str(job_id), str(user_id))
     return PatchResult(None, job_id)
+
+
+async def restore_keywords_override(session: AsyncSession, user_id: UUID, project_id: UUID) -> None:
+    """A replan that ended without a new plan: `options.keywords_override` goes back to what the
+    stored plan was built with (the planner reads it from the options), or away. No commit."""
+    projects = ProjectRepository(session)
+    project = await projects.get(user_id=user_id, project_id=project_id)
+    latest = await PlanRepository(session).latest(user_id=user_id, project_id=project_id)
+    if project is None or latest is None:
+        return
+    options = {k: v for k, v in project.options.items() if k != "keywords_override"}
+    if kept := latest.plan.get("options", {}).get("keywords_override"):
+        options["keywords_override"] = kept
+    await projects.update_fields(
+        user_id=user_id, project_id=project_id, values={"options": options}
+    )

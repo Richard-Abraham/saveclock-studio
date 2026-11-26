@@ -3,11 +3,13 @@
 import itertools
 import json
 from pathlib import Path
+from uuid import UUID
 
 import pytest
 
 from saveclock.adapters.stock.fake import FakeStockProvider
 from saveclock.domain.plan_validator import blocking, validate_plan
+from saveclock.domain.planner import PlanError
 from saveclock.errors import StockUnavailable
 from saveclock.services.draft import STAGES, run_draft
 from tests.integration.draft_harness import OWNER, Draft
@@ -214,3 +216,33 @@ async def test_an_analysis_of_a_foreign_project_never_drafts(draft: Draft) -> No
     await run_draft(draft.ctx, djob, other, mode="draft")
     assert await draft.job(djob) == ("error", "forbidden")
     assert await draft.status(pid) == ("planning", None)
+
+
+async def test_a_planner_error_ends_the_job_without_a_retry(
+    draft: Draft, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    def broken(*_a: object, **_k: object) -> object:
+        raise PlanError("cut_cap_unreachable")
+
+    monkeypatch.setattr("saveclock.services.draft.plans.build", broken)
+    pid, djob = await draft.analysed()
+    await run_draft(draft.ctx, djob, OWNER, mode="draft")  # returns: Dramatiq would not retry
+    assert await draft.status(pid) == ("failed_plan", "plan_failed")
+    assert await draft.job(djob) == ("error", "internal_error")
+
+
+async def test_a_planner_error_in_a_replan_keeps_the_stored_plan(
+    draft: Draft, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    def broken(*_a: object, **_k: object) -> object:
+        raise PlanError("cut_cap_unreachable")
+
+    pid = await draft.drafted()
+    r = await draft.client.patch(
+        f"/api/v1/projects/{pid}/plan",
+        json={"base_version": 1, "ops": [{"op": "set_keywords", "keywords": ["red"]}]},
+    )
+    monkeypatch.setattr("saveclock.services.draft.plans.build", broken)
+    await run_draft(draft.ctx, UUID(r.json()["job_id"]), OWNER, mode="replan")
+    assert await draft.status(pid) == ("draft_ready", "plan_failed")
+    assert len(await draft.sql("SELECT 1 FROM edit_plans")) == 1

@@ -1,5 +1,6 @@
 """GET and PATCH /projects/{id}/plan over HTTP with a real draft behind them."""
 
+import asyncio
 import json
 from typing import Any
 from uuid import UUID
@@ -8,6 +9,7 @@ import pytest
 
 from saveclock.domain.edit_plan import EditPlan
 from saveclock.domain.plan_validator import blocking, validate_plan
+from saveclock.repositories.plans import PlanRepository
 from saveclock.services.draft import run_draft
 from tests.integration.draft_harness import OWNER, Draft
 
@@ -342,3 +344,53 @@ async def test_an_identical_patch_on_a_frozen_version_makes_no_new_version(draft
     assert same.status_code == 200
     assert (same.json()["version"], same.json()["frozen"]) == (1, True)
     assert [r[0] for r in await draft.sql("SELECT version FROM edit_plans")] == [1]
+
+
+async def test_two_patches_on_one_base_of_an_unfrozen_plan_do_not_both_win(
+    draft: Draft, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    pid = await draft.drafted()
+    real = PlanRepository.replace_working
+    both_read = asyncio.Barrier(2)
+
+    async def after_both_read(self: PlanRepository, **kw: Any) -> bool:
+        await both_read.wait()  # each request has read version 1 before either writes
+        return await real(self, **kw)
+
+    monkeypatch.setattr(PlanRepository, "replace_working", after_both_read)
+    first, second = await asyncio.gather(
+        patch(draft, pid, 1, {"op": "set_density", "level": 1}),
+        patch(draft, pid, 1, {"op": "set_density", "level": -2}),
+    )
+    assert sorted([first.status_code, second.status_code]) == [200, 409]
+    winner = first if first.status_code == 200 else second
+    stored = await draft.plan(pid)
+    assert stored.options.density == winner.json()["options"]["density"]
+
+
+async def test_a_cancelled_replan_drops_the_new_keywords(draft: Draft) -> None:
+    pid = await draft.drafted()
+    r = await patch(draft, pid, 1, {"op": "set_keywords", "keywords": ["red"]})
+    assert r.status_code == 202
+    assert (await draft.client.post(f"/api/v1/projects/{pid}/cancel")).status_code == 202
+    assert await draft.status(pid) == ("draft_ready", None)
+    opts = json.loads((await draft.sql("SELECT options FROM projects WHERE id = $1", pid))[0][0])
+    assert "keywords_override" not in opts
+
+
+async def test_a_failed_replan_restores_the_keywords_of_the_stored_plan(draft: Draft) -> None:
+    pid = await draft.drafted()
+    first = await patch(draft, pid, 1, {"op": "set_keywords", "keywords": ["red"]})
+    await run_draft(draft.ctx, UUID(first.json()["job_id"]), OWNER, mode="replan")
+    await patch(draft, pid, 1, {"op": "lock_clip", "cut_index": 1, "locked": True})
+    rows = await draft.sql("SELECT id, plan FROM edit_plans")
+    data = json.loads(rows[0][1])
+    data["cuts"][1]["clip"]["mezzanine_frames"] = 1  # the lock can no longer be kept
+    await draft.sql(
+        "UPDATE edit_plans SET plan = $1::jsonb WHERE id = $2", json.dumps(data), rows[0][0]
+    )
+    r = await patch(draft, pid, 1, {"op": "set_keywords", "keywords": ["blue"]})
+    await run_draft(draft.ctx, UUID(r.json()["job_id"]), OWNER, mode="replan")
+    assert await draft.status(pid) == ("draft_ready", "lock_conflict")
+    opts = json.loads((await draft.sql("SELECT options FROM projects WHERE id = $1", pid))[0][0])
+    assert opts["keywords_override"] == ["red"]

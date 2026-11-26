@@ -2,6 +2,7 @@
 FFmpeg (the subprocess chain test in test_ingest_worker.py covers the actors themselves)."""
 
 import asyncio
+import json
 from collections.abc import AsyncIterator
 from pathlib import Path
 from urllib.parse import quote
@@ -27,6 +28,7 @@ from tests.conftest import ENV
 from tests.factories import media
 from tests.factories.audio import click_track
 from tests.integration.conftest import REDIS_URL, ApiEnv
+from tests.integration.draft_harness import Draft
 
 pytestmark = pytest.mark.integration
 OWNER = UUID("00000000-0000-4000-8000-000000000001")
@@ -358,6 +360,23 @@ async def test_exhausted_retries_mark_the_job_dead_and_the_project_failed(
     await pipe.sql("UPDATE jobs SET state = 'running' WHERE id = $1", vjob)
     await asyncio.to_thread(hook, {"args": [str(vjob), str(OWNER)]}, {})
     assert await pipe.status(pid) == ("failed_plan", "retries_exhausted")
+
+
+async def test_a_dead_replan_job_keeps_the_stored_plan_and_its_keywords(
+    draft: Draft,
+) -> None:
+    pid = await draft.drafted()
+    r = await draft.client.patch(
+        f"/api/v1/projects/{pid}/plan",
+        json={"base_version": 1, "ops": [{"op": "set_keywords", "keywords": ["red"]}]},
+    )
+    job = r.json()["job_id"]
+    broker = build_broker(draft.ctx.settings)
+    register_failure_hook(broker, draft.ctx.settings)
+    await asyncio.to_thread(broker.actors[FAILED_ACTOR].fn, {"args": [job, str(OWNER)]}, {})
+    assert await draft.status(pid) == ("draft_ready", "retries_exhausted")
+    opts = json.loads((await draft.sql("SELECT options FROM projects WHERE id = $1", pid))[0][0])
+    assert "keywords_override" not in opts
 
 
 async def test_a_dead_job_for_a_foreign_project_changes_nothing(pipe: Pipeline) -> None:

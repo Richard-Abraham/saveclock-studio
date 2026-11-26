@@ -82,10 +82,11 @@ async def test_insert_for_a_foreign_project_writes_nothing(draft: Draft) -> None
 async def test_replace_working_stops_at_a_frozen_version_and_at_a_stranger(draft: Draft) -> None:
     pid = await draft.drafted()
     plan = await draft.plan(pid)
-    row = (await draft.sql("SELECT id FROM edit_plans"))[0]
+    row = (await draft.sql("SELECT id, content_hash FROM edit_plans"))[0]
     args = {
         "project_id": pid,
         "plan_id": row[0],
+        "expected_hash": bytes(row[1]),
         "plan": plan.model_dump(mode="json"),
         "content_hash": b"\x07" * 32,
         "created_by": "user",
@@ -93,13 +94,16 @@ async def test_replace_working_stops_at_a_frozen_version_and_at_a_stranger(draft
     async with draft.ctx.sessionmaker() as session:
         plans = PlanRepository(session)
         assert not await plans.replace_working(user_id=STRANGER, **args)
+        stale = {**args, "expected_hash": b"\x00" * 32}  # someone else wrote since our read
+        assert not await plans.replace_working(user_id=OWNER, **stale)
         assert await plans.replace_working(user_id=OWNER, **args)
         await session.commit()
     assert bytes((await draft.sql("SELECT content_hash FROM edit_plans"))[0][0]) == b"\x07" * 32
     await draft.freeze(pid)
     async with draft.ctx.sessionmaker() as session:
         assert not await PlanRepository(session).replace_working(
-            user_id=OWNER, **{**args, "content_hash": b"\x08" * 32}
+            user_id=OWNER,
+            **{**args, "expected_hash": b"\x07" * 32, "content_hash": b"\x08" * 32},
         )
     assert bytes((await draft.sql("SELECT content_hash FROM edit_plans"))[0][0]) == b"\x07" * 32
 
