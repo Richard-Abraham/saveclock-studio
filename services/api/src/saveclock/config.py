@@ -168,7 +168,7 @@ COMPOSE_ONLY = (
     ),
     ComposeVar(
         name="IMAGE_TAG",
-        doc="tag of the saveclock-* images compose runs (default local; rollback uses sha-<commit>)",
+        doc="tag of the saveclock-* images compose runs (default local; rollback: sha-<commit>)",
         default="local",
     ),
 )

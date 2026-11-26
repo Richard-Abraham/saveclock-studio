@@ -73,4 +73,4 @@
 | `REDIS_PASSWORD` | `str` | `` | yes | yes | compose | requirepass for redis |
 | `API_PORT` | `str` | `8000` | no | no | compose | host port of the api (default 8000; the restore scratch stack uses 18000) |
 | `WEB_PORT` | `str` | `3000` | no | no | compose | host port of the web shell (default 3000; the scratch stack uses 13000) |
-| `IMAGE_TAG` | `str` | `local` | no | no | compose | tag of the saveclock-* images compose runs (default local; rollback uses sha-<commit>) |
+| `IMAGE_TAG` | `str` | `local` | no | no | compose | tag of the saveclock-* images compose runs (default local; rollback: sha-<commit>) |
