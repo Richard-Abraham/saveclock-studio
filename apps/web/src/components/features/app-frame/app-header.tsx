@@ -19,7 +19,7 @@ export function AppHeader() {
       <Link
         href="/"
         translate="no"
-        className="flex min-h-11 items-center gap-2 font-display text-h3 font-bold text-ink"
+        className="flex min-h-11 items-center gap-2 font-display text-h3 font-semibold text-ink"
       >
         <LogoMark />
         SaveClock Studio

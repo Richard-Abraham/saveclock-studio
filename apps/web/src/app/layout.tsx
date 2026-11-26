@@ -13,12 +13,15 @@ import { THEME_COLOR } from "@/styles/theme-color";
 import "./globals.css";
 
 const display = Bricolage_Grotesque({
-  subsets: ["latin", "latin-ext"],
+  subsets: ["latin"],
   display: "swap",
   variable: "--font-bricolage",
+  // shortcut: one static weight (600) instead of the variable file: 22 KB vs 41 KB, so fonts fit the 70 KB budget
+  // (DESIGN §3.2 budgets "Bricolage 600"). h1 is 600 not 650; upgrade if the budget allows the variable file.
+  weight: "600",
 });
 const sans = Instrument_Sans({
-  subsets: ["latin", "latin-ext"],
+  subsets: ["latin"],
   display: "swap",
   variable: "--font-instrument",
 });

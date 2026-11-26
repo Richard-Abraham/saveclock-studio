@@ -14,7 +14,10 @@ BUDGETS = {  # name: (audit reader, comparison, limit, unit)
     "LCP": (lambda r: r["audits"]["largest-contentful-paint"]["numericValue"] / 1000, "<=", 2.0, " s"),
     "CLS": (lambda r: r["audits"]["cumulative-layout-shift"]["numericValue"], "<=", 0.05, ""),
 }
-TRANSFER = {"script": 90, "stylesheet": 20, "font": 70}  # KB
+# Light-screen first-load JS is 200 KB since UX-SPEC's "Rev 3.6 budget note" (local-only edition; the
+# Next 16 + React chunks alone are about 187 KB). Fonts and CSS are unchanged. Never raise without a measurement.
+LIGHT_SCREEN_JS_KB = 200
+TRANSFER = {"script": LIGHT_SCREEN_JS_KB, "stylesheet": 20, "font": 70}  # KB
 
 
 def transfer_kb(report: dict, resource_type: str) -> float:
