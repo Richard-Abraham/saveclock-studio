@@ -8,5 +8,6 @@ Turns a song into a beat-synced vertical (9:16) video made from stock clips. Eve
 - `plans/` — the execution plan for each phase.
 - `spike/` — the Phase 0 test harness and its results.
 - `docs/mockups/index.html` — clickable screen mockups.
+- `docs/SETUP.md` — set up and test the app on another PC after cloning.
 
 It is a personal, local-only app (DECISIONS Rev 3.5). No license has been granted yet, so all rights are reserved.
