@@ -9,7 +9,8 @@ import { readServerEnv } from "./src/lib/server-env";
 // shortcut: Next bakes `rewrites()` into the build, so API_INTERNAL_URL and ALLOWED_HOSTS are read
 // when the image is built (their defaults match compose); upgrade to a runtime proxy only if the
 // api ever moves off http://api:8000.
-const { apiOrigin, allowedHosts } = readServerEnv();
+const { apiOrigin: apiInternalOrigin, allowedHosts } = readServerEnv();
+const apiOrigin = process.env.NEXT_PUBLIC_API_ORIGIN ?? "http://localhost:8000"; // what the browser may call
 
 const securityHeaders = [
   { key: "X-Content-Type-Options", value: "nosniff" },
@@ -20,8 +21,8 @@ const securityHeaders = [
   {
     key: "Content-Security-Policy-Report-Only",
     value:
-      "default-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline'; " +
-      "script-src 'self' 'unsafe-inline'; frame-ancestors 'none'",
+      `default-src 'self'; connect-src 'self' ${apiOrigin}; img-src 'self' data:; ` +
+      "style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline'; frame-ancestors 'none'",
   },
 ];
 
@@ -37,7 +38,7 @@ const config: NextConfig = {
     return Promise.resolve([
       {
         source: "/api/:path*",
-        destination: `${apiOrigin}/api/:path*`,
+        destination: `${apiInternalOrigin}/api/:path*`,
         has: [{ type: "header" as const, key: "host", value: hostConditionPattern(allowedHosts) }],
       },
     ]);

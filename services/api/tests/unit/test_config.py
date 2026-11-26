@@ -103,5 +103,6 @@ def test_inventory_parity_with_arch_18() -> None:
         "BROKER_HEARTBEAT_TIMEOUT_S",
         "APP_VERSION",
         "TUNING_PUBLISHER",
+        "NEXT_PUBLIC_API_ORIGIN",  # plan 002 Branch B (OQ-26)
     }
     assert ARCH_18 - ours == set()

@@ -95,6 +95,8 @@ class Settings(BaseSettings):
     backup_password_file: str | None = _f(None, "host", secret=True)
     backup_dest_dir: str | None = _f(None, "host", secret=True)
     next_public_app_origin: str | None = _f(None, "W")
+    # Branch B of OQ-26 (plan 002): the browser calls the API directly at this origin.
+    next_public_api_origin: str = _f("http://localhost:8000", "W", example="http://localhost:8000")
     fake_stock: bool = _f(False, "local/CI")
     fake_ml: bool = _f(False, "local/CI")
     fake_llm: bool = _f(False, "local/CI")

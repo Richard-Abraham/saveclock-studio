@@ -117,11 +117,10 @@ services:
     environment:
       API_INTERNAL_URL: "http://api:8000/api/v1"
       ALLOWED_HOSTS: "localhost,127.0.0.1" # W14: the web layer checks Host itself
-      HOSTNAME: "0.0.0.0" # binds inside the container only; the HOST binding is loopback
     networks: [front]
     user: "10001:10001"
     read_only: true
-    tmpfs: ["/tmp:size=64m", "/app/apps/web/.next/cache:size=64m"]
+    tmpfs: ["/tmp:size=64m", "/app/apps/web/.next/cache:size=64m,mode=1777"]
     cap_drop: [ALL]
     security_opt: ["no-new-privileges:true"]
     mem_limit: 512m

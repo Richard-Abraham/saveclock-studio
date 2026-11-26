@@ -90,6 +90,19 @@ def main() -> int:
         check(f"Host {host} to / is 200", request(web, "GET", "/", {"Host": host})[0] == 200)
     check("foreign Host straight to the API is 403", request(api, "GET", "/api/v1/health/live", foreign)[0] == 403)
 
+    # Branch B (OQ-26): the browser calls the API origin directly; CORS allows only the app origin.
+    def allow_origin(origin: str) -> str | None:
+        parts = urlsplit(api)
+        conn = http.client.HTTPConnection(parts.hostname, parts.port, timeout=15)
+        conn.request("OPTIONS", "/api/v1/health/live", headers={"Origin": origin, "Access-Control-Request-Method": "GET"})
+        response = conn.getresponse()
+        response.read()
+        conn.close()
+        return response.getheader("access-control-allow-origin")
+
+    check("CORS preflight from the app origin is allowed", allow_origin("http://localhost:3000") == "http://localhost:3000")
+    check("CORS preflight from a foreign origin gets no Allow-Origin", allow_origin("http://evil.example") is None)
+
     if failures:
         print(f"WEB SMOKE FAILED ({len(failures)}): " + "; ".join(failures))
         return 1

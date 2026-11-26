@@ -12,11 +12,13 @@ COPY packages/contracts/package.json packages/contracts/
 RUN pnpm install --frozen-lockfile --filter @saveclock/web...
 
 # next/font downloads the two Google fonts here, at build time: they end up in the image and the
-# browser never contacts Google (plan 002 W5). NEXT_PUBLIC_APP_ORIGIN is public; nothing else is
+# browser never contacts Google (plan 002 W5). the NEXT_PUBLIC_*_ORIGIN values are public; nothing else is
 # passed at build time and no .env is ever copied in.
 FROM deps AS build
 ARG NEXT_PUBLIC_APP_ORIGIN=http://localhost:3000
-ENV NEXT_PUBLIC_APP_ORIGIN=${NEXT_PUBLIC_APP_ORIGIN}
+ARG NEXT_PUBLIC_API_ORIGIN=http://localhost:8000
+ENV NEXT_PUBLIC_APP_ORIGIN=${NEXT_PUBLIC_APP_ORIGIN} \
+    NEXT_PUBLIC_API_ORIGIN=${NEXT_PUBLIC_API_ORIGIN}
 COPY apps/web apps/web
 COPY packages/contracts packages/contracts
 RUN pnpm --filter @saveclock/web build

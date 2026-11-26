@@ -4,6 +4,7 @@ from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
+from starlette.middleware.cors import CORSMiddleware
 
 from saveclock.api.error_handlers import register_error_handlers
 from saveclock.api.middleware import (
@@ -48,7 +49,17 @@ def create_app(settings: Settings | None = None, deps: Deps | None = None) -> Fa
     app.include_router(settings_router.router, prefix=API_PREFIX)
     if settings.app_env in STUB_ENVS:
         app.include_router(stub.router, prefix=API_PREFIX)
-    # add_middleware: the last one added is the outermost.
+    # add_middleware: the last one added is the outermost. CORS is innermost, so the access
+    # guard has already refused a foreign Host or Origin before CORS sees the request.
+    # Branch B of OQ-26: the browser at APP_ORIGIN calls this origin directly (upload, SSE).
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=[settings.app_origin.rstrip("/")],
+        allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+        allow_headers=["Content-Type", "X-Filename", "X-Request-Id"],
+        allow_credentials=False,
+        max_age=600,
+    )
     app.add_middleware(SecurityHeadersMiddleware)
     app.add_middleware(AccessGuardMiddleware, settings=settings)
     app.add_middleware(RequestIdMiddleware)

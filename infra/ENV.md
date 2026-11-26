@@ -53,6 +53,7 @@
 | `BACKUP_PASSWORD_FILE` | `str | None` | `` | no | yes | host | ARCH §18 |
 | `BACKUP_DEST_DIR` | `str | None` | `` | no | yes | host | ARCH §18 |
 | `NEXT_PUBLIC_APP_ORIGIN` | `str | None` | `` | no | no | W | ARCH §18 |
+| `NEXT_PUBLIC_API_ORIGIN` | `str` | `http://localhost:8000` | no | no | W | ARCH §18 |
 | `FAKE_STOCK` | `bool` | `False` | no | no | local/CI | ARCH §18 |
 | `FAKE_ML` | `bool` | `False` | no | no | local/CI | ARCH §18 |
 | `FAKE_LLM` | `bool` | `False` | no | no | local/CI | ARCH §18 |
