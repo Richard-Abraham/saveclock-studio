@@ -8,6 +8,7 @@ import dramatiq
 import structlog
 from dramatiq.middleware import Middleware
 from redis import Redis
+from redis.exceptions import RedisError
 
 from saveclock.config import Settings
 from saveclock.services.autotune import effective, host_facts
@@ -28,18 +29,20 @@ class TuningHeartbeat(Middleware):
     def _publish(self, redis: Redis) -> None:
         redis.setex(TUNING_KEY, TTL_S, json.dumps(dataclasses.asdict(self.tuning)))
 
-    def _loop(self) -> None:
-        redis: Redis = Redis.from_url(self.settings.redis_url.get_secret_value())
-        try:
-            while not self._stop.is_set():
+    def _loop(self, redis: Redis, interval: float = INTERVAL_S) -> None:
+        while not self._stop.is_set():
+            try:
                 self._publish(redis)
-                self._stop.wait(INTERVAL_S)
-        finally:
-            redis.close()
+            except RedisError:
+                log.warning("tuning.publish_failed")  # keep looping: the key has a TTL anyway
+            self._stop.wait(interval)
 
     def after_worker_boot(self, broker: dramatiq.Broker, worker: dramatiq.Worker) -> None:
         log.info("tuning.chosen", **dataclasses.asdict(self.tuning))
-        self._thread = threading.Thread(target=self._loop, daemon=True, name="tuning-heartbeat")
+        redis: Redis = Redis.from_url(self.settings.redis_url.get_secret_value())
+        self._thread = threading.Thread(
+            target=self._loop, args=(redis,), daemon=True, name="tuning-heartbeat"
+        )
         self._thread.start()
 
     def before_worker_shutdown(self, broker: dramatiq.Broker, worker: dramatiq.Worker) -> None:
