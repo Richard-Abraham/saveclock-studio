@@ -1,6 +1,9 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 
 import { PageTitle } from "@/components/features/app-frame/page-title";
+
+export const metadata: Metadata = { title: "Page not found" };
 
 export default function NotFound() {
   return (
