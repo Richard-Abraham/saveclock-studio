@@ -5,5 +5,6 @@
 useDefault = true
 
 [allowlist]
-description = "local git-ignored .env with generated throwaway passwords"
-paths = ['''^\.env$''']
+description = "local git-ignored .env with generated throwaway passwords, and Next build output"
+# apps/web/.next/: git-ignored Next build output; contains Next's generated preview keys.
+paths = ['''^\.env$''', '''^apps/web/\.next/''']
