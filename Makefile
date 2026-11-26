@@ -20,13 +20,13 @@ TRIVY := ghcr.io/aquasecurity/trivy@sha256:6e7f515a46af13a01d534734c666261de65c6
 
 # Stages, in order; the first failure stops the run and names the stage.
 FAST_STAGES := guard secrets banned doctor env-docs-check fmt-check lint types arch pins \
-  compose-lint test-deps-up test migrations web-install contracts-check audit \
+  compose-lint test-deps-up ffmpeg-bin test migrations web-install contracts-check audit \
   web-env web-lint web-test web-build bundle-scan web-audit-prod
 CHECK_STAGES := $(FAST_STAGES) images image-guards hadolint
 
 .PHONY: help guard secrets banned doctor fmt-check lint types arch pins compose-lint test \
   migrations audit env env-docs env-docs-check contracts contracts-check test-deps-up \
-  test-deps-down ffmpeg-cache images image-guards hadolint scan-images up dev down \
+  test-deps-down ffmpeg-cache ffmpeg-bin models-cache test-ml images image-guards hadolint scan-images up dev down \
   down-volumes sandbox check-fast check web-install web-env web-lint web-test web-build \
   bundle-scan web-audit-prod measure-rewrite smoke-web web-audit stack-up seed smoke-stub \
   predeploy-scan backup backup-init backup-test restore-proof backup-install-timer backup-timer-uninstall rollback-demo fresh-clone-timing
@@ -83,9 +83,13 @@ test-deps-down:
 	$(COMPOSE_TEST) down
 
 test:
-	$(UV) run pytest -q -m "not golden and not live and not migration_roundtrip" --cov --cov-branch \
+	$(UV) run pytest -q -m "not golden and not live and not ml and not migration_roundtrip" --cov --cov-branch \
 	  --cov-report=json:coverage.json --cov-fail-under=85
 	python3 scripts/cov_floors.py
+
+# the real Beat This model on a generated click track; needs the worker's ml extra and the weights
+test-ml:
+	MODELS_DIR="$(CURDIR)/infra/docker/cache/models" $(UV) run --extra ml pytest -q -m ml
 
 # alembic check (models == migration) and a downgrade -1 / upgrade head round trip
 migrations:
@@ -118,7 +122,16 @@ ffmpeg-cache:
 	cp "$(FFMPEG_SRC)/$$name" infra/docker/cache/ && \
 	echo "$$pin_sha  infra/docker/cache/$$name" | sha256sum -c - && echo OK
 
-images: ffmpeg-cache
+# the pinned FFmpeg for host tests (the Fedora build has no libx264): extracted to .data/ffmpeg
+ffmpeg-bin: ffmpeg-cache
+	python3 infra/docker/fetch_ffmpeg.py infra/docker/ffmpeg.pin infra/docker/cache .data/ffmpeg
+
+# the Beat This weights from the owner's local download, sha256-checked against the manifest
+MODELS_SRC := $(HOME)/saveclock-spike/downloads/models-beat_this
+models-cache:
+	python3 scripts/fetch_models.py infra/docker/models.manifest.json $(MODELS_SRC) infra/docker/cache/models
+
+images: ffmpeg-cache models-cache
 	$(CONTAINER) build --target api -f infra/docker/Dockerfile.api \
 	  --build-arg APP_VERSION=sha-$(GIT_SHA) -t saveclock-api:sha-$(GIT_SHA) -t saveclock-api:local .
 	$(CONTAINER) build --target worker -f infra/docker/Dockerfile.api \

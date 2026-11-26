@@ -36,6 +36,10 @@ for svc in api web worker worker-maint; do
     chk "/data/blobs is writable" "$svc" 'touch /data/blobs/.sandbox && rm /data/blobs/.sandbox'
   fi
   chk "/tmp is writable" "$svc" 'touch /tmp/.sandbox && rm /tmp/.sandbox'
+  if [ "$svc" = worker ]; then  # decode scratch: a writable tmpfs that cannot execute anything
+    chk "/scratch is writable" "$svc" 'touch /scratch/.sandbox && rm /scratch/.sandbox'
+    chk "/scratch is mounted noexec" "$svc" 'awk '"'"'$5=="/scratch" {print $6}'"'"' /proc/self/mountinfo | grep -q noexec'
+  fi
   chk "no container socket" "$svc" '[ ! -e /var/run/docker.sock ] && [ ! -e /run/podman/podman.sock ]'
   chk "seccomp filter active" "$svc" 'grep -q "^Seccomp:[[:space:]]*2$" /proc/self/status'
   chk "memory.max = $mem" "$svc" "[ \"\$(cat /sys/fs/cgroup/memory.max)\" = $mem ]" && mem_enforced=1 || mem_enforced=0

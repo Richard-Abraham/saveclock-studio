@@ -1,11 +1,13 @@
 """Integration fixtures: real Postgres and Redis from compose.test.yml (make test-deps-up)."""
 
 import os
+import signal
 import subprocess
 import sys
 import uuid
-from collections.abc import AsyncIterator
-from dataclasses import dataclass
+from collections.abc import AsyncIterator, Iterator
+from contextlib import asynccontextmanager
+from dataclasses import dataclass, replace
 from pathlib import Path
 
 import asyncpg
@@ -13,7 +15,11 @@ import httpx
 import pytest
 from redis.asyncio import Redis
 
-from tests.conftest import client_for, make_app
+from saveclock.adapters.queue import FakeEnqueuer
+from saveclock.config import Settings
+from saveclock.container import build_deps
+from saveclock.main import create_app
+from tests.conftest import ENV, FFMPEG_DIR, client_for, make_app
 
 API_DIR = Path(__file__).resolve().parents[2]
 PG_HOST, PG_PORT = "127.0.0.1", 55432
@@ -110,3 +116,103 @@ async def api_client(migrated_db: Db, blob_root: Path) -> AsyncIterator[httpx.As
     async with client_for(app) as client:
         yield client
     await app.state.deps.close()
+
+
+@dataclass(frozen=True)
+class ApiEnv:
+    client: httpx.AsyncClient
+    enqueuer: FakeEnqueuer
+    db: Db
+    blob_root: Path
+
+
+@asynccontextmanager
+async def build_api(db: Db, blob_root: Path, **overrides: object) -> AsyncIterator[ApiEnv]:
+    """The real app over ASGI with a recording enqueuer instead of the Redis broker."""
+    settings_args: dict[str, object] = {
+        "database_url": db.url("app_rw"),
+        "redis_url": REDIS_URL,
+        "blob_root": str(blob_root),
+        "disk_low_watermark_gb": 0,
+        **overrides,
+    }
+    settings = Settings(_env_file=None, **{**ENV, **settings_args})  # type: ignore[arg-type]
+    enqueuer = FakeEnqueuer()
+    deps = replace(build_deps(settings), enqueuer=enqueuer)
+    app = create_app(settings, deps)
+    async with client_for(app) as client:
+        yield ApiEnv(client, enqueuer, db, blob_root)
+    await deps.close()
+
+
+@pytest.fixture
+async def api(migrated_db: Db, blob_root: Path) -> AsyncIterator[ApiEnv]:
+    async with build_api(migrated_db, blob_root) as env:
+        yield env
+
+
+class Harness:
+    def __init__(self, db: Db, blob_root: Path, tmp_path: Path) -> None:
+        self.db, self.blob_root, self.tmp_path = db, blob_root, tmp_path
+        self.procs: list[subprocess.Popen[bytes]] = []
+
+    def env(self, **extra: str) -> dict[str, str]:
+        env = {
+            k: v
+            for k, v in os.environ.items()
+            if k not in {"OWNER_DISPLAY_NAME", "FETCH_CONCURRENCY"}
+        }
+        env.update(
+            APP_ENV="ci",
+            APP_ORIGIN="http://localhost:3000",
+            DATABASE_URL=self.db.url("app_rw"),
+            REDIS_URL=REDIS_URL,
+            BLOB_ROOT=str(self.blob_root),
+            DISK_LOW_WATERMARK_GB="0",
+            SCRATCH_ROOT=str(self.tmp_path / "scratch"),
+            FFMPEG_BIN=str(FFMPEG_DIR / "ffmpeg"),
+            FFPROBE_BIN=str(FFMPEG_DIR / "ffprobe"),
+            FAKE_ML="true",  # the click picker stands in for Beat This (tests/ml: the real one)
+            WORKER_HEAVY_CONCURRENCY="1",
+        )
+        env.update(extra)
+        return env
+
+    def start_worker(self, queues: list[str], **extra_env: str) -> subprocess.Popen[bytes]:
+        log = (self.tmp_path / f"worker{len(self.procs)}.log").open("wb")
+        proc = subprocess.Popen(  # noqa: S603 - fixed argument list, no shell
+            [
+                sys.executable,
+                "-m",
+                "dramatiq",
+                "saveclock.workers.main",
+                "--processes",
+                "1",
+                "--threads",
+                "2",
+                "--queues",
+                *queues,
+            ],
+            cwd=API_DIR,
+            env=self.env(**extra_env),
+            stdout=log,
+            stderr=subprocess.STDOUT,
+            start_new_session=True,
+        )
+        self.procs.append(proc)
+        return proc
+
+    def kill_all(self) -> None:
+        for proc in self.procs:
+            if proc.poll() is None:
+                os.killpg(proc.pid, signal.SIGKILL)
+            proc.wait(timeout=10)
+
+
+@pytest.fixture
+def harness(
+    migrated_db: Db, blob_root: Path, tmp_path: Path, redis_client: Redis
+) -> Iterator[Harness]:
+    h = Harness(migrated_db, blob_root, tmp_path)
+    yield h
+    h.kill_all()

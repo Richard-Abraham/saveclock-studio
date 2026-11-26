@@ -1,6 +1,144 @@
 {
   "components": {
     "schemas": {
+      "AnalysisOut": {
+        "additionalProperties": false,
+        "description": "`beats_s` is the effective grid: the fallback grid when `fallback` is set.",
+        "properties": {
+          "beats_s": {
+            "items": {
+              "type": "number"
+            },
+            "title": "Beats S",
+            "type": "array"
+          },
+          "confidence": {
+            "$ref": "#/components/schemas/ConfidenceOut"
+          },
+          "downbeats_s": {
+            "items": {
+              "type": "number"
+            },
+            "title": "Downbeats S",
+            "type": "array"
+          },
+          "energy_curve": {
+            "items": {
+              "type": "number"
+            },
+            "title": "Energy Curve",
+            "type": "array"
+          },
+          "fallback": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Fallback"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "flags": {
+            "additionalProperties": true,
+            "title": "Flags",
+            "type": "object"
+          },
+          "low_confidence_ranges": {
+            "items": {
+              "items": {
+                "type": "number"
+              },
+              "type": "array"
+            },
+            "title": "Low Confidence Ranges",
+            "type": "array"
+          },
+          "sections": {
+            "items": {
+              "$ref": "#/components/schemas/SectionOut"
+            },
+            "title": "Sections",
+            "type": "array"
+          },
+          "segment": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SegmentOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "tempo_bpm": {
+            "title": "Tempo Bpm",
+            "type": "number"
+          },
+          "tempo_octave_adjust": {
+            "title": "Tempo Octave Adjust",
+            "type": "integer"
+          },
+          "waveform_peaks": {
+            "items": {
+              "type": "number"
+            },
+            "title": "Waveform Peaks",
+            "type": "array"
+          }
+        },
+        "required": [
+          "tempo_bpm",
+          "tempo_octave_adjust",
+          "beats_s",
+          "downbeats_s",
+          "sections",
+          "energy_curve",
+          "waveform_peaks",
+          "low_confidence_ranges",
+          "confidence",
+          "fallback",
+          "segment",
+          "flags"
+        ],
+        "title": "AnalysisOut",
+        "type": "object"
+      },
+      "AnalysisSummary": {
+        "additionalProperties": false,
+        "properties": {
+          "confidence": {
+            "title": "Confidence",
+            "type": "number"
+          },
+          "fallback": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Fallback"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "tempo_bpm": {
+            "title": "Tempo Bpm",
+            "type": "number"
+          },
+          "tempo_octave_adjust": {
+            "title": "Tempo Octave Adjust",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "tempo_bpm",
+          "tempo_octave_adjust",
+          "confidence",
+          "fallback"
+        ],
+        "title": "AnalysisSummary",
+        "type": "object"
+      },
       "AnthropicKey": {
         "additionalProperties": false,
         "properties": {
@@ -47,6 +185,38 @@
           "renders"
         ],
         "title": "ByArea",
+        "type": "object"
+      },
+      "ConfidenceOut": {
+        "additionalProperties": false,
+        "properties": {
+          "band": {
+            "enum": [
+              "high",
+              "medium",
+              "low"
+            ],
+            "title": "Band",
+            "type": "string"
+          },
+          "reasons": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Reasons",
+            "type": "array"
+          },
+          "score": {
+            "title": "Score",
+            "type": "number"
+          }
+        },
+        "required": [
+          "score",
+          "band",
+          "reasons"
+        ],
+        "title": "ConfidenceOut",
         "type": "object"
       },
       "Configured": {
@@ -170,6 +340,15 @@
         "title": "ErrorResponse",
         "type": "object"
       },
+      "Fallback": {
+        "enum": [
+          "energy_grid",
+          "even_grid",
+          "phrase_only"
+        ],
+        "title": "Fallback",
+        "type": "string"
+      },
       "HealthLive": {
         "additionalProperties": false,
         "properties": {
@@ -227,6 +406,133 @@
           "anthropic"
         ],
         "title": "Keys",
+        "type": "object"
+      },
+      "ProjectCreate": {
+        "additionalProperties": false,
+        "properties": {
+          "options": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ProjectOptions"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "title": {
+            "anyOf": [
+              {
+                "maxLength": 120,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Title"
+          }
+        },
+        "title": "ProjectCreate",
+        "type": "object"
+      },
+      "ProjectDetail": {
+        "additionalProperties": false,
+        "description": "`plan` and `render` are placeholders that plans 006 and 007 fill in additively.",
+        "properties": {
+          "analysis": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AnalysisSummary"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "flags": {
+            "additionalProperties": true,
+            "title": "Flags",
+            "type": "object"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "last_activity_at": {
+            "format": "date-time",
+            "title": "Last Activity At",
+            "type": "string"
+          },
+          "options": {
+            "additionalProperties": true,
+            "title": "Options",
+            "type": "object"
+          },
+          "plan": {
+            "title": "Plan",
+            "type": "null"
+          },
+          "render": {
+            "title": "Render",
+            "type": "null"
+          },
+          "song": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SongMeta"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "status_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Status Reason"
+          },
+          "title": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Title"
+          },
+          "ui_status": {
+            "$ref": "#/components/schemas/UiStatus"
+          }
+        },
+        "required": [
+          "id",
+          "title",
+          "ui_status",
+          "status_reason",
+          "flags",
+          "options",
+          "song",
+          "analysis",
+          "last_activity_at",
+          "created_at"
+        ],
+        "title": "ProjectDetail",
         "type": "object"
       },
       "ProjectItem": {
@@ -306,6 +612,158 @@
         "title": "ProjectList",
         "type": "object"
       },
+      "ProjectOptions": {
+        "additionalProperties": false,
+        "description": "The shape of `projects.options` (the column itself stays free-form jsonb, P4-12).",
+        "properties": {
+          "density": {
+            "default": 0,
+            "maximum": 1.0,
+            "minimum": -2.0,
+            "title": "Density",
+            "type": "integer"
+          },
+          "duration": {
+            "default": 30,
+            "enum": [
+              15,
+              30,
+              60
+            ],
+            "title": "Duration",
+            "type": "integer"
+          },
+          "keywords_override": {
+            "anyOf": [
+              {
+                "items": {
+                  "pattern": "^[a-z][a-z \\-]{1,30}$",
+                  "type": "string"
+                },
+                "maxItems": 8,
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Keywords Override"
+          },
+          "style": {
+            "default": "default",
+            "pattern": "^[a-z][a-z0-9_-]{0,30}$",
+            "title": "Style",
+            "type": "string"
+          },
+          "vibe": {
+            "anyOf": [
+              {
+                "maxLength": 200,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Vibe"
+          }
+        },
+        "title": "ProjectOptions",
+        "type": "object"
+      },
+      "ProjectPatch": {
+        "additionalProperties": false,
+        "properties": {
+          "options": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ProjectOptions"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "title": {
+            "anyOf": [
+              {
+                "maxLength": 120,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Title"
+          }
+        },
+        "title": "ProjectPatch",
+        "type": "object"
+      },
+      "SectionOut": {
+        "additionalProperties": false,
+        "properties": {
+          "end_s": {
+            "title": "End S",
+            "type": "number"
+          },
+          "energy": {
+            "enum": [
+              "e1",
+              "e2",
+              "e3",
+              "e4"
+            ],
+            "title": "Energy",
+            "type": "string"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "label": {
+            "title": "Label",
+            "type": "string"
+          },
+          "start_s": {
+            "title": "Start S",
+            "type": "number"
+          }
+        },
+        "required": [
+          "id",
+          "start_s",
+          "end_s",
+          "label",
+          "energy"
+        ],
+        "title": "SectionOut",
+        "type": "object"
+      },
+      "SegmentOut": {
+        "additionalProperties": false,
+        "properties": {
+          "end_s": {
+            "title": "End S",
+            "type": "number"
+          },
+          "start_s": {
+            "title": "Start S",
+            "type": "number"
+          },
+          "total_frames": {
+            "title": "Total Frames",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "start_s",
+          "end_s",
+          "total_frames"
+        ],
+        "title": "SegmentOut",
+        "type": "object"
+      },
       "SettingsOut": {
         "additionalProperties": false,
         "properties": {
@@ -341,6 +799,73 @@
           "intermediate_ttl_days"
         ],
         "title": "SettingsOut",
+        "type": "object"
+      },
+      "SongMeta": {
+        "additionalProperties": false,
+        "properties": {
+          "channels": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Channels"
+          },
+          "codec": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Codec"
+          },
+          "duration_s": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Duration S"
+          },
+          "original_filename": {
+            "title": "Original Filename",
+            "type": "string"
+          },
+          "sample_rate": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sample Rate"
+          },
+          "size_bytes": {
+            "title": "Size Bytes",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "original_filename",
+          "size_bytes",
+          "duration_s",
+          "codec",
+          "sample_rate",
+          "channels"
+        ],
+        "title": "SongMeta",
         "type": "object"
       },
       "Stock": {
@@ -527,6 +1052,25 @@
         ],
         "title": "UiStatus",
         "type": "string"
+      },
+      "UploadAccepted": {
+        "additionalProperties": false,
+        "properties": {
+          "job_id": {
+            "format": "uuid",
+            "title": "Job Id",
+            "type": "string"
+          },
+          "ui_status": {
+            "$ref": "#/components/schemas/UiStatus"
+          }
+        },
+        "required": [
+          "job_id",
+          "ui_status"
+        ],
+        "title": "UploadAccepted",
+        "type": "object"
       },
       "Volume": {
         "additionalProperties": false,
@@ -1006,6 +1550,672 @@
         "summary": "List ",
         "tags": [
           "projects"
+        ]
+      },
+      "post": {
+        "operationId": "create_project",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ProjectCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProjectDetail"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "forbidden; details.reason is one of host_not_allowed, origin_mismatch, cross_site"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "not found"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "validation_error (details.fields)"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "internal_error"
+          }
+        },
+        "summary": "Create",
+        "tags": [
+          "projects"
+        ]
+      }
+    },
+    "/api/v1/projects/{project_id}": {
+      "get": {
+        "operationId": "get_project",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Project Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProjectDetail"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "forbidden; details.reason is one of host_not_allowed, origin_mismatch, cross_site"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "not found"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "validation_error (details.fields)"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "internal_error"
+          }
+        },
+        "summary": "Get",
+        "tags": [
+          "projects"
+        ]
+      },
+      "patch": {
+        "operationId": "patch_project",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Project Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ProjectPatch"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProjectDetail"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "forbidden; details.reason is one of host_not_allowed, origin_mismatch, cross_site"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "not found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "conflict; details.reason is one of not_ready, wrong_state, upload_in_progress, retry_limit"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "validation_error (details.fields)"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "internal_error"
+          }
+        },
+        "summary": "Patch",
+        "tags": [
+          "projects"
+        ]
+      }
+    },
+    "/api/v1/projects/{project_id}/analysis": {
+      "get": {
+        "description": "409 `conflict` with `details.reason = not_ready` until the analysis exists.",
+        "operationId": "get_analysis",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Project Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AnalysisOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "forbidden; details.reason is one of host_not_allowed, origin_mismatch, cross_site"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "not found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "conflict; details.reason is one of not_ready, wrong_state, upload_in_progress, retry_limit"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "validation_error (details.fields)"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "internal_error"
+          }
+        },
+        "summary": "Get",
+        "tags": [
+          "analysis"
+        ]
+      }
+    },
+    "/api/v1/projects/{project_id}/cancel": {
+      "post": {
+        "operationId": "cancel_project",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Project Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProjectDetail"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "forbidden; details.reason is one of host_not_allowed, origin_mismatch, cross_site"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "not found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "conflict; details.reason is one of not_ready, wrong_state, upload_in_progress, retry_limit"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "validation_error (details.fields)"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "internal_error"
+          }
+        },
+        "summary": "Cancel",
+        "tags": [
+          "projects"
+        ]
+      }
+    },
+    "/api/v1/projects/{project_id}/retry": {
+      "post": {
+        "operationId": "retry_project",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Project Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProjectDetail"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "forbidden; details.reason is one of host_not_allowed, origin_mismatch, cross_site"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "not found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "conflict; details.reason is one of not_ready, wrong_state, upload_in_progress, retry_limit"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "validation_error (details.fields)"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "internal_error"
+          }
+        },
+        "summary": "Retry",
+        "tags": [
+          "projects"
+        ]
+      }
+    },
+    "/api/v1/projects/{project_id}/song": {
+      "post": {
+        "description": "One streamed upload: raw body, `Content-Length` required, `X-Filename` percent-encoded.",
+        "operationId": "upload_song",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Project Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "content-length",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Content-Length"
+            }
+          },
+          {
+            "in": "header",
+            "name": "content-type",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Content-Type"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-filename",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Filename"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/octet-stream": {
+              "schema": {
+                "format": "binary",
+                "type": "string"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UploadAccepted"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "bad_request; details.reason is one of content_length_required, bad_filename"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "forbidden; details.reason is one of host_not_allowed, origin_mismatch, cross_site"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "not found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "conflict; details.reason is one of not_ready, wrong_state, upload_in_progress, retry_limit"
+          },
+          "413": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "payload_too_large"
+          },
+          "415": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "unsupported_media; details.reason is one of unsniffable, extension_mismatch, mime_mismatch"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "validation_error (details.fields)"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "internal_error"
+          },
+          "507": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "insufficient_storage"
+          }
+        },
+        "summary": "Upload Song",
+        "tags": [
+          "upload"
         ]
       }
     },

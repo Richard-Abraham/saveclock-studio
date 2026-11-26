@@ -48,6 +48,10 @@ def song_incoming_key(project_id: UUID) -> str:
     return f"songs/{project_id}/incoming.bin"
 
 
+def canonical_key(project_id: UUID) -> str:
+    return work_key(project_id, "canonical.flac")
+
+
 def work_key(project_id: UUID, *parts: str) -> str:
     return validate_key("/".join(["work", str(project_id), *parts]))
 

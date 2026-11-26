@@ -8,6 +8,7 @@ dependencies = [
     "asyncpg>=0.32.0",
     "dramatiq[redis]>=2,<3",
     "fastapi>=0.165.0",
+    "numpy>=2.5.4",
     "pydantic>=2.14,<3",
     "pydantic-settings>=2.16.3",
     "redis>=8.2.0",
@@ -16,6 +17,25 @@ dependencies = [
     "uuid-utils>=1.2.0",
     "uvicorn[standard]>=0.54.0",
 ]
+
+[project.optional-dependencies]
+# the worker image only (torch CPU build from the pytorch-cpu index); the api image never installs it
+ml = [
+    "beat-this>=1.1.0",
+    "torch>=2.15.0",
+    "torchaudio>=2.11.1",
+    "soundfile>=0.14.0",
+    "scipy>=1.18.1",
+]
+
+[[tool.uv.index]]
+name = "pytorch-cpu"
+url = "https://download.pytorch.org/whl/cpu"
+explicit = true
+
+[tool.uv.sources]
+torch = { index = "pytorch-cpu" }
+torchaudio = { index = "pytorch-cpu" }
 
 [build-system]
 requires = ["hatchling"]
@@ -35,6 +55,8 @@ dev = [
     "pytest-cov>=7.1.0",
     "pyyaml>=6.0.4",
     "ruff>=0.17.6",
+    "scipy>=1.18.1",  # the unit tests run FakeBeatModel and the DSP without the ml extra
+    "soundfile>=0.14.0",
     "types-pyyaml>=6.0.12.20261122",
 ]
 
@@ -44,13 +66,17 @@ target-version = "py312"
 src = ["src", "tests"]
 
 [tool.ruff.lint]
-select = ["E", "F", "I", "UP", "B", "SIM", "S", "C4", "PT", "RUF", "ASYNC", "N", "PL", "TCH", "ANN", "DTZ"]
+select = ["E", "F", "I", "UP", "B", "SIM", "S", "C4", "PT", "RUF", "ASYNC", "N", "PL", "TCH", "ANN", "DTZ", "TID251"]
 ignore = [
   "PLR0913",  # many keyword args are normal for service/repository signatures
   "PLR0911",  # early returns are clearer than nesting
   "PLC0415",  # lazy imports are used on purpose in the alembic env and the worker entrypoint
   "N818",  # error classes follow the plan names (NotFound, Forbidden, ...) without an Error suffix
 ]
+
+# ruff 0.17 has no S614 (unsafe torch.load), so the ban is spelled out here (plan 004 Step 9)
+[tool.ruff.lint.flake8-tidy-imports.banned-api]
+"torch.load".msg = "torch.load unpickles: weights are loaded by beat_this with weights_only=True"
 
 [tool.ruff.lint.per-file-ignores]
 "tests/**" = ["S101", "ANN", "PLR2004"]
@@ -66,8 +92,14 @@ mypy_path = "src"
 module = ["asyncpg", "asyncpg.*"]
 ignore_missing_imports = true  # asyncpg ships no stubs; only the tests use it directly
 
+[[tool.mypy.overrides]]
+module = ["beat_this", "beat_this.*", "soundfile", "scipy", "scipy.*", "torch", "torch.*"]
+ignore_missing_imports = true  # beat_this ships no py.typed; the ml extra is not in the dev env
+
 [tool.pytest.ini_options]
 markers = [
+  "ffmpeg: needs the pinned FFmpeg binary (make ffmpeg-bin)",
+  "ml: needs torch and the model weights (make test-ml)",
   "unit: no I/O",
   "integration: needs postgres/redis/files",
   "golden: golden-file tests",
@@ -83,9 +115,13 @@ testpaths = ["tests"]
 [tool.coverage.run]
 branch = true
 source = ["saveclock"]
+# SQLAlchemy's asyncio layer runs on greenlets; without this, code after the first awaited query
+# in a request handler is not traced and shows as uncovered
+concurrency = ["thread", "greenlet"]
 
 [tool.importlinter]
 root_package = "saveclock"
+include_external_packages = true  # the domain contract forbids third-party imports
 
 # Shared kernel (config, errors, observability, ids) and the wiring modules (main, container)
 # are deliberately not listed.
@@ -97,4 +133,27 @@ layers = [
   "saveclock.services",
   "saveclock.repositories | saveclock.adapters",
   "saveclock.models",
+  "saveclock.domain",
+]
+
+# The domain is pure logic: no layer above it, no framework, no I/O library (STANDARDS §1).
+[[tool.importlinter.contracts]]
+name = "domain is pure"
+type = "forbidden"
+source_modules = ["saveclock.domain"]
+forbidden_modules = [
+  "saveclock.api",
+  "saveclock.workers",
+  "saveclock.services",
+  "saveclock.repositories",
+  "saveclock.adapters",
+  "saveclock.models",
+  "sqlalchemy",
+  "fastapi",
+  "httpx",
+  "redis",
+  "numpy",
+  "scipy",
+  "torch",
+  "soundfile",
 ]

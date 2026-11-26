@@ -21,7 +21,9 @@ NAMESPACE = UUID("5a5e0000-0000-4000-8000-5ab000000001")
 # hop order and stage values (plan 001 Step 8)
 HOPS: tuple[tuple[JobQueue, JobStage], ...] = (
     (JobQueue.ANALYSIS, JobStage.ANALYZE),
-    (JobQueue.FETCH, JobStage.DRAFT),
+    # not `draft`: uq_jobs_active (0002) allows one active draft/render per project, and hop 3 is
+    # enqueued while hop 2 still runs (P4-14)
+    (JobQueue.FETCH, JobStage.SWAP_NORMALIZE),
     (JobQueue.RENDER, JobStage.RENDER),
     (JobQueue.MAINTENANCE, JobStage.SWEEP),
 )

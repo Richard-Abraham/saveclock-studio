@@ -102,7 +102,9 @@ def register_stub_actors(broker: dramatiq.Broker, settings: Settings) -> StubAct
 
     async def finish(user_id: UUID, job_id: UUID, run_ms: int) -> None:
         async with _session(settings) as session:
-            await JobRepository(session).finish(user_id=user_id, job_id=job_id, run_ms=run_ms)
+            await JobRepository(session).finish_with(
+                user_id=user_id, job_id=job_id, timings={"run_ms": run_ms}
+            )
 
     def make_body(queue: JobQueue, next_queue: JobQueue | None) -> Any:  # noqa: ANN401
         def body(job_id: str, user_id: str) -> None:

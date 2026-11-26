@@ -99,7 +99,100 @@ export interface paths {
         /** List */
         get: operations["list_projects"];
         put?: never;
+        /** Create */
+        post: operations["create_project"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/projects/{project_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get */
+        get: operations["get_project"];
+        put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** Patch */
+        patch: operations["patch_project"];
+        trace?: never;
+    };
+    "/api/v1/projects/{project_id}/analysis": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get
+         * @description 409 `conflict` with `details.reason = not_ready` until the analysis exists.
+         */
+        get: operations["get_analysis"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/projects/{project_id}/cancel": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Cancel */
+        post: operations["cancel_project"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/projects/{project_id}/retry": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Retry */
+        post: operations["retry_project"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/projects/{project_id}/song": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Upload Song
+         * @description One streamed upload: raw body, `Content-Length` required, `X-Filename` percent-encoded.
+         */
+        post: operations["upload_song"];
         delete?: never;
         options?: never;
         head?: never;
@@ -127,6 +220,45 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        /**
+         * AnalysisOut
+         * @description `beats_s` is the effective grid: the fallback grid when `fallback` is set.
+         */
+        AnalysisOut: {
+            /** Beats S */
+            beats_s: number[];
+            confidence: components["schemas"]["ConfidenceOut"];
+            /** Downbeats S */
+            downbeats_s: number[];
+            /** Energy Curve */
+            energy_curve: number[];
+            fallback: components["schemas"]["Fallback"] | null;
+            /** Flags */
+            flags: {
+                [key: string]: unknown;
+            };
+            /** Low Confidence Ranges */
+            low_confidence_ranges: number[][];
+            /** Sections */
+            sections: components["schemas"]["SectionOut"][];
+            segment: components["schemas"]["SegmentOut"] | null;
+            /** Tempo Bpm */
+            tempo_bpm: number;
+            /** Tempo Octave Adjust */
+            tempo_octave_adjust: number;
+            /** Waveform Peaks */
+            waveform_peaks: number[];
+        };
+        /** AnalysisSummary */
+        AnalysisSummary: {
+            /** Confidence */
+            confidence: number;
+            fallback: components["schemas"]["Fallback"] | null;
+            /** Tempo Bpm */
+            tempo_bpm: number;
+            /** Tempo Octave Adjust */
+            tempo_octave_adjust: number;
+        };
         /** AnthropicKey */
         AnthropicKey: {
             /** Configured */
@@ -144,6 +276,18 @@ export interface components {
             songs: number;
             /** Work */
             work: number;
+        };
+        /** ConfidenceOut */
+        ConfidenceOut: {
+            /**
+             * Band
+             * @enum {string}
+             */
+            band: "high" | "medium" | "low";
+            /** Reasons */
+            reasons: string[];
+            /** Score */
+            score: number;
         };
         /** Configured */
         Configured: {
@@ -180,6 +324,11 @@ export interface components {
         ErrorResponse: {
             error: components["schemas"]["ErrorBody"];
         };
+        /**
+         * Fallback
+         * @enum {string}
+         */
+        Fallback: "energy_grid" | "even_grid" | "phrase_only";
         /** HealthLive */
         HealthLive: {
             /**
@@ -205,6 +354,52 @@ export interface components {
             anthropic: components["schemas"]["AnthropicKey"];
             pexels: components["schemas"]["Configured"];
             pixabay: components["schemas"]["Configured"];
+        };
+        /** ProjectCreate */
+        ProjectCreate: {
+            options?: components["schemas"]["ProjectOptions"] | null;
+            /** Title */
+            title?: string | null;
+        };
+        /**
+         * ProjectDetail
+         * @description `plan` and `render` are placeholders that plans 006 and 007 fill in additively.
+         */
+        ProjectDetail: {
+            analysis: components["schemas"]["AnalysisSummary"] | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Flags */
+            flags: {
+                [key: string]: unknown;
+            };
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * Last Activity At
+             * Format: date-time
+             */
+            last_activity_at: string;
+            /** Options */
+            options: {
+                [key: string]: unknown;
+            };
+            /** Plan */
+            plan?: null;
+            /** Render */
+            render?: null;
+            song: components["schemas"]["SongMeta"] | null;
+            /** Status Reason */
+            status_reason: string | null;
+            /** Title */
+            title: string | null;
+            ui_status: components["schemas"]["UiStatus"];
         };
         /** ProjectItem */
         ProjectItem: {
@@ -236,6 +431,63 @@ export interface components {
             /** Next Cursor */
             next_cursor: string | null;
         };
+        /**
+         * ProjectOptions
+         * @description The shape of `projects.options` (the column itself stays free-form jsonb, P4-12).
+         */
+        ProjectOptions: {
+            /**
+             * Density
+             * @default 0
+             */
+            density: number;
+            /**
+             * Duration
+             * @default 30
+             * @enum {integer}
+             */
+            duration: 15 | 30 | 60;
+            /** Keywords Override */
+            keywords_override?: string[] | null;
+            /**
+             * Style
+             * @default default
+             */
+            style: string;
+            /** Vibe */
+            vibe?: string | null;
+        };
+        /** ProjectPatch */
+        ProjectPatch: {
+            options?: components["schemas"]["ProjectOptions"] | null;
+            /** Title */
+            title?: string | null;
+        };
+        /** SectionOut */
+        SectionOut: {
+            /** End S */
+            end_s: number;
+            /**
+             * Energy
+             * @enum {string}
+             */
+            energy: "e1" | "e2" | "e3" | "e4";
+            /** Id */
+            id: string;
+            /** Label */
+            label: string;
+            /** Start S */
+            start_s: number;
+        };
+        /** SegmentOut */
+        SegmentOut: {
+            /** End S */
+            end_s: number;
+            /** Start S */
+            start_s: number;
+            /** Total Frames */
+            total_frames: number;
+        };
         /** SettingsOut */
         SettingsOut: {
             disk: components["schemas"]["Disk"];
@@ -244,6 +496,21 @@ export interface components {
             keys: components["schemas"]["Keys"];
             stock: components["schemas"]["Stock"];
             tuning: components["schemas"]["Tuning"] | null;
+        };
+        /** SongMeta */
+        SongMeta: {
+            /** Channels */
+            channels: number | null;
+            /** Codec */
+            codec: string | null;
+            /** Duration S */
+            duration_s: number | null;
+            /** Original Filename */
+            original_filename: string;
+            /** Sample Rate */
+            sample_rate: number | null;
+            /** Size Bytes */
+            size_bytes: number;
         };
         /** Stock */
         Stock: {
@@ -327,6 +594,15 @@ export interface components {
          * @enum {string}
          */
         UiStatus: "uploading" | "analysing" | "draft" | "rendering" | "ready" | "failed" | "canceled";
+        /** UploadAccepted */
+        UploadAccepted: {
+            /**
+             * Job Id
+             * Format: uuid
+             */
+            job_id: string;
+            ui_status: components["schemas"]["UiStatus"];
+        };
         /** Volume */
         Volume: {
             /** Free */
@@ -692,6 +968,507 @@ export interface operations {
             };
             /** @description internal_error */
             500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    create_project: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ProjectCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProjectDetail"];
+                };
+            };
+            /** @description forbidden; details.reason is one of host_not_allowed, origin_mismatch, cross_site */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description validation_error (details.fields) */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description internal_error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    get_project: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                project_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProjectDetail"];
+                };
+            };
+            /** @description forbidden; details.reason is one of host_not_allowed, origin_mismatch, cross_site */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description validation_error (details.fields) */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description internal_error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    patch_project: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                project_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ProjectPatch"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProjectDetail"];
+                };
+            };
+            /** @description forbidden; details.reason is one of host_not_allowed, origin_mismatch, cross_site */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description conflict; details.reason is one of not_ready, wrong_state, upload_in_progress, retry_limit */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description validation_error (details.fields) */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description internal_error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    get_analysis: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                project_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AnalysisOut"];
+                };
+            };
+            /** @description forbidden; details.reason is one of host_not_allowed, origin_mismatch, cross_site */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description conflict; details.reason is one of not_ready, wrong_state, upload_in_progress, retry_limit */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description validation_error (details.fields) */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description internal_error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    cancel_project: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                project_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProjectDetail"];
+                };
+            };
+            /** @description forbidden; details.reason is one of host_not_allowed, origin_mismatch, cross_site */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description conflict; details.reason is one of not_ready, wrong_state, upload_in_progress, retry_limit */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description validation_error (details.fields) */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description internal_error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    retry_project: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                project_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProjectDetail"];
+                };
+            };
+            /** @description forbidden; details.reason is one of host_not_allowed, origin_mismatch, cross_site */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description conflict; details.reason is one of not_ready, wrong_state, upload_in_progress, retry_limit */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description validation_error (details.fields) */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description internal_error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    upload_song: {
+        parameters: {
+            query?: never;
+            header?: {
+                "content-length"?: string | null;
+                "content-type"?: string | null;
+                "x-filename"?: string | null;
+            };
+            path: {
+                project_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/octet-stream": string;
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UploadAccepted"];
+                };
+            };
+            /** @description bad_request; details.reason is one of content_length_required, bad_filename */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description forbidden; details.reason is one of host_not_allowed, origin_mismatch, cross_site */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description conflict; details.reason is one of not_ready, wrong_state, upload_in_progress, retry_limit */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description payload_too_large */
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description unsupported_media; details.reason is one of unsniffable, extension_mismatch, mime_mismatch */
+            415: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description validation_error (details.fields) */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description internal_error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description insufficient_storage */
+            507: {
                 headers: {
                     [name: string]: unknown;
                 };
