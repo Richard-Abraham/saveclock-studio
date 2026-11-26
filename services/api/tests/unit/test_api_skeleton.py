@@ -6,8 +6,8 @@ import structlog
 from fastapi import FastAPI
 
 from saveclock.api.error_handlers import register_error_handlers
-from saveclock.api.export import openapi_json
 from saveclock.api.middleware import RequestIdMiddleware, SecurityHeadersMiddleware
+from saveclock.export import openapi_json
 from saveclock.observability.logging import configure_logging
 from tests.conftest import client_for, make_app
 

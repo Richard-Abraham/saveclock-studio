@@ -5,9 +5,9 @@ from fastapi.responses import Response, StreamingResponse
 from starlette.types import Message
 
 from saveclock.api.error_handlers import register_error_handlers
-from saveclock.api.export import openapi_json
 from saveclock.api.middleware import AccessGuardMiddleware, RequestIdMiddleware
 from saveclock.config import Settings
+from saveclock.export import openapi_json
 from tests.conftest import ENV, client_for, make_app
 
 

@@ -1,32 +1,22 @@
-"""Wiring: builds the real dependencies once per process. Not part of any layer."""
+"""Wiring: builds the real dependencies once per process (not a layer; only main imports it)."""
 
 import asyncio
-from dataclasses import dataclass, field
 from functools import partial
+from typing import TYPE_CHECKING
 
 from redis.asyncio import Redis
-from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker
 
 from saveclock.adapters.blobstore.filesystem import FilesystemBlobStore
-from saveclock.adapters.blobstore.port import BlobStore
 from saveclock.adapters.db import create_engine, create_sessionmaker, ping_db
 from saveclock.config import Settings
-from saveclock.services.health import Check
-from saveclock.services.settings import UsageCache
+from saveclock.deps import Deps
+from saveclock.workers.broker import build_broker
+from saveclock.workers.stub import register_stub_actors
 
+if TYPE_CHECKING:
+    from saveclock.services.stub import Enqueue
 
-@dataclass(frozen=True)
-class Deps:
-    engine: AsyncEngine
-    sessionmaker: async_sessionmaker[AsyncSession]
-    redis: Redis
-    blobs: BlobStore
-    checks: dict[str, Check]
-    usage_cache: UsageCache = field(default_factory=UsageCache)
-
-    async def close(self) -> None:
-        await self.redis.aclose()
-        await self.engine.dispose()
+STUB_ENVS = frozenset({"local", "ci"})
 
 
 def build_deps(settings: Settings) -> Deps:
@@ -42,11 +32,16 @@ def build_deps(settings: Settings) -> Deps:
     async def blob_volume() -> None:
         await asyncio.to_thread(blobs.probe)
 
+    enqueue_stub: Enqueue | None = None
+    if settings.app_env in STUB_ENVS:
+        enqueue_stub = register_stub_actors(build_broker(settings), settings).send_first
+
     return Deps(
         engine=engine,
         sessionmaker=sessionmaker,
         redis=redis,
         blobs=blobs,
+        enqueue_stub=enqueue_stub,
         checks={
             "postgres": partial(ping_db, sessionmaker),
             "redis": ping_redis,

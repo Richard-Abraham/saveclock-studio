@@ -1,8 +1,8 @@
-"""Write packages/contracts/openapi.json (thin wrapper over saveclock.api.export)."""
+"""Write packages/contracts/openapi.json (thin wrapper over saveclock.export)."""
 
 from pathlib import Path
 
-from saveclock.api.export import openapi_json
+from saveclock.export import openapi_json
 
 OUT = Path(__file__).resolve().parent.parent / "packages" / "contracts" / "openapi.json"
 

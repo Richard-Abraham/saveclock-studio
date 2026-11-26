@@ -7,7 +7,7 @@ from fastapi import Depends, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from saveclock.config import Settings
-from saveclock.container import Deps
+from saveclock.deps import Deps
 from saveclock.services.identity import CurrentUser, get_owner
 
 

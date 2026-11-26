@@ -5,7 +5,7 @@ from fastapi import APIRouter, Depends
 from saveclock.api.deps import get_deps
 from saveclock.api.schemas.common import ERROR_RESPONSES
 from saveclock.api.schemas.health import HealthLive, HealthReady
-from saveclock.container import Deps
+from saveclock.deps import Deps
 from saveclock.errors import UpstreamUnavailable
 from saveclock.services.health import readiness
 

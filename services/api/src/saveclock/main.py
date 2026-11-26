@@ -11,10 +11,11 @@ from saveclock.api.middleware import (
     RequestIdMiddleware,
     SecurityHeadersMiddleware,
 )
-from saveclock.api.v1 import health, projects
+from saveclock.api.v1 import health, projects, stub
 from saveclock.api.v1 import settings as settings_router
 from saveclock.config import Settings
-from saveclock.container import Deps, build_deps
+from saveclock.container import STUB_ENVS, build_deps
+from saveclock.deps import Deps
 from saveclock.observability.logging import configure_logging
 
 API_PREFIX = "/api/v1"
@@ -45,6 +46,8 @@ def create_app(settings: Settings | None = None, deps: Deps | None = None) -> Fa
     app.include_router(health.router, prefix=API_PREFIX)
     app.include_router(projects.router, prefix=API_PREFIX)
     app.include_router(settings_router.router, prefix=API_PREFIX)
+    if settings.app_env in STUB_ENVS:
+        app.include_router(stub.router, prefix=API_PREFIX)
     # add_middleware: the last one added is the outermost.
     app.add_middleware(SecurityHeadersMiddleware)
     app.add_middleware(AccessGuardMiddleware, settings=settings)

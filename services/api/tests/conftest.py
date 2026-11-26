@@ -6,7 +6,7 @@ import pytest
 from fastapi import FastAPI
 
 from saveclock.config import Settings
-from saveclock.container import Deps, build_deps
+from saveclock.container import build_deps
 from saveclock.main import create_app
 from saveclock.services.health import Check
 
@@ -21,7 +21,7 @@ ENV = {
 
 def make_app(checks: dict[str, Check] | None = None, **overrides: object) -> FastAPI:
     settings = Settings(_env_file=None, **{**ENV, **overrides})  # type: ignore[arg-type]
-    deps: Deps = build_deps(settings)
+    deps = build_deps(settings)
     if checks is not None:
         deps = replace(deps, checks=checks)
     return create_app(settings, deps)

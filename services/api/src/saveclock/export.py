@@ -1,4 +1,4 @@
-"""`python -m saveclock.api.export`: print the OpenAPI document, deterministically.
+"""`python -m saveclock.export`: print the OpenAPI document, deterministically.
 
 Uses obviously fake settings: building the app connects to nothing and needs no environment.
 """

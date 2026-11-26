@@ -6,7 +6,7 @@ from saveclock.api.deps import current_user, get_deps, get_settings
 from saveclock.api.schemas.common import ERROR_RESPONSES
 from saveclock.api.schemas.settings import SettingsOut
 from saveclock.config import Settings
-from saveclock.container import Deps
+from saveclock.deps import Deps
 from saveclock.services.identity import CurrentUser
 from saveclock.services.settings import settings_view
 
