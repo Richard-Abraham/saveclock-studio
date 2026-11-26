@@ -7,4 +7,5 @@ useDefault = true
 [allowlist]
 description = "local git-ignored .env with generated throwaway passwords, and Next build output"
 # apps/web/.next/: git-ignored Next build output; contains Next's generated preview keys.
-paths = ['''^\.env$''', '''^apps/web/\.next/''', '''^infra/docker/cache/''']
+# .claude/worktrees/: git-ignored executor worktrees (their own .env and build output); never committed.
+paths = ['''^\.env$''', '''^apps/web/\.next/''', '''^infra/docker/cache/''', '''^\.claude/worktrees/''']
