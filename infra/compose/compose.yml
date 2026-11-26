@@ -153,12 +153,16 @@ services:
       WORKER_HEAVY_CONCURRENCY: "${WORKER_HEAVY_CONCURRENCY:-}"
       FETCH_CONCURRENCY: "${FETCH_CONCURRENCY:-}"
       TUNING_PUBLISHER: "true"
+      SCRATCH_ROOT: /scratch
+      MODELS_DIR: /opt/models
+      FAKE_ML: "${FAKE_ML:-false}"
     volumes:
       - "blobs:/data/blobs"
     networks: [back]
     user: "10001:10001"
     read_only: true
-    tmpfs: ["/tmp:size=64m"]
+    # per-job decode scratch (SEC-023); the maintenance worker never decodes, so it has none
+    tmpfs: ["/tmp:size=64m", "/scratch:size=1g,mode=0700,uid=10001,gid=10001,noexec,nosuid,nodev"]
     cap_drop: [ALL]
     security_opt: ["no-new-privileges:true"]
     mem_limit: 4g

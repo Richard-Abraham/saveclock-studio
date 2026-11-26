@@ -14,6 +14,8 @@ PORT_OK = (
     re.compile(r"\$\{BIND_ADDR:-127\.0\.0\.1\}:\$\{WEB_PORT:-3000\}:3000"),
     re.compile(r"127\.0\.0\.1:\d+:\d+"),
 )
+# empty thread counts reach libraries as a bad value (compose "Phase 2 adds ..." note): leave them out
+THREAD_VARS = {"FFMPEG_THREADS", "TORCH_THREADS", "OMP_NUM_THREADS"}
 EXPECTED = {
     "compose.yml": {"postgres", "redis", "migrate", "api", "web", "worker", "worker-maint"},
     "compose.test.yml": {"postgres", "redis"},
@@ -51,6 +53,18 @@ def lint(path: Path) -> list[str]:
             problems.append(f"{name}: network_mode host")
         if svc.get("privileged") is True:
             problems.append(f"{name}: privileged")
+        if path.name == "compose.yml" and name == "worker":
+            scratch = [t for t in svc.get("tmpfs", []) or [] if str(t).startswith("/scratch:")]
+            if not scratch or "noexec" not in scratch[0]:
+                problems.append("worker: /scratch tmpfs with noexec is missing")
+        if path.name == "compose.yml" and name == "worker-maint" and "/scratch" in text.split(
+            "worker-maint:", 1
+        )[1].split("\n  ", 1)[0]:
+            problems.append("worker-maint: must not get a /scratch (it never decodes)")
+        for key in THREAD_VARS & set(svc.get("environment") or {}):
+            value = str(svc["environment"][key])
+            if value.strip() == "" or value.endswith(":-}"):
+                problems.append(f"{name}: {key} must not be passed as an empty string")
         for volume in svc.get("volumes", []) or []:
             source = volume if isinstance(volume, str) else str(volume.get("source", ""))
             if "docker.sock" in source or "podman.sock" in source:

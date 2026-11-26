@@ -5,7 +5,13 @@ import sys
 from pathlib import Path
 
 FLOOR = 95.0
-PATHS = ("saveclock/adapters/blobstore/", "saveclock/services/files.py")
+PATHS = (
+    "saveclock/adapters/blobstore/",
+    "saveclock/services/files.py",
+    "saveclock/domain/",
+    "saveclock/adapters/ffmpeg.py",
+    "saveclock/services/ingest.py",
+)
 REPORT = Path(__file__).resolve().parent.parent / "services" / "api" / "coverage.json"
 
 

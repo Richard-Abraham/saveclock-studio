@@ -55,6 +55,8 @@ dev = [
     "pytest-cov>=7.1.0",
     "pyyaml>=6.0.4",
     "ruff>=0.17.6",
+    "scipy>=1.18.1",  # the unit tests run FakeBeatModel and the DSP without the ml extra
+    "soundfile>=0.14.0",
     "types-pyyaml>=6.0.12.20261122",
 ]
 
@@ -109,9 +111,13 @@ testpaths = ["tests"]
 [tool.coverage.run]
 branch = true
 source = ["saveclock"]
+# SQLAlchemy's asyncio layer runs on greenlets; without this, code after the first awaited query
+# in a request handler is not traced and shows as uncovered
+concurrency = ["thread", "greenlet"]
 
 [tool.importlinter]
 root_package = "saveclock"
+include_external_packages = true  # the domain contract forbids third-party imports
 
 # Shared kernel (config, errors, observability, ids) and the wiring modules (main, container)
 # are deliberately not listed.
@@ -123,4 +129,27 @@ layers = [
   "saveclock.services",
   "saveclock.repositories | saveclock.adapters",
   "saveclock.models",
+  "saveclock.domain",
+]
+
+# The domain is pure logic: no layer above it, no framework, no I/O library (STANDARDS §1).
+[[tool.importlinter.contracts]]
+name = "domain is pure"
+type = "forbidden"
+source_modules = ["saveclock.domain"]
+forbidden_modules = [
+  "saveclock.api",
+  "saveclock.workers",
+  "saveclock.services",
+  "saveclock.repositories",
+  "saveclock.adapters",
+  "saveclock.models",
+  "sqlalchemy",
+  "fastapi",
+  "httpx",
+  "redis",
+  "numpy",
+  "scipy",
+  "torch",
+  "soundfile",
 ]
