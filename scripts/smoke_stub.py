@@ -105,7 +105,6 @@ def main() -> int:
     parser.add_argument("--web", default="http://localhost:3000")
     parser.add_argument("--api", default="http://127.0.0.1:8000")
     parser.add_argument("--seed", action="store_true")
-    parser.add_argument("--propagation", action="store_true", help="also require the request id in the api and worker logs")
     args = parser.parse_args()
     web, api = args.web, args.api
     origin = web  # the app origin the browser would send
@@ -180,20 +179,18 @@ def main() -> int:
         logs = {svc: service_logs(container, project, svc) for svc in ("api", "worker", "worker-maint", "web")}
         lines = {svc: json_lines(text) for svc, text in logs.items()}
         check("every JSON-looking log line parses", all(bad == 0 for _, bad in lines.values()))
-        if args.propagation:  # SEC-123; the app code does not propagate the id yet, so this FAILS today
-            api_hit = any(rec.get("request_id") == request_id for rec in lines["api"][0])
-            check("the request id is in the api log", api_hit)
-            for stage in HOPS:
-                svc = STAGE_SERVICES[stage]
-                hit = any(
-                    rec.get("request_id") == request_id
-                    and rec.get("stage") == stage
-                    and rec.get("event") == "job.finished"
-                    for rec in lines[svc][0]
-                )
-                check(f"the request id reaches the {stage} hop's worker log", hit)
-        else:
-            print("NOT RUN request-id propagation (SEC-123): make smoke-propagation (it fails today, an open finding)")
+        # SEC-123: the request id of the POST is in the api log and in each hop's worker log
+        api_hit = any(rec.get("request_id") == request_id for rec in lines["api"][0])
+        check("the request id is in the api log", api_hit)
+        for stage in HOPS:
+            svc = STAGE_SERVICES[stage]
+            hit = any(
+                rec.get("request_id") == request_id
+                and rec.get("stage") == stage
+                and rec.get("event") == "job.finished"
+                for rec in lines[svc][0]
+            )
+            check(f"the request id reaches the {stage} hop's worker log", hit)
         secrets = [
             ln.split("=", 1)[1] for ln in open(".env").read().splitlines()  # noqa: SIM115
             if ln.split("=", 1)[0].endswith(("PASSWORD", "_KEY")) and "=" in ln and len(ln.split("=", 1)[1]) >= 8

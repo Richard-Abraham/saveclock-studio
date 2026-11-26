@@ -28,7 +28,7 @@ CHECK_STAGES := $(FAST_STAGES) images image-guards hadolint
   migrations audit env env-docs env-docs-check contracts contracts-check test-deps-up \
   test-deps-down ffmpeg-cache images image-guards hadolint scan-images up dev down \
   down-volumes sandbox check-fast check web-install web-env web-lint web-test web-build \
-  bundle-scan web-audit-prod measure-rewrite smoke-web web-audit stack-up seed smoke-stub smoke-propagation \
+  bundle-scan web-audit-prod measure-rewrite smoke-web web-audit stack-up seed smoke-stub \
   predeploy-scan backup backup-test restore-proof backup-timer-install backup-timer-uninstall \
   backup-install-timer rollback-demo fresh-clone-timing
 
@@ -246,11 +246,6 @@ seed:
 smoke-stub:
 	PROJECT=$(PROJECT) CONTAINER=$(CONTAINER) python3 scripts/smoke_stub.py --web http://localhost:$(WEB_PORT) \
 	  --api http://127.0.0.1:$(API_PORT)
-
-# Fails today: the app code does not carry the request id into the logs of the api or the worker hops.
-smoke-propagation:
-	PROJECT=$(PROJECT) CONTAINER=$(CONTAINER) python3 scripts/smoke_stub.py --propagation \
-	  --web http://localhost:$(WEB_PORT) --api http://127.0.0.1:$(API_PORT)
 
 predeploy-scan:
 	scripts/predeploy_scan.sh .
