@@ -248,3 +248,46 @@ def test_probe_fails_on_read_only_root(tmp_path: Path) -> None:
             store.probe()
     finally:
         root.chmod(0o700)
+
+
+@pytest.mark.unit
+def test_stat_of_a_directory_is_not_found(store: BlobStore) -> None:
+    store.put("work/p1/a.bin", iter([b"a"]), max_bytes=10)
+    with pytest.raises(NotFound):
+        store.stat("work/p1")
+
+
+@pytest.mark.unit
+def test_prefix_operations_on_a_single_file(store: BlobStore, tmp_path: Path) -> None:
+    store.put("work/p1/a.bin", iter([b"abc"]), max_bytes=10)
+    assert store.list("work/p1/a.bin") == ["work/p1/a.bin"]
+    assert store.usage("work/p1/a.bin") == 3
+    assert store.delete_prefix("work/p1/a.bin") == 3
+    assert not store.exists("work/p1/a.bin")
+
+
+@pytest.mark.unit
+def test_local_path_stays_under_the_root(store: BlobStore, tmp_path: Path) -> None:
+    assert store.local_path("work/p1/a.bin") == tmp_path / "root" / "work/p1/a.bin"
+    with pytest.raises(InvalidKey):
+        store.local_path("../x")
+
+
+@pytest.mark.unit
+def test_walks_ignore_symlinks(store: BlobStore, tmp_path: Path) -> None:
+    store.put("work/p1/a.bin", iter([b"abc"]), max_bytes=10)
+    outside = tmp_path / "outside.bin"
+    outside.write_bytes(b"x" * 100)
+    (tmp_path / "root" / "work" / "p1" / "link.bin").symlink_to(outside)
+    assert store.usage() == 3
+    assert store.list("work") == ["work/p1/a.bin"]
+
+
+@pytest.mark.unit
+def test_containment_backstop_refuses_a_resolved_path_outside_the_root(
+    store: BlobStore, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # No symlink is involved here: the realpath check is a second line of defence.
+    monkeypatch.setattr(os.path, "realpath", lambda _p: "/elsewhere")
+    with pytest.raises(InvalidKey):
+        store.stat("work/p1/a.bin")

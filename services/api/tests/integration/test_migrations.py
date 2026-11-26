@@ -177,6 +177,15 @@ async def test_alembic_check_and_roundtrip(migrated_db: Db) -> None:
     assert await snapshot(migrated_db) == before
 
 
+async def test_downgrade_one_step_roundtrip(migrated_db: Db) -> None:
+    before = await snapshot(migrated_db)
+    down = migrated_db.alembic("downgrade", "-1")
+    assert down.returncode == 0, down.stderr
+    up = migrated_db.alembic("upgrade", "head")
+    assert up.returncode == 0, up.stderr
+    assert await snapshot(migrated_db) == before
+
+
 async def test_heads(migrated_db: Db) -> None:
     out = migrated_db.alembic("heads")
     assert out.stdout.strip() == "0001_baseline (head)"

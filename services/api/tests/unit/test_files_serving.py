@@ -95,6 +95,8 @@ async def test_range_requests(served: tuple[FilesystemBlobStore, FastAPI]) -> No
         assert bad.status_code == 416
         assert bad.headers["content-range"] == "bytes */10"
         assert bad.json()["error"]["code"] == "bad_request"
+        zero_suffix = await c.get(f"/blob/{key}", headers={"range": "bytes=-0"})
+        assert zero_suffix.status_code == 416
         garbage = await c.get(f"/blob/{key}", headers={"range": "bytes=a-b"})
         assert garbage.status_code == 416
 

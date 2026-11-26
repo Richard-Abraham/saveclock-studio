@@ -1,0 +1,199 @@
+# One stack for dev and the owner's machine (C17). Project name `saveclock` comes from the Makefile.
+# Compose-spec subset that podman-compose 1.6.0 supports; every hardening key is verified on
+# the RUNNING containers by `make sandbox`, never by reading this file.
+networks:
+  front: {}
+  back:
+    internal: true # C9: the worker egress network arrives with T-2.6 (fetch)
+
+volumes:
+  pgdata: {}
+  blobs: {}
+
+services:
+  postgres:
+    image: docker.io/library/postgres:16@sha256:07abc3f43c9395b0bdbbab36bc25ddb0e8d83cd4fcafb5fb7d6abe14ff156dd8
+    environment:
+      POSTGRES_DB: saveclock
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: "${POSTGRES_PASSWORD}"
+      POSTGRES_APP_PASSWORD: "${POSTGRES_APP_PASSWORD}"
+      POSTGRES_MIGRATOR_PASSWORD: "${POSTGRES_MIGRATOR_PASSWORD}"
+    volumes:
+      - "pgdata:/var/lib/postgresql/data"
+      - "../postgres/init:/docker-entrypoint-initdb.d:ro,z"
+    networks: [back]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d saveclock"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    mem_limit: 512m
+
+  redis:
+    image: docker.io/library/redis:7@sha256:6b645a37f49b0546582468706b32e71a8b7fbb5ba4583d0f9e27a8004716b738
+    command:
+      - sh
+      - -c
+      - exec redis-server --appendonly yes --appendfsync everysec --maxmemory 256mb --maxmemory-policy noeviction --requirepass "$$REDIS_PASSWORD"
+    environment:
+      REDIS_PASSWORD: "${REDIS_PASSWORD}"
+      REDISCLI_AUTH: "${REDIS_PASSWORD}"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    networks: [back]
+    mem_limit: 256m
+
+  migrate:
+    image: saveclock-api:${IMAGE_TAG:-local}
+    command: ["alembic", "upgrade", "head"]
+    restart: "no"
+    networks: [back]
+    environment:
+      MIGRATOR_DATABASE_URL: "postgresql+asyncpg://migrator:${POSTGRES_MIGRATOR_PASSWORD}@postgres:5432/saveclock"
+      OWNER_DISPLAY_NAME: "${OWNER_DISPLAY_NAME}"
+      OWNER_EMAIL: "${OWNER_EMAIL:-owner@saveclock.local}"
+    user: "10001:10001"
+    read_only: true
+    tmpfs: ["/tmp:size=64m"]
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    mem_limit: 256m
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  api:
+    build:
+      context: ../..
+      dockerfile: infra/docker/Dockerfile.api
+      target: api
+      args:
+        APP_VERSION: "${IMAGE_TAG:-local}"
+    image: saveclock-api:${IMAGE_TAG:-local}
+    ports:
+      - "${BIND_ADDR:-127.0.0.1}:8000:8000"
+    environment:
+      APP_ENV: "${APP_ENV:-local}"
+      APP_VERSION: "${IMAGE_TAG:-local}"
+      APP_ORIGIN: "${APP_ORIGIN:-http://localhost:3000}"
+      ALLOWED_HOSTS: "localhost,127.0.0.1,api"
+      DATABASE_URL: "postgresql+asyncpg://app_rw:${POSTGRES_APP_PASSWORD}@postgres:5432/saveclock"
+      REDIS_URL: "redis://:${REDIS_PASSWORD}@redis:6379/0"
+      BLOB_ROOT: /data/blobs
+      PEXELS_KEY_CONFIGURED: "${PEXELS_KEY_CONFIGURED:-false}"
+      PIXABAY_KEY_CONFIGURED: "${PIXABAY_KEY_CONFIGURED:-false}"
+      ANTHROPIC_KEY_CONFIGURED: "${ANTHROPIC_KEY_CONFIGURED:-false}"
+    volumes:
+      - "blobs:/data/blobs"
+    networks: [front, back]
+    user: "10001:10001"
+    read_only: true
+    tmpfs: ["/tmp:size=64m"]
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    mem_limit: 512m
+    cpus: 1
+    pids_limit: 256
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request as u; u.urlopen('http://127.0.0.1:8000/api/v1/health/ready', timeout=3)"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+
+  worker:
+    build:
+      context: ../..
+      dockerfile: infra/docker/Dockerfile.api
+      target: worker
+      args:
+        APP_VERSION: "${IMAGE_TAG:-local}"
+    image: saveclock-worker:${IMAGE_TAG:-local}
+    command:
+      - sh
+      - -c
+      - exec dramatiq saveclock.workers.main --processes 1 --threads "$${FETCH_CONCURRENCY:-4}" --queues analysis fetch render
+    environment:
+      APP_ENV: "${APP_ENV:-local}"
+      APP_VERSION: "${IMAGE_TAG:-local}"
+      APP_ORIGIN: "${APP_ORIGIN:-http://localhost:3000}"
+      DATABASE_URL: "postgresql+asyncpg://app_rw:${POSTGRES_APP_PASSWORD}@postgres:5432/saveclock"
+      REDIS_URL: "redis://:${REDIS_PASSWORD}@redis:6379/0"
+      BLOB_ROOT: /data/blobs
+      WORKER_HEAVY_CONCURRENCY: "${WORKER_HEAVY_CONCURRENCY:-}"
+      FFMPEG_THREADS: "${FFMPEG_THREADS:-}"
+      TORCH_THREADS: "${TORCH_THREADS:-}"
+      OMP_NUM_THREADS: "${OMP_NUM_THREADS:-}"
+      FETCH_CONCURRENCY: "${FETCH_CONCURRENCY:-}"
+    volumes:
+      - "blobs:/data/blobs"
+    networks: [back]
+    user: "10001:10001"
+    read_only: true
+    tmpfs: ["/tmp:size=64m"]
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    mem_limit: 4g
+    cpus: 3
+    pids_limit: 512
+    stop_grace_period: 90s
+    healthcheck:
+      test: ["CMD", "python", "-m", "saveclock.workers.healthcheck"]
+      interval: 15s
+      timeout: 5s
+      retries: 4
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+
+  worker-maint:
+    image: saveclock-worker:${IMAGE_TAG:-local}
+    command:
+      - sh
+      - -c
+      - exec dramatiq saveclock.workers.main --processes 1 --threads 1 --queues maintenance
+    environment:
+      APP_ENV: "${APP_ENV:-local}"
+      APP_VERSION: "${IMAGE_TAG:-local}"
+      APP_ORIGIN: "${APP_ORIGIN:-http://localhost:3000}"
+      DATABASE_URL: "postgresql+asyncpg://app_rw:${POSTGRES_APP_PASSWORD}@postgres:5432/saveclock"
+      REDIS_URL: "redis://:${REDIS_PASSWORD}@redis:6379/0"
+      BLOB_ROOT: /data/blobs
+    volumes:
+      - "blobs:/data/blobs"
+    networks: [back]
+    user: "10001:10001"
+    read_only: true
+    tmpfs: ["/tmp:size=64m"]
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    mem_limit: 256m
+    cpus: 1
+    pids_limit: 128
+    stop_grace_period: 90s
+    healthcheck:
+      test: ["CMD", "python", "-m", "saveclock.workers.healthcheck"]
+      interval: 15s
+      timeout: 5s
+      retries: 4
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
