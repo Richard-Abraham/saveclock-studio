@@ -13,10 +13,9 @@ PORT_OK = (
     re.compile(r"127\.0\.0\.1:\d+:\d+"),
 )
 EXPECTED = {
-    "compose.yml": {"postgres", "redis", "migrate", "api", "worker", "worker-maint"},
+    "compose.yml": {"postgres", "redis", "migrate", "api", "web", "worker", "worker-maint"},
     "compose.test.yml": {"postgres", "redis"},
 }
-OPTIONAL = {"compose.yml": {"web"}}  # joins in plan 002
 
 
 def lint(path: Path) -> list[str]:
@@ -31,7 +30,7 @@ def lint(path: Path) -> list[str]:
         names = set(services)
         for name in sorted(expected - names):
             problems.append(f"missing service {name}")
-        for name in sorted(names - expected - OPTIONAL.get(path.name, set())):
+        for name in sorted(names - expected):
             problems.append(f"unexpected service {name}")
     for name, svc in services.items():
         for port in svc.get("ports", []) or []:
