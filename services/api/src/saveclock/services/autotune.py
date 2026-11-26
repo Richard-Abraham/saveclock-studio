@@ -1,7 +1,7 @@
 """Self-tuning of worker concurrency (DECISIONS §8g)."""
 
 import os
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import Literal
 
@@ -78,31 +78,13 @@ def host_facts(root: Path = CGROUP) -> HostFacts:
 def effective(settings: Settings, facts: HostFacts) -> Tuning:
     """Auto values with the optional overrides from `Settings` applied (None = auto)."""
     t = detect(facts.cpu, facts.ram_gb)
-    values: dict[str, int | str] = {
-        "heavy": t.heavy,
-        "torch_threads": t.torch_threads,
-        "ffmpeg_threads": t.ffmpeg_threads,
-        "fetch_concurrency": t.fetch_concurrency,
-        "device": settings.device,
-    }
-    overrides: dict[str, int | None] = {
+    overrides: dict[str, int | str | None] = {
         "heavy": settings.worker_heavy_concurrency,
         "torch_threads": settings.torch_threads,
         "ffmpeg_threads": settings.ffmpeg_threads,
         "fetch_concurrency": settings.fetch_concurrency,
+        "device": settings.device if settings.device != "cpu" else None,
     }
-    source = dict(t.source)
-    for name, value in overrides.items():
-        if value is not None:
-            values[name] = value
-            source[name] = "override"
-    if settings.device != "cpu":
-        source["device"] = "override"
-    return Tuning(
-        heavy=int(values["heavy"]),
-        torch_threads=int(values["torch_threads"]),
-        ffmpeg_threads=int(values["ffmpeg_threads"]),
-        fetch_concurrency=int(values["fetch_concurrency"]),
-        device=str(values["device"]),
-        source=source,
-    )
+    chosen = {name: value for name, value in overrides.items() if value is not None}
+    source: dict[str, Source] = {**t.source, **dict.fromkeys(chosen, "override")}
+    return replace(t, **chosen, source=source)  # type: ignore[arg-type]
