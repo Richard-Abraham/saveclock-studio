@@ -6,8 +6,8 @@ import { readServerEnv } from "@/lib/server-env";
 const { allowedHosts } = readServerEnv();
 
 /**
- * Host allowlist for every page (SEC-166, plan 002 W14). The rewrite to the API has its own `has`
- * condition on Host; the API checks Host again at its own edge. Never reads the request body.
+ * Host allowlist for every web route, /api included (SEC-166, plan 002 W14): one rule, one verdict.
+ * The API checks Host again at its own edge. Never reads the request body.
  */
 export function proxy(request: NextRequest): Response {
   if (isAllowedHost(request.headers.get("host"), allowedHosts)) return NextResponse.next();
@@ -18,7 +18,7 @@ export function proxy(request: NextRequest): Response {
 }
 
 export const config = {
-  // Pages and /healthz only. NOT /api (a proxy touching /api request bodies applies a default
-  // body-size limit that would break the 100 MB upload; OQ-26), and not static assets.
-  matcher: ["/((?!api/|_next/static|_next/image|favicon\\.ico).*)"],
+  // Every route including /api (JSON through the rewrite; uploads go straight to the API since OQ-26
+  // Branch B, so the proxy's 10 MB body buffer no longer matters), but not static assets.
+  matcher: ["/((?!_next/static|_next/image|favicon\\.ico).*)"],
 };

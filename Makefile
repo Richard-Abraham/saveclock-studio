@@ -160,7 +160,7 @@ dev: up
 	  [ "$$code" = 200 ] && { echo "ready: $$code"; exit 0; }; sleep 2; done; \
 	echo "api did not become ready"; exit 1
 	@for i in $$(seq 1 60); do \
-	  code=$$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:3000/healthz); \
+	  code=$$(curl -s -o /dev/null -w '%{http_code}' http://localhost:3000/healthz); \
 	  [ "$$code" = 200 ] && { echo "web ready: $$code"; exit 0; }; sleep 2; done; \
 	echo "web did not become ready"; exit 1
 

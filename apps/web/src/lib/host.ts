@@ -23,10 +23,3 @@ export function isAllowedHost(hostHeader: string | null | undefined, allowed: re
   if (hostHeader == null || hostHeader.trim() === "") return false;
   return allowed.includes(hostname(hostHeader));
 }
-
-/** Regex source for a `has: [{type: "header", key: "host", value}]` rewrite condition. */
-export function hostConditionPattern(allowed: readonly string[]): string {
-  const escape = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-  const names = allowed.map((h) => (h.includes(":") ? `\\[${escape(h)}\\]` : escape(h)));
-  return `(${names.join("|")})(:[0-9]+)?`;
-}

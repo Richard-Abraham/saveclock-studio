@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { hostConditionPattern, hostname, isAllowedHost, parseAllowedHosts } from "./host";
+import { hostname, isAllowedHost, parseAllowedHosts } from "./host";
 
 const ALLOWED = ["localhost", "127.0.0.1"];
 
@@ -38,14 +38,5 @@ describe("helpers", () => {
 
   it("parses the allowlist csv", () => {
     expect(parseAllowedHosts(" localhost, 127.0.0.1 ,,")).toEqual(["localhost", "127.0.0.1"]);
-  });
-
-  it("builds an anchored-by-Next regex source from the list", () => {
-    const pattern = new RegExp(`^${hostConditionPattern(ALLOWED)}$`);
-    expect(pattern.test("localhost:3000")).toBe(true);
-    expect(pattern.test("127.0.0.1")).toBe(true);
-    expect(pattern.test("127x0x0x1")).toBe(false);
-    expect(pattern.test("evil.example:3000")).toBe(false);
-    expect(pattern.test("localhost.evil.example")).toBe(false);
   });
 });

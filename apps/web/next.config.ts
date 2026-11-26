@@ -3,7 +3,6 @@ import { fileURLToPath } from "node:url";
 
 import type { NextConfig } from "next";
 
-import { hostConditionPattern } from "./src/lib/host";
 import { readServerEnv } from "./src/lib/server-env";
 
 // shortcut: Next bakes `rewrites()` into the build, so API_INTERNAL_URL and ALLOWED_HOSTS are read
@@ -39,7 +38,6 @@ const config: NextConfig = {
       {
         source: "/api/:path*",
         destination: `${apiInternalOrigin}/api/:path*`,
-        has: [{ type: "header" as const, key: "host", value: hostConditionPattern(allowedHosts) }],
       },
     ]);
   },

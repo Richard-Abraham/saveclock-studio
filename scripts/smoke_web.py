@@ -40,8 +40,8 @@ def wait_for(base: str, path: str, seconds: int = 60) -> bool:
 
 def main() -> int:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--web", default="http://127.0.0.1:3000")
-    parser.add_argument("--api", default="http://127.0.0.1:8000")
+    parser.add_argument("--web", default="http://localhost:3000")
+    parser.add_argument("--api", default="http://localhost:8000")
     parser.add_argument("--project-title", default=None, help="expect this seeded project on /")
     args = parser.parse_args()
     web, api = args.web, args.api
@@ -80,14 +80,16 @@ def main() -> int:
     status, _ = request(web, "POST", "/api/v1/health/live")
     check("POST through the rewrite with no Origin is not 403", status != 403, str(status))
 
+    # One Host rule for pages and /api alike: localhost in any case or with a trailing dot passes; a
+    # foreign host and 127.0.0.1 (a different origin from the CORS allow-list's) are refused.
     foreign = {"Host": "evil.example"}
-    check("foreign Host to / is 403 (the web Host guard)", request(web, "GET", "/", foreign)[0] == 403)
-    status, _ = request(web, "GET", "/api/v1/health/live", foreign)
-    check("foreign Host to /api is not 200 (no rewrite)", status in (403, 404), str(status))
-    check("foreign Host to /settings is 403", request(web, "GET", "/settings", foreign)[0] == 403)
-    check("foreign Host to /healthz is 403", request(web, "GET", "/healthz", foreign)[0] == 403)
-    for host in ("localhost:3000", "127.0.0.1:3000"):
-        check(f"Host {host} to / is 200", request(web, "GET", "/", {"Host": host})[0] == 200)
+    for path in ("/", "/settings", "/healthz", "/api/v1/health/live"):
+        for host in ("localhost:3000", "LOCALHOST:3000", "localhost.:3000"):
+            status = request(web, "GET", path, {"Host": host})[0]
+            check(f"Host {host} to {path} is 200", status == 200, str(status))
+        for host in ("evil.example", "127.0.0.1:3000"):
+            status = request(web, "GET", path, {"Host": host})[0]
+            check(f"Host {host} to {path} is 403", status == 403, str(status))
     check("foreign Host straight to the API is 403", request(api, "GET", "/api/v1/health/live", foreign)[0] == 403)
 
     # Branch B (OQ-26): the browser calls the API origin directly; CORS allows only the app origin.
