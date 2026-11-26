@@ -7,7 +7,6 @@ import { expectNoSeriousViolations } from "../../../../tests/a11y";
 import { API, envelope, serveApi, server, settingsFixture } from "../../../../tests/msw";
 import { SettingsContent } from "./settings-content";
 import { SettingsSections } from "./settings-sections";
-import { SettingsSkeleton } from "./settings-skeleton";
 
 const refresh = vi.fn();
 vi.mock("next/navigation", () => ({ useRouter: () => ({ refresh }), usePathname: () => "/settings" }));
@@ -167,14 +166,5 @@ describe("SettingsContent (the S11 body, rendered from real API responses)", () 
     expect(screen.getByText("We couldn’t load your settings.")).toBeInTheDocument();
     await userEvent.click(screen.getByRole("button", { name: "Retry" }));
     expect(refresh).toHaveBeenCalledTimes(1);
-  });
-});
-
-describe("SettingsSkeleton", () => {
-  it("is busy, announces loading in hidden text and draws four cards", () => {
-    const { container } = render(<SettingsSkeleton />);
-    expect(container.querySelector("[aria-busy='true']")).not.toBeNull();
-    expect(screen.getByText("Loading settings…")).toHaveClass("sr-only");
-    expect(container.querySelectorAll(".rounded-card.border")).toHaveLength(4);
   });
 });

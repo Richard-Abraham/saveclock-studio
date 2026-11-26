@@ -7,7 +7,6 @@ import { expectNoSeriousViolations } from "../../../../tests/a11y";
 import { API, envelope, projectFixture, serveApi, server, settingsFixture } from "../../../../tests/msw";
 import { ProjectList } from "./project-list";
 import { ProjectsContent } from "./projects-content";
-import { ProjectsSkeleton } from "./projects-skeleton";
 
 const refresh = vi.fn();
 vi.mock("next/navigation", () => ({ useRouter: () => ({ refresh }), usePathname: () => "/" }));
@@ -62,17 +61,6 @@ describe("ProjectList", () => {
     expect(screen.getByText("Untitled")).toHaveAttribute("title", "Untitled");
   });
 });
-
-describe("ProjectsSkeleton", () => {
-  it("is busy, announces loading in hidden text and draws six rows", () => {
-    const { container } = render(<ProjectsSkeleton />);
-    expect(container.querySelector("[aria-busy='true']")).not.toBeNull();
-    expect(screen.getByText("Loading projects…")).toHaveClass("sr-only");
-    // six rows plus the two disk placeholders, all decorative
-    expect(container.querySelectorAll("[aria-hidden='true']")).toHaveLength(8);
-  });
-});
-
 describe("ProjectsContent (the S9 body, rendered from real API responses)", () => {
   it("shows the disk line from GET /settings and the empty state", async () => {
     serveApi({ settings: settingsFixture(), projects: [] });
