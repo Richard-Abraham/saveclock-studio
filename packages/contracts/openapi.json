@@ -904,7 +904,7 @@
                 }
               }
             },
-            "description": "internal_error"
+            "description": "upstream_unavailable; details.checks maps each dependency to ok or error"
           }
         },
         "summary": "Ready",
