@@ -14,7 +14,7 @@ in_svc() { # service, command...: run inside the container
   $COMPOSE exec -T "$svc" "$@"
 }
 chk() { # label, service, sh-snippet that must exit 0
-  if in_svc "$2" sh -c "$3" >/dev/null 2>&1; then pass "$2: $1"; else bad "$2: $1"; fi
+  if in_svc "$2" sh -c "$3" >/dev/null 2>&1; then pass "$2: $1"; else bad "$2: $1"; return 1; fi
 }
 
 # service:memory-bytes:cpu-quota
@@ -30,9 +30,11 @@ for spec in api:536870912:100000 worker:4294967296:300000 worker-maint:268435456
   chk "/tmp is writable" "$svc" 'touch /tmp/.sandbox && rm /tmp/.sandbox'
   chk "no container socket" "$svc" '[ ! -e /var/run/docker.sock ] && [ ! -e /run/podman/podman.sock ]'
   chk "seccomp filter active" "$svc" 'grep -q "^Seccomp:[[:space:]]*2$" /proc/self/status'
-  chk "memory.max = $mem" "$svc" "[ \"\$(cat /sys/fs/cgroup/memory.max)\" = $mem ]"
+  chk "memory.max = $mem" "$svc" "[ \"\$(cat /sys/fs/cgroup/memory.max)\" = $mem ]" && mem_enforced=1 || mem_enforced=0
   chk "cpu.max quota = $quota" "$svc" "[ \"\$(cut -d' ' -f1 /sys/fs/cgroup/cpu.max)\" = $quota ]"
-  # a hog that touches 2x the limit must be OOM-killed (exit 137) quickly
+  # a hog that touches 2x the limit must be OOM-killed (exit 137) quickly, but never run it
+  # when the limit is not enforced: it would eat the host's RAM
+  if [ "$mem_enforced" != 1 ]; then echo "SKIP $svc: memory limit not enforced"; continue; fi
   start=$SECONDS
   # shellcheck disable=SC2016
   in_svc "$svc" python -c "
