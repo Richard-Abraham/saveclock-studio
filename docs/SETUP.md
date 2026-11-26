@@ -2,7 +2,7 @@
 
 This guide takes a fresh PC from `git clone` to a running, tested app. Every command here comes from the repo's own files (`Makefile`, `scripts/`, `infra/`). If a command and this guide disagree, the repo wins; fix the guide.
 
-**Status of the app.** Phase 1 (the walking skeleton) is built: web shell, API, workers, Postgres, Redis, backups. Phase 2 has started: song upload, validation and Beat This beat analysis are built (plan 004). Stock clips, the planner, render and the CLI are **not built yet (Phase 2)**. Today `make smoke-stub` pushes a stub job through every hop. Sections marked "not built yet (Phase 2)" will be completed as Phase 2 lands.
+**Status of the app.** Phase 1 (the walking skeleton) is built: web shell, API, workers, Postgres, Redis, backups. Phase 2 has started: song upload, validation, beat analysis (plan 004) and stock-clip search, ranking and normalizing (plan 005) are built. The planner, render and the CLI are **not built yet (Phase 2)**. Today `make smoke-stub` pushes a stub job through every hop. Sections marked "not built yet (Phase 2)" will be completed as Phase 2 lands.
 
 ## 1. What you need on the PC
 
@@ -108,6 +108,18 @@ make models-cache MODELS_SRC=$HOME/saveclock-models
 ```
 
 Expected: `OK beat_this-final0.ckpt sha256 verified`. After that the copy lives in `infra/docker/cache/models/` (git-ignored) and `MODELS_SRC` is not needed again. The worker image is about 1.9 GB because it carries CPU-only torch.
+
+**SigLIP 2 (clip ranking, required since plan 005).** Seven files, about 1.5 GB, pinned to Hugging Face revision `75de2d55ec2d0b4efc50b3e9ad70dba96a7b2fa2` of `google/siglip2-base-patch16-224`. Sizes and SHA-256 are in `infra/docker/models.manifest.json`. Copy `~/saveclock-downloads/siglip2/` from the laptop, or download into a new empty folder:
+
+```sh
+mkdir -p ~/saveclock-downloads/siglip2 && cd ~/saveclock-downloads/siglip2
+R=https://huggingface.co/google/siglip2-base-patch16-224/resolve/75de2d55ec2d0b4efc50b3e9ad70dba96a7b2fa2
+for f in config.json model.safetensors preprocessor_config.json special_tokens_map.json tokenizer.json tokenizer.model tokenizer_config.json; do curl -fL -o "$f" "$R/$f"; done
+cd -
+make models-cache MODELS_SRC=$HOME/saveclock-models SIGLIP_SRC=$HOME/saveclock-downloads/siglip2
+```
+
+Expected: one `OK ... sha256 verified` line per file. A mismatch refuses; never edit the manifest to match. With both models the worker image is about 3.8 GB.
 
 ### 2c. The backup passphrase
 
