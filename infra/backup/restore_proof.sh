@@ -2,26 +2,19 @@
 # Restore proof (plan 003 Step 6, NFR-030): restore the latest snapshot into a SEPARATE scratch compose
 # project and verify it against the checksum manifest written at backup time. Never touches the live
 # stack's volumes or the repository (read-only use). Prints RESTORE PROOF OK elapsed=<s> on success.
-# env: PROJECT (live project, default saveclock; the scratch project is <PROJECT>-restore), CONTAINER,
+# env (from make): PROJECT (live project; the scratch project is <PROJECT>-restore), CONTAINER, COMPOSE,
 #      BACKUP_REPO / BACKUP_PASSWORD_FILE (else from .env), RESTORE_SNAPSHOT (default latest)
 set -Eeuo pipefail
 cd "$(dirname "$0")/../.."
 
-PROJECT="${PROJECT:-saveclock}"
-CONTAINER="${CONTAINER:-$(command -v docker >/dev/null 2>&1 && echo docker || echo podman)}"
+: "${PROJECT:?run through make restore-proof}" "${CONTAINER:?run through make restore-proof}" "${COMPOSE:?run through make restore-proof}"
 SCRATCH="${PROJECT}-restore"
-COMPOSE_BIN="$([ "$CONTAINER" = docker ] && echo "docker compose" || echo "podman compose")"
 export API_PORT=18000 WEB_PORT=13000 APP_ORIGIN=http://localhost:13000 NEXT_PUBLIC_API_ORIGIN=http://localhost:18000
-COMPOSE="$COMPOSE_BIN -p $SCRATCH --env-file .env -f infra/compose/compose.yml"
+COMPOSE="${COMPOSE/ -p $PROJECT / -p $SCRATCH }"  # the same compose command, aimed at the scratch project
 IMAGE="$(sed -n 's/^IMAGE=//p' infra/backup/restic.pin)"
 SNAPSHOT="${RESTORE_SNAPSHOT:-latest}"
 
-getv() {
-  if [ -n "${!1:-}" ]; then printf '%s' "${!1}"; return; fi
-  local v=""
-  [ -f .env ] && v="$(grep -E "^$1=" .env | tail -1 | cut -d= -f2- || true)"
-  printf '%s' "$v"
-}
+source infra/backup/lib.sh
 REPO="$(realpath -m "$(getv BACKUP_REPO)")"
 PWFILE="$(realpath -m "$(getv BACKUP_PASSWORD_FILE)")"
 [ -d "$REPO" ] || { echo "FAIL: BACKUP_REPO is not a directory" >&2; exit 1; }

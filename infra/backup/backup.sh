@@ -1,25 +1,19 @@
 #!/usr/bin/env bash
 # Nightly backup (plan 003, ARCH §23): pg_dump + the permanent blobs into a restic repository.
-# Run from the repo root (make backup, or the systemd unit with WorkingDirectory=).
+# Run through make (make backup, or the systemd unit: `make backup` with WorkingDirectory=), which
+# supplies PROJECT, CONTAINER and COMPOSE.
 # Reads BACKUP_* from the environment, else from .env (grep/cut: never sourced, never exported into a
 # container, never echoed). restic runs as a pinned container (infra/backup/restic.pin), --network none.
-# env: PROJECT (compose project, default saveclock), CONTAINER (podman|docker), COMPOSE (compose command),
+# env (from make): PROJECT (compose project), CONTAINER (podman|docker), COMPOSE (compose command),
 #      BACKUP_DRY=1 (print the restic argument lists and stop), BACKUP_STATE_DIR (default .data/backup)
 set -Eeuo pipefail
 cd "$(dirname "$0")/../.."
 
-PROJECT="${PROJECT:-saveclock}"
-CONTAINER="${CONTAINER:-$(command -v docker >/dev/null 2>&1 && echo docker || echo podman)}"
-COMPOSE="${COMPOSE:-$([ "$CONTAINER" = docker ] && echo "docker compose" || echo "podman compose") -p $PROJECT --env-file .env -f infra/compose/compose.yml}"
+: "${PROJECT:?run through make backup}" "${CONTAINER:?run through make backup}" "${COMPOSE:?run through make backup}"
 STATE_DIR="${BACKUP_STATE_DIR:-.data/backup}"
 IMAGE="$(sed -n 's/^IMAGE=//p' infra/backup/restic.pin)"
 
-getv() { # NAME [default]: environment first, then .env; prints the value
-  if [ -n "${!1:-}" ]; then printf '%s' "${!1}"; return; fi
-  local v=""
-  [ -f .env ] && v="$(grep -E "^$1=" .env | tail -1 | cut -d= -f2- || true)"
-  printf '%s' "${v:-${2:-}}"
-}
+source infra/backup/lib.sh
 REPO="$(getv BACKUP_REPO)"
 PWFILE="$(getv BACKUP_PASSWORD_FILE)"
 STAGING="$(getv BACKUP_STAGING_DIR .data/backup-staging)"

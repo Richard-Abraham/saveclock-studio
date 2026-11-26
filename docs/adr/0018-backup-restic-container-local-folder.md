@@ -14,7 +14,7 @@ The local-only edition keeps the owner's songs and rendered videos in a blob vol
 - **Encryption and key custody**: client-side, by restic. The passphrase lives in a file outside the repo (`BACKUP_PASSWORD_FILE`, mode 600) and a copy in the owner's password manager (SEC-162). Without the passphrase the repository cannot be read, so the owner must confirm the second copy in writing.
 - **What is backed up**: a `pg_dump -Fc` of the whole database, `songs/` and `renders/` of the blob volume, and a checksum manifest plus counts written at backup time. **Not backed up**: `work/` (intermediate, rebuildable), Redis, `.env` and the passphrase (they live in the password manager, ARCH §23).
 - **Retention**: `restic forget --keep-daily 7 --keep-weekly 4 --keep-monthly 6 --prune`, then `restic check` after every run.
-- **Schedule**: a systemd user timer (`infra/backup/systemd/`), 02:30, `Persistent=true`. It is installed by `make backup-timer-install` on the machine that should back up.
+- **Schedule**: a systemd user timer (`infra/backup/systemd/`), 02:30, `Persistent=true`. It is installed by `make backup-install-timer` on the machine that should back up.
 - **Proof**: `make restore-proof` restores the latest snapshot into a scratch compose project and checks the project list, the web shell, every file checksum, the owner row and readiness (NFR-030). The elapsed time is the RTO evidence.
 
 ## Consequences and limits

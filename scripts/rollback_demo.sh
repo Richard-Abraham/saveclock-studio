@@ -4,8 +4,7 @@
 # env: PROJECT, CONTAINER, COMPOSE (from make), API_PORT, ROLLBACK_TAG (default: the tag we started on)
 set -Eeuo pipefail
 cd "$(dirname "$0")/.."
-PROJECT="${PROJECT:-saveclock}"
-CONTAINER="${CONTAINER:-podman}"
+: "${PROJECT:?run through make rollback-demo}" "${CONTAINER:?}" "${COMPOSE:?}"
 API_PORT="${API_PORT:-8000}"
 A="sha-$(git rev-parse --short HEAD)"
 B="sha-demo-b"
@@ -18,11 +17,9 @@ api_image() { # the image NAME the running api container uses, and its id
   "$CONTAINER" inspect --format '{{.ImageName}} {{.Image}}' "$cid"
 }
 api_version() { # `version` of the newest worker log line (the api logs only uvicorn access lines)
-  local cid
-  cid="$(for l in io.podman.compose.project com.docker.compose.project; do
-    "$CONTAINER" ps -q --filter label=com.docker.compose.service=worker --filter "label=$l=$PROJECT"; done | head -1)"
+  local v=""
   for _ in $(seq 1 30); do
-    v="$("$CONTAINER" logs "$cid" 2>&1 | grep -o '"version": *"[^"]*"' | tail -1 | sed 's/.*: *//; s/"//g')"
+    v="$($COMPOSE logs --no-log-prefix worker 2>&1 | grep -o '"version": *"[^"]*"' | tail -1 | sed 's/.*: *//; s/"//g')"
     [ -n "$v" ] && break; sleep 2
   done
   echo "$v"

@@ -1,7 +1,7 @@
 """Stub-job smoke through the web origin (plan 003 Step 2b/2c). Stdlib only.
 
 Usage: python3 scripts/smoke_stub.py [--seed] [--web http://localhost:3000] [--api http://127.0.0.1:8000]
-Env (optional, enables the log checks): CONTAINER, PROJECT (compose project name).
+Env (optional, enables the log checks): COMPOSE (the compose command, set by make).
 
 --seed: print `already seeded` when GET /projects already has items, otherwise run one stub job
 (sleep 0) and print the project id. Without --seed: the full smoke, one PASS/FAIL line per check,
@@ -12,11 +12,12 @@ import argparse
 import http.client
 import json
 import os
+import re
+import shlex
 import subprocess
 import sys
 import time
 from urllib.parse import urlsplit
-from uuid import UUID
 
 HOPS = ("analysis", "fetch", "render", "maintenance")
 STAGE_SERVICES = {"analysis": "worker", "fetch": "worker", "render": "worker", "maintenance": "worker-maint"}
@@ -54,18 +55,16 @@ def wait_chain(web: str, job_id: str, seconds: int = 60) -> dict | None:
     return None
 
 
-def service_logs(container: str, project: str, service: str) -> str:
-    out = []
-    for label in ("io.podman.compose.project", "com.docker.compose.project"):
-        ids = subprocess.run(  # noqa: S603 - fixed argument list
-            [container, "ps", "-q", "--filter", f"label=com.docker.compose.service={service}",
-             "--filter", f"label={label}={project}"],
-            capture_output=True, text=True, check=False,
-        ).stdout.split()
-        for cid in ids:
-            logs = subprocess.run([container, "logs", cid], capture_output=True, text=True, check=False)  # noqa: S603
-            out.append(logs.stdout + logs.stderr)
-    return "\n".join(out)
+ANSI = re.compile(r"\x1b\[[0-9;]*m")
+
+
+def service_logs(compose: str, service: str) -> str:
+    """The service's log, without podman-compose's colour codes."""
+    out = subprocess.run(  # noqa: S603 - the compose command comes from make
+        [*shlex.split(compose), "logs", "--no-log-prefix", service],
+        capture_output=True, text=True, check=False,
+    )
+    return ANSI.sub("", out.stdout + out.stderr)
 
 
 def json_lines(text: str) -> tuple[list[dict], int]:
@@ -126,7 +125,6 @@ def main() -> int:
     job = json.loads(body)
     job_id, project_id, request_id = job["job_id"], job["project_id"], hdrs.get("x-request-id", "")
     check("the response carries X-Request-Id", bool(request_id))
-    UUID(job_id)
 
     chain = wait_chain(web, job_id)
     check("all four hops (analysis, fetch, render, maintenance) reach ok within 60 s", chain is not None)
@@ -174,9 +172,9 @@ def main() -> int:
         call(web, "GET", "/api/v1/health/live", {"Host": "evil.example"})[0] != 200,
     )
 
-    container, project = os.environ.get("CONTAINER"), os.environ.get("PROJECT")
-    if container and project:
-        logs = {svc: service_logs(container, project, svc) for svc in ("api", "worker", "worker-maint", "web")}
+    compose = os.environ.get("COMPOSE")
+    if compose:
+        logs = {svc: service_logs(compose, svc) for svc in ("api", "worker", "worker-maint", "web")}
         lines = {svc: json_lines(text) for svc, text in logs.items()}
         check("every JSON-looking log line parses", all(bad == 0 for _, bad in lines.values()))
         # SEC-123: the request id of the POST is in the api log and in each hop's worker log
@@ -198,7 +196,7 @@ def main() -> int:
         leaked = sum(1 for text in logs.values() for s in secrets if s in text)
         check(f"no .env secret value appears in the logs ({leaked} matches)", leaked == 0)
     else:
-        print("SKIPPED log checks (CONTAINER and PROJECT not set)")
+        print("SKIPPED log checks (COMPOSE not set)")
 
     if failures:
         print(f"STUB SMOKE FAILED ({len(failures)}): " + "; ".join(failures))

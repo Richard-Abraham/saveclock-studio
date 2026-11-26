@@ -29,8 +29,7 @@ CHECK_STAGES := $(FAST_STAGES) images image-guards hadolint
   test-deps-down ffmpeg-cache images image-guards hadolint scan-images up dev down \
   down-volumes sandbox check-fast check web-install web-env web-lint web-test web-build \
   bundle-scan web-audit-prod measure-rewrite smoke-web web-audit stack-up seed smoke-stub \
-  predeploy-scan backup backup-test restore-proof backup-timer-install backup-timer-uninstall \
-  backup-install-timer rollback-demo fresh-clone-timing
+  predeploy-scan backup backup-test restore-proof backup-install-timer backup-timer-uninstall rollback-demo fresh-clone-timing
 
 help:
 	@echo "targets: check-fast check dev down sandbox images scan-images env env-docs contracts"
@@ -244,7 +243,7 @@ seed:
 	python3 scripts/smoke_stub.py --seed --web http://localhost:$(WEB_PORT) --api http://127.0.0.1:$(API_PORT)
 
 smoke-stub:
-	PROJECT=$(PROJECT) CONTAINER=$(CONTAINER) python3 scripts/smoke_stub.py --web http://localhost:$(WEB_PORT) \
+	COMPOSE="$(COMPOSE)" python3 scripts/smoke_stub.py --web http://localhost:$(WEB_PORT) \
 	  --api http://127.0.0.1:$(API_PORT)
 
 predeploy-scan:
@@ -260,15 +259,13 @@ restore-proof:
 	$(STACK_ENV) bash infra/backup/restore_proof.sh
 
 # Writes to ~/.config/systemd/user and enables the timer: run it on the machine that should back up.
-backup-timer-install:
+backup-install-timer:
 	@mkdir -p $(HOME)/.config/systemd/user
 	@for u in saveclock-backup.service saveclock-backup.timer; do \
 	  sed -e 's|@REPO@|$(CURDIR)|' -e 's|@PROJECT@|$(PROJECT)|' infra/backup/systemd/$$u > $(HOME)/.config/systemd/user/$$u; done
 	systemctl --user daemon-reload
 	systemctl --user enable --now saveclock-backup.timer
 	systemctl --user list-timers saveclock-backup.timer --no-pager
-
-backup-install-timer: backup-timer-install
 
 backup-timer-uninstall:
 	-systemctl --user disable --now saveclock-backup.timer
@@ -279,7 +276,7 @@ rollback-demo:
 	$(STACK_ENV) bash scripts/rollback_demo.sh
 
 fresh-clone-timing:
-	CONTAINER=$(CONTAINER) bash scripts/fresh_clone_timing.sh
+	PROJECT=$(PROJECT) CONTAINER=$(CONTAINER) bash scripts/fresh_clone_timing.sh
 
 # --- gates -------------------------------------------------------------------------------
 # run_stages <stage...>: one runner for both gates; stops at the first failure and names it.

@@ -6,7 +6,7 @@ Nightly: `infra/backup/backup.sh` (also `make backup`). It writes a `pg_dump`, a
 `BACKUP_ALLOW_SAME_DISK` (leave `no` on the real machine). Needs `podman` or `docker`, `jq`, `curl`.
 Result of each run: `.data/backup/last_run.json` and `.data/backup/backup.log`.
 
-Timer: `make backup-timer-install` (writes `~/.config/systemd/user/`, enables it), `make backup-timer-uninstall`.
+Timer: `make backup-install-timer` (writes `~/.config/systemd/user/`, enables it), `make backup-timer-uninstall`.
 A laptop asleep at 02:30 runs the job at the next wake (`Persistent=true`).
 
 ## A bad day: restore everything

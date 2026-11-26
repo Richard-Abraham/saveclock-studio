@@ -6,8 +6,8 @@
 # env: CONTAINER, PROJECT (main project name; the fresh one is <PROJECT>-fresh)
 set -Eeuo pipefail
 cd "$(dirname "$0")/.."
-CONTAINER="${CONTAINER:-podman}"
-FRESH="${PROJECT:-saveclock}-fresh"
+: "${CONTAINER:?run through make fresh-clone-timing}" "${PROJECT:?}"
+FRESH="${PROJECT}-fresh"
 SRC="$PWD"
 TMP="$(mktemp -d)"
 touch "$TMP/.saveclock-fresh-scratch"
