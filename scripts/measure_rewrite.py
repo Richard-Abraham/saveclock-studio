@@ -1,6 +1,6 @@
 """OQ-26: do SSE and a 100 MB upload stream without buffering? (plan 002 Step 7, Branch B)
 
-Usage: python3 scripts/measure_rewrite.py [--web http://127.0.0.1:3000] [--api http://127.0.0.1:8000]
+Usage: python3 scripts/measure_rewrite.py [--web http://localhost:3000] [--api http://localhost:8000]
                                           [--container podman|docker]
 Stdlib only. Measured 2026-11-26 on Next 16.4.6: SSE streams through the rewrite, but the rewrite
 cuts request bodies at 10 MB, so Branch B applies (DECISIONS §8g): the browser sends the upload
@@ -216,8 +216,8 @@ def describe_upload(label: str, r: Upload, verdict: str | None = None) -> str:
 
 def main() -> int:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--web", default="http://127.0.0.1:3000")
-    parser.add_argument("--api", default="http://127.0.0.1:8000")
+    parser.add_argument("--web", default="http://localhost:3000")
+    parser.add_argument("--api", default="http://localhost:8000")
     parser.add_argument("--container", default=(shutil.which("docker") and "docker") or "podman")
     args = parser.parse_args()
     reasons: list[str] = []

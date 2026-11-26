@@ -11,7 +11,7 @@ const { allowedHosts } = readServerEnv();
  */
 export function proxy(request: NextRequest): Response {
   if (isAllowedHost(request.headers.get("host"), allowedHosts)) return NextResponse.next();
-  return new Response("Host not allowed", {
+  return new Response("Host not allowed. Use http://localhost:3000 (not 127.0.0.1 or another name).", {
     status: 403,
     headers: { "content-type": "text/plain; charset=utf-8", "cache-control": "no-store" },
   });

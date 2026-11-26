@@ -6,7 +6,7 @@ describe("readServerEnv", () => {
   it("uses the compose defaults when nothing is set", () => {
     expect(readServerEnv({ API_INTERNAL_URL: undefined, ALLOWED_HOSTS: undefined })).toEqual({
       apiOrigin: "http://api:8000",
-      allowedHosts: ["localhost", "127.0.0.1"],
+      allowedHosts: ["localhost"],
     });
   });
 

@@ -5,7 +5,7 @@ import { parseAllowedHosts } from "./host";
 /** Server-only environment (STANDARDS §3): read once, validated with Zod, never sent to the browser. */
 const schema = z.object({
   API_INTERNAL_URL: z.url().default("http://api:8000/api/v1"),
-  ALLOWED_HOSTS: z.string().default("localhost,127.0.0.1"),
+  ALLOWED_HOSTS: z.string().default("localhost"),
 });
 
 export type ServerEnv = {

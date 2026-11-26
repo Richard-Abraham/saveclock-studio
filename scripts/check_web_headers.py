@@ -33,7 +33,7 @@ def headers_of(base: str, path: str) -> dict[str, str]:
 
 def main() -> int:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--web", default="http://127.0.0.1:3000")
+    parser.add_argument("--web", default="http://localhost:3000")
     web = parser.parse_args().web
     problems: list[str] = []
 
