@@ -95,6 +95,10 @@ class CircuitBreaker:
             return True
         return False
 
+    def release_probe(self) -> None:
+        """The half-open trial ended without a verdict (a 4xx, a refusal): allow the next one."""
+        self._probing = False
+
     def record_success(self) -> None:
         self._recent.clear()
         self._opened_at, self._probing = None, False
@@ -153,6 +157,7 @@ class ProviderHttp:
         if not self.breaker.allow():
             raise StockUnavailable("stock provider circuit is open", {"reason": "circuit_open"})
         if not self.limiter.acquire():
+            self.breaker.release_probe()
             raise StockUnavailable("stock provider rate limit", {"reason": "rate_limited"})
         parts = urlsplit(url)
         for attempt in range(MAX_RETRIES + 1):
@@ -174,8 +179,10 @@ class ProviderHttp:
                 self.breaker.record_success()
                 return _json_object(response)
             if status in KEY_REJECTED:
+                self.breaker.release_probe()
                 raise StockUnavailable("stock provider key rejected", {"reason": "key_rejected"})
             if response is not None and status not in RETRY_STATUSES:
+                self.breaker.release_probe()
                 raise StockUnavailable("stock provider refused", {"reason": "bad_status"})
             self.breaker.record_failure()
             if attempt < MAX_RETRIES:

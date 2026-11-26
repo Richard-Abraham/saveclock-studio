@@ -10,6 +10,7 @@ from structlog.types import EventDict, WrappedLogger
 
 SENSITIVE = re.compile(r"(?i)(key|token|secret|password|authorization|cookie)")
 REDACTED = "[redacted]"
+QUIET_LOGGERS = ("httpx", "httpcore", "httpx2", "anthropic")  # never log request URLs
 
 
 def _scrub_value(key: str, value: Any) -> Any:  # noqa: ANN401
@@ -46,3 +47,6 @@ def configure_logging(*, level: str, env: str, version: str, service: str = "api
         logger_factory=lambda *_: structlog.PrintLogger(sys.stdout),
         cache_logger_on_first_use=False,
     )
+    # httpx logs `HTTP Request: GET <full url>` at INFO, and a Pixabay key is in its query string
+    for noisy in QUIET_LOGGERS:
+        logging.getLogger(noisy).setLevel(logging.WARNING)

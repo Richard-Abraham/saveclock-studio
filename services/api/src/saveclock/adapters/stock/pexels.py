@@ -10,6 +10,7 @@ from saveclock.adapters.blobstore.port import BlobStore
 from saveclock.adapters.stock.download import Downloader
 from saveclock.adapters.stock.limits import ProviderHttp, SearchCache
 from saveclock.adapters.stock.port import StockClip, pick_file_width
+from saveclock.errors import StockUnavailable
 
 SEARCH_URL = "https://api.pexels.com/videos/search"
 LICENSE = "Pexels License"
@@ -80,7 +81,12 @@ class PexelsProvider:
         if cached is not None:
             return cached
         data = self._http.get_json(SEARCH_URL, params=params, headers={"Authorization": self._key})
-        clips = parse_videos(data)
+        try:
+            clips = parse_videos(data)
+        except (KeyError, TypeError, ValueError, AttributeError):
+            raise StockUnavailable(
+                "stock provider sent a malformed answer", {"reason": "bad_body"}
+            ) from None
         self._cache.set(params, clips)
         return clips
 

@@ -12,6 +12,7 @@ from saveclock.adapters.blobstore.port import BlobStore
 from saveclock.adapters.stock.download import Downloader
 from saveclock.adapters.stock.limits import ProviderHttp, SearchCache
 from saveclock.adapters.stock.port import StockClip, pick_file_width
+from saveclock.errors import StockUnavailable
 
 SEARCH_URL = "https://pixabay.com/api/videos/"
 LICENSE = "Pixabay Content License"
@@ -71,7 +72,12 @@ class PixabayProvider:
         if cached is not None:
             return cached
         data = self._http.get_json(SEARCH_URL, params={**params, "key": self._key})
-        clips = parse_hits(data)
+        try:
+            clips = parse_hits(data)
+        except (KeyError, TypeError, ValueError, AttributeError):
+            raise StockUnavailable(
+                "stock provider sent a malformed answer", {"reason": "bad_body"}
+            ) from None
         self._cache.set(params, clips)
         return clips
 
