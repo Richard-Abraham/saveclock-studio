@@ -8,6 +8,9 @@ import os
 import signal
 import time
 from collections.abc import AsyncIterator
+from decimal import Decimal
+from fractions import Fraction
+from math import floor
 from pathlib import Path
 from typing import Any
 from urllib.parse import quote
@@ -120,7 +123,20 @@ async def test_upload_to_a_valid_draft_with_no_further_call(
     assert (plan.version, plan.total_frames) == (1, 900)
     assert blocking(validate_plan(plan, allow_repeats=True, beats_s=plan.beat_grid.beats_s)) == []
     clicks = grid["beats_s"]
-    assert all(min(abs(c.beat_ref.t_s - t) for t in clicks) < 0.02 for c in plan.cuts)  # the click picker leads by 5 ms
+    nearest = [min(clicks, key=lambda t: abs(c.beat_ref.t_s - t)) for c in plan.cuts]
+    offsets = [c.beat_ref.t_s - t for c, t in zip(plan.cuts, nearest, strict=True)]
+    assert max(offsets) - min(offsets) < 0.001  # one fixed offset: the click picker's own lead
+    assert abs(sum(offsets) / len(offsets)) < 0.02
+    for c in plan.cuts[1:]:  # the frame rule, in exact arithmetic
+        exact = floor(
+            (
+                Fraction(Decimal(repr(c.beat_ref.t_s)))
+                - Fraction(Decimal(repr(plan.segment.start_s)))
+            )
+            * 30
+            + Fraction(1, 2)
+        )
+        assert c.out_start_frame == exact
     keys = [(c.clip.provider, c.clip.provider_id) for c in plan.cuts]
     flags = (await api.get(f"/api/v1/projects/{pid}")).json()["flags"]
     assert (len(set(keys)) == len(keys)) != flags["pool_exhausted"]  # unique unless exhausted
