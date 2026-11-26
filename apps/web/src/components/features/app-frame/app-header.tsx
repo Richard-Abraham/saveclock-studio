@@ -15,7 +15,8 @@ function LogoMark() {
 
 export function AppHeader() {
   return (
-    <header className="flex flex-wrap items-center gap-x-4 gap-y-2 px-4 py-3 md:px-6 lg:min-h-16 lg:px-8">
+    <header>
+      <div className="mx-auto flex max-w-[1200px] flex-wrap items-center gap-x-4 gap-y-2 px-4 py-3 md:px-6 lg:min-h-16 lg:px-8">
       <Link
         href="/"
         translate="no"
@@ -26,6 +27,7 @@ export function AppHeader() {
       </Link>
       <AppNav />
       <HealthIndicator />
+      </div>
     </header>
   );
 }
