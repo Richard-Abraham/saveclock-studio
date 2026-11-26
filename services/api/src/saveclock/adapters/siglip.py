@@ -3,7 +3,7 @@
 `torch`, `transformers` and `PIL` are imported inside the methods, so importing this module is
 free (the API image has none of them). The weights directory is verified against the manifest
 first (`verified_group`) and loaded with `local_files_only=True` from safetensors; there is no
-`torch.load` anywhere (SEC-170).
+unpickling call anywhere (SEC-170).
 """
 
 import hashlib
