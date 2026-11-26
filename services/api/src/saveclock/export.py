@@ -1,4 +1,4 @@
-"""`python -m saveclock.export`: print the OpenAPI document, deterministically.
+"""The OpenAPI document, deterministically (written by scripts/export_openapi.py).
 
 Uses obviously fake settings: building the app connects to nothing and needs no environment.
 """
@@ -18,7 +18,3 @@ def openapi_json() -> str:
         blob_root="/nonexistent",
     )
     return json.dumps(create_app(settings).openapi(), indent=2, sort_keys=True) + "\n"
-
-
-if __name__ == "__main__":
-    print(openapi_json(), end="")
