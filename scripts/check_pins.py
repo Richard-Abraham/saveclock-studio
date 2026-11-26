@@ -38,8 +38,18 @@ def compose_offenders(path: Path) -> list[str]:
     return bad
 
 
+def node_tag_offenders() -> list[str]:
+    """The node image tag in Dockerfile.web must be the version in .nvmrc (one pin, two readers)."""
+    want = (ROOT / ".nvmrc").read_text().strip()
+    text = (ROOT / "infra" / "docker" / "Dockerfile.web").read_text()
+    tags = set(re.findall(r"library/node:([0-9.]+)-slim@", text))
+    return [f"Dockerfile.web: node image tag {t} != .nvmrc {want}" for t in sorted(tags) if t != want] or (
+        [] if tags else ["Dockerfile.web: no node image tag found"]
+    )
+
+
 def main() -> int:
-    offenders: list[str] = []
+    offenders: list[str] = node_tag_offenders()
     for dockerfile in sorted((ROOT / "infra" / "docker").glob("Dockerfile*")):
         offenders += dockerfile_offenders(dockerfile)
     for compose in sorted((ROOT / "infra" / "compose").glob("*.yml")):
