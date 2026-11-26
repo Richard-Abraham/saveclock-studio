@@ -125,7 +125,9 @@ async def test_upload_to_a_valid_draft_with_no_further_call(
     clicks = grid["beats_s"]
     nearest = [min(clicks, key=lambda t: abs(c.beat_ref.t_s - t)) for c in plan.cuts]
     offsets = [c.beat_ref.t_s - t for c, t in zip(plan.cuts, nearest, strict=True)]
-    assert max(offsets) - min(offsets) < 0.001  # one fixed offset: the click picker's own lead
+    # The fake click picker's envelope peak lands about +/-3 ms off the click start (and the
+    # t=0 click is clamped to 0), so the offsets share one value within 10 ms, well under a frame.
+    assert max(offsets) - min(offsets) < 0.01
     assert abs(sum(offsets) / len(offsets)) < 0.02
     for c in plan.cuts[1:]:  # the frame rule, in exact arithmetic
         exact = floor(
