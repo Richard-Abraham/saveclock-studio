@@ -216,15 +216,15 @@ measure-rewrite:
 smoke-web:
 	python3 scripts/smoke_web.py
 
-LIGHTHOUSE := lighthouse@13.6.0
+# Lighthouse is an exact-pinned devDependency of apps/web (in the lockfile), run with `pnpm exec`.
 web-audit: guard
 	@chrome=$$(command -v google-chrome chromium chromium-browser | head -1); \
 	[ -n "$$chrome" ] || { echo "NOT MEASURED (no Chrome): run this on a machine with Chrome"; exit 1; }; \
 	rm -rf .data/lighthouse && mkdir -p .data/lighthouse; \
-	for i in 1 2 3; do curl -s -o /dev/null http://localhost:3000/ -o /dev/null http://localhost:3000/settings; done; \
+	for u in / /settings; do curl -s -o /dev/null http://localhost:3000$$u; done; \
 	for page in home:/ settings:/settings; do \
-	  CHROME_PATH="$$chrome" pnpm dlx $(LIGHTHOUSE) "http://localhost:3000$${page#*:}" --quiet \
-	    --output=json --output-path=".data/lighthouse/$${page%%:*}.json" \
+	  CHROME_PATH="$$chrome" pnpm --filter @saveclock/web exec lighthouse "http://localhost:3000$${page#*:}" --quiet \
+	    --output=json --output-path="$(CURDIR)/.data/lighthouse/$${page%%:*}.json" \
 	    --chrome-flags="--headless=new --no-sandbox" || exit 1; \
 	done; \
 	python3 scripts/check_lighthouse.py .data/lighthouse

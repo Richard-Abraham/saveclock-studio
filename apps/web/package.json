@@ -37,6 +37,7 @@
     "eslint-plugin-boundaries": "7.4.5",
     "eslint-plugin-jsx-a11y": "6.10.2",
     "jsdom": "31.0.1",
+    "lighthouse": "13.6.0",
     "msw": "3.0.7",
     "postcss": "8.5.33",
     "tailwindcss": "4.3.5",
