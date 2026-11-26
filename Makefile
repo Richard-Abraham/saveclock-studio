@@ -96,7 +96,7 @@ contracts:
 # file, a stale regeneration and an un-regenerated Python change all fail (and nothing is overwritten).
 contracts-check: guard
 	@set -e; tmp=$$(mktemp -d); trap 'rm -rf "$$tmp"' EXIT; \
-	$(UV) run python -c "from saveclock.export import openapi_json; print(openapi_json(), end='')" >"$$tmp/openapi.json"; \
+	$(UV) run python ../../scripts/export_openapi.py "$$tmp/openapi.json"; \
 	pnpm --filter @saveclock/contracts exec openapi-typescript "$$tmp/openapi.json" -o "$$tmp/schema.d.ts" >/dev/null; \
 	diff -u packages/contracts/openapi.json "$$tmp/openapi.json" || { echo "CONTRACT DRIFT: openapi.json differs from the Python models (run make contracts)"; exit 1; }; \
 	diff -u packages/contracts/src/schema.d.ts "$$tmp/schema.d.ts" || { echo "CONTRACT DRIFT: schema.d.ts differs from openapi.json (run make contracts)"; exit 1; }; \

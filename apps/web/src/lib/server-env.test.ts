@@ -16,7 +16,10 @@ describe("readServerEnv", () => {
   it("derives the origin (no path) from API_INTERNAL_URL and splits the host list", () => {
     vi.stubEnv("API_INTERNAL_URL", "http://127.0.0.1:8000/api/v1");
     vi.stubEnv("ALLOWED_HOSTS", "localhost,api");
-    expect(readServerEnv()).toEqual({ apiOrigin: "http://127.0.0.1:8000", allowedHosts: ["localhost", "api"] });
+    expect(readServerEnv()).toEqual({
+      apiOrigin: "http://127.0.0.1:8000",
+      allowedHosts: ["localhost", "api"],
+    });
   });
 
   it("rejects a malformed URL at startup", () => {

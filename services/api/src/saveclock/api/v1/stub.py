@@ -63,9 +63,9 @@ async def download(
     return StreamingResponse(out.body, status_code=out.status, headers=out.headers)
 
 
-# shortcut: the two measurement routes below exist only for the OQ-26 check (plan 002 Step 7);
-# Phase 2 deletes them together with the rest of this stub.
-@router.get("/sse", operation_id="stub_sse")
+# shortcut: the two measurement routes below exist only for OQ-26 (plan 002 Step 7) and are
+# kept out of the OpenAPI schema; delete in Phase 2 with measure_rewrite.
+@router.get("/sse", operation_id="stub_sse", include_in_schema=False)
 async def sse(
     user: Annotated[CurrentUser, Depends(current_user)],
     events: Annotated[int, Query(ge=1, le=120)] = 30,
@@ -82,7 +82,7 @@ async def sse(
     return StreamingResponse(stream(), media_type="text/event-stream")
 
 
-@router.post("/upload-sink", operation_id="stub_upload_sink")
+@router.post("/upload-sink", operation_id="stub_upload_sink", include_in_schema=False)
 async def upload_sink(
     request: Request, user: Annotated[CurrentUser, Depends(current_user)]
 ) -> UploadSinkOut:
