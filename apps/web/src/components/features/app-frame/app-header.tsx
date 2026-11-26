@@ -17,16 +17,16 @@ export function AppHeader() {
   return (
     <header>
       <div className="mx-auto flex max-w-[1200px] flex-wrap items-center gap-x-4 gap-y-2 px-4 py-3 md:px-6 lg:min-h-16 lg:px-8">
-      <Link
-        href="/"
-        translate="no"
-        className="flex min-h-11 items-center gap-2 font-display text-h3 font-semibold text-ink"
-      >
-        <LogoMark />
-        SaveClock Studio
-      </Link>
-      <AppNav />
-      <HealthIndicator />
+        <Link
+          href="/"
+          translate="no"
+          className="flex min-h-11 items-center gap-2 font-display text-h3 font-semibold text-ink"
+        >
+          <LogoMark />
+          SaveClock Studio
+        </Link>
+        <AppNav />
+        <HealthIndicator />
       </div>
     </header>
   );

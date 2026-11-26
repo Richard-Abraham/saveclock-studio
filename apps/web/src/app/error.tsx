@@ -23,8 +23,8 @@ export default function ErrorPage({ retry }: { error: unknown; retry: () => void
           </Button>
         }
       >
-        Reload it. If it keeps happening, check that <span translate="no">SaveClock</span> is running on
-        this computer.
+        Reload it. If it keeps happening, check that <span translate="no">SaveClock</span> is running on this
+        computer.
       </Callout>
     </>
   );
