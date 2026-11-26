@@ -61,7 +61,7 @@ function ApiKeys({ keys, pixabayEnabled }: { keys: SettingsOut["keys"]; pixabayE
         </SettingRow>
         <SettingRow
           label="Claude"
-          help={keys.anthropic.configured ? null : "Optional — Claude Code can set keywords instead"}
+          help={keys.anthropic.configured ? null : "Optional — Claude Code can set keywords instead."}
         >
           <KeyStatus configured={keys.anthropic.configured} missing="neutral" />
         </SettingRow>

@@ -75,7 +75,7 @@ describe("SettingsSections", () => {
     expect(within(valueOf("Pexels")).getByText("Not set")).toBeInTheDocument();
     expect(screen.getByText(/Pexels isn’t set up, so no clips can be fetched\./)).toBeInTheDocument();
     expect(screen.getByText("PEXELS_API_KEY")).toHaveAttribute("translate", "no");
-    expect(screen.getByText("Optional — Claude Code can set keywords instead")).toBeInTheDocument();
+    expect(screen.getByText("Optional — Claude Code can set keywords instead.")).toBeInTheDocument();
     // optional keys that are off get no fix line
     expect(screen.queryByText(/PIXABAY_API_KEY/)).not.toBeInTheDocument();
     expect(screen.queryByText(/ANTHROPIC_API_KEY/)).not.toBeInTheDocument();
