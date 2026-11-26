@@ -1,8 +1,10 @@
 """FilesystemBlobStore: keys map to files under one root, nothing escapes it (SEC-160)."""
 
+import contextlib
 import os
 import shutil
 import stat as statmod
+import uuid
 from collections.abc import Iterable, Iterator
 from pathlib import Path
 
@@ -153,9 +155,9 @@ class FilesystemBlobStore:
             raise InsufficientStorage(msg)
 
     def probe(self) -> None:
-        probe = self.root / PROBE_NAME
+        probe = self.root / f"{PROBE_NAME}-{uuid.uuid4().hex}"  # concurrent probes must not collide
         fd = os.open(probe, os.O_WRONLY | os.O_CREAT | os.O_TRUNC | os.O_NOFOLLOW, 0o600)
         with os.fdopen(fd, "wb") as f:
             f.write(b"ok")
-        probe.unlink()
+        probe.unlink(missing_ok=True)
         self.ensure_free_space(0)

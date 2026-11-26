@@ -291,3 +291,20 @@ def test_containment_backstop_refuses_a_resolved_path_outside_the_root(
     monkeypatch.setattr(os.path, "realpath", lambda _p: "/elsewhere")
     with pytest.raises(InvalidKey):
         store.stat("work/p1/a.bin")
+
+
+@pytest.mark.unit
+def test_concurrent_probes_never_raise(tmp_path: Path) -> None:
+    from concurrent.futures import ThreadPoolExecutor
+
+    store = FilesystemBlobStore(tmp_path, low_watermark_gb=0)
+
+    def hammer() -> None:
+        for _ in range(50):
+            store.probe()
+
+    with ThreadPoolExecutor(8) as pool:
+        for future in [pool.submit(hammer) for _ in range(8)]:
+            future.result()
+    assert list(tmp_path.iterdir()) == []
+
