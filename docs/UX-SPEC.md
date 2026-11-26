@@ -1,6 +1,6 @@
 # SaveClock Studio — UX-SPEC.md
 
-Status: DRAFT for design approval (**Rev 3.6, personal edition, local-only**) · Date: 2026-11-26 · Consistent with `DECISIONS.md` Rev 3.6 (canonical). Visual language, tokens and components: `DESIGN.md`. Siblings: `PRD.md`, `ROADMAP.md`, `CHECKLIST.md`, `ARCHITECTURE.md`, `STANDARDS.md`, `SECURITY.md`, `QUALITY.md`. Static mockup: `mockups/index.html`.
+Status: DRAFT for design approval (**Rev 3.7, personal edition, local-only**) · Date: 2026-11-26 · Consistent with `DECISIONS.md` Rev 3.6 (canonical). Visual language, tokens and components: `DESIGN.md`. Siblings: `PRD.md`, `ROADMAP.md`, `CHECKLIST.md`, `ARCHITECTURE.md`, `STANDARDS.md`, `SECURITY.md`, `QUALITY.md`. Static mockup: `mockups/index.html`.
 
 No application code is written in this phase. Per the repo process (DECISIONS §8) no UI plan executes until the owner approves this design. The public-edition spec (Rev 2.2) is archived unchanged in `archive/public-edition-rev2.2/UX-SPEC.md`.
 
@@ -10,6 +10,7 @@ Acceptance criteria use the form **AC-<screen>-<n>**. Every criterion carries th
 
 ## Rev 3 changelog (2026-11-08) — personal edition
 
+- **Rev 3.7 (2026-11-26, plan 002, web shell; deviations recorded in place):** **S9 and S11 have no loading state** (the server renders both in about 10 ms; a Suspense fallback broke LCP), so the `Skeleton` component is dropped from S9 and the loading skeleton from S11; AC-X-8 is read with that exception. The **S11 Performance rows show the 5 fields `GET /settings` returns** (`tuning`: heavy-job concurrency, FFmpeg threads, torch threads, fetch concurrency, device), not CPU or RAM; AC-S11-5 follows. The **S11 disk warning has no "Open Settings" link** (it would link to the page you are on); S9 keeps it. The **error page has its own `h1`** ("This page couldn't be shown.") and a body-only callout with a Retry button. S11 is read-only in Phase 1 (no Pixabay switch, no Clean up now, no appearance controls; `PUT /settings` and `POST /housekeeping/run` do not exist yet).
 - **Rev 3.6 (2026-11-26, DECISIONS §8f/§8g):** local-only: the app opens at `http://localhost` on the owner's machine; no Tailscale, no phone-over-tailnet. Offline/"tailnet down" copy becomes "can't reach the server". The 540×960 preview stays; its stutter fallback now reads "if playback stutters". **S11 Settings** gains a read-only list of the auto-detected values (CPU, RAM, heavy concurrency, threads, device; AC-S11-5). **S6 keywords:** the owner can type or edit the keywords in the editor (chips as before), and a hint says Claude Code can also set them. No screen added or removed.
 - **Rev 3.3 (2026-11-08, DECISIONS §8d):** upload is one streamed request (progress bar, Cancel, and on failure "choose the song again"; no resume copy, AC-S3-2 reworded); downloads are direct file streams (no signed links, so no "link expired" state); Settings maps to `GET/PUT /settings` + `POST /housekeeping/run`; endpoint numbers follow the renumbered ARCHITECTURE §7 table (27 endpoints).
 - **Rev 3.2 (2026-11-08):** every acceptance criterion maps to an active PRD story (no `[no story]`); "Report an issue" dropped (US-031 deferred); Settings used endpoints #32/#33/#28/#29 in Rev 3.2; since Rev 3.3 see the Rev 3.3 line above (ARCHITECTURE §7).
@@ -433,14 +434,14 @@ Stock clips: Pexels, Pixabay ...  [Copy credits]
 
 **Layout.** Mobile: title "Projects", disk-usage line ("3.2 GB of 40 GB used · Manage storage"), list of cards (thumbnail from draft frame, title = song filename, BPM · length · size, status pill, last edited), bottom nav with "New". Desktop: responsive grid (3–4 columns). Sort: recent (default), largest first. Filters via URL: `?status=`.
 
-**Components.** `ProjectCard`, `StatusPill`, `DiskMeter`, `DropdownMenu` (Open, Rename, Delete project), `EmptyState`, `Skeleton`, virtualised list for > 50.
+**Components.** `ProjectCard`, `StatusPill`, `DiskMeter`, `DropdownMenu` (Open, Rename, Delete project), `EmptyState`, virtualised list for > 50. (Rev 3.7: no `Skeleton`; see States.)
 
 **States.**
 - Empty: "No videos yet. Choose a song to make your first one." + button.
-- Loading: 6 skeleton cards.
+- Loading: none (Rev 3.7). The server renders the list in about 10 ms and a Suspense fallback broke LCP, so the page arrives rendered; there is no skeleton.
 - Error: "We couldn't load your projects. Retry".
 - Item states: Draft, Analysing, Rendering (progress mini), Ready (download), Failed.
-- Disk nearly full (≥ 90%): `Callout` warn "Disk is 93% full. Clean up intermediates or delete old projects." linking to Settings.
+- Disk nearly full (≥ 90%): `Callout` warn "Disk is 93% full. Clean up intermediates or delete old projects." with an "Open Settings" link (S9 only; on S11 the callout has no link, Rev 3.7).
 - Long titles truncate with `title` attribute and wrap in detail.
 - Many items: virtualised.
 
@@ -467,13 +468,13 @@ Not in the personal edition (no tiers, billing or "Coming soon" page). See §7 a
 - **API keys** — status only: Pexels (Set / Not set), Pixabay, Claude (vibe keywords; "Not set, using the fallback keyword table"). Keys live in the server environment (ARCHITECTURE env vars); the page never displays or accepts a key value.
 - **Stock sources** — Pexels (primary, always on); `Switch` "Also use Pixabay" (DECISIONS §3: Pixabay optional).
 - **Storage** — `DiskMeter` ("3.2 GB of 40 GB used"), note on the 7-day intermediates housekeeping, button **Clean up now** (removes intermediates older than 7 days).
-- **Performance (read-only)** — the values the app detected and uses (Rev 3.6, DECISIONS §8g): CPU cores, RAM, heavy-job concurrency, FFmpeg threads, torch threads, fetch concurrency, device. Values come from `GET /settings` (`tuning`); overrides are made in `.env`, not on this page. Plain `Card` list; no new component.
+- **Performance (read-only)** — the values the app detected and uses (Rev 3.6, DECISIONS §8g): heavy-job concurrency, FFmpeg threads, torch threads, fetch concurrency, device (Rev 3.7: the 5 fields the API returns; CPU cores and RAM are not shown). Values come from `GET /settings` (`tuning`); when it is `null` (no worker has published yet) the section reads "Not available: the worker isn't running"; overrides are made in `.env`, not on this page. Plain `Card` list; no new component.
 - **Appearance** — theme (Light / Dark / System), "Pulse on beat", "Single-key shortcuts".
 - **Delete project** — pick a project, confirm. Dialog states exactly what is removed; the "Delete project" button is danger style, initial focus on Cancel.
 
 **Components.** `SettingsSection`, `Switch`, `ToggleGroup`, `DiskMeter`, `Dialog`, `Button` danger, `Toast`.
 
-**States.** Loading skeleton; saved toasts ("Saved"); clean-up running/result ("Cleaned up 1.4 GB of intermediates."); delete in progress; delete failed with retry; key missing shows "Not set" with a one-line fix ("Set PEXELS_API_KEY in the server environment").
+**States.** No loading state (Rev 3.7, same reason as S9); saved toasts ("Saved"); clean-up running/result ("Cleaned up 1.4 GB of intermediates."); delete in progress; delete failed with retry; key missing shows "Not set" with a one-line fix ("Set PEXELS_API_KEY in the server environment").
 
 **Copy.** Confirm text: "Delete this project and its renders? This can’t be undone." Toast: "Project deleted."
 
@@ -502,6 +503,7 @@ Each is built from `EmptyState`/`Callout`/`Dialog`. Rules: say what happened, sa
 | Server unreachable / offline | global | see §3.6 | Retry |
 | 404 | any | "We can't find that page." | Go to Projects |
 | 500 / API down | any | "SaveClock Studio can't reach the server. Your work is saved. Retry" | Retry |
+| Unexpected page error (Rev 3.7) | any | h1 "This page couldn’t be shown."; callout: "Reload it. If it keeps happening, check that SaveClock is running on this computer." | Retry |
 | Empty projects | S9 | see DESIGN §7 | Choose a song |
 
 **Acceptance criteria.**
@@ -520,7 +522,7 @@ Each is built from `EmptyState`/`Callout`/`Dialog`. Rules: say what happened, sa
 - AC-X-5 [US-024]: Performance budgets in §3.5 met on the budget profile; bundle-size budget enforced in CI.
 - AC-X-6 [US-017, US-013, US-014]: Retention (kept until the owner deletes; intermediates cleaned after 7 days), modes A/B, and no-public-link rules are worded identically on Projects, Export and Settings.
 - AC-X-7 [US-013]: No UI offers a public share link, gallery or embed (DECISIONS §2, §1 non-goals).
-- AC-X-8 [US-024]: Every async surface has loading, empty and error states.
+- AC-X-8 [US-024]: Every async surface has loading, empty and error states. (Rev 3.7: S9 and S11 are exempt from the loading state; they render on the server in about 10 ms.)
 - AC-X-9 [US-024]: Brand and units wrapped for translation safety (`translate="no"` on brand, units with `&nbsp;`).
 - AC-X-10 [US-024]: Every pointer target ≥ 24×24 CSS px (44×44 on touch); every drag has a non-drag alternative (3.4); every control has hover, focus-visible and `touch-action: manipulation`.
 - AC-X-11 [US-035]: No screen shows a sign-in form, account menu, pricing, quota, watermark, 72 h countdown or consent banner.

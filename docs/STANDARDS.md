@@ -1,9 +1,10 @@
 # SaveClock Studio — Engineering Standards
 
-Status: DRAFT · **Rev 3.6 — Personal edition (public-ready), local-only** · Date: 2026-11-26 · Base: the `sattva-production-grade-engineering` skill (layering, validation, ownership checks, error handling, secrets, tests, reproducible builds). Decisions: `DECISIONS.md`. Architecture: `ARCHITECTURE.md` (Rev 3). Related by filename: `SECURITY.md`, `QUALITY.md`, `CHECKLIST.md`, `adr/`.
+Status: DRAFT · **Rev 3.7 — Personal edition (public-ready), local-only** · Date: 2026-11-26 · Base: the `sattva-production-grade-engineering` skill (layering, validation, ownership checks, error handling, secrets, tests, reproducible builds). Decisions: `DECISIONS.md`. Architecture: `ARCHITECTURE.md` (Rev 3). Related by filename: `SECURITY.md`, `QUALITY.md`, `CHECKLIST.md`, `adr/`.
 
-## Rev 3 changelog (2026-11-08; latest Rev 3.6)
+## Rev 3 changelog (2026-11-08; latest Rev 3.7)
 
+- **Rev 3.7 (2026-11-26, plans 001 and 002, ADR-0016, ADR-0017):** §1 tree updated to what exists after the walking skeleton (planned folders marked). Integration tests use `infra/compose/compose.test.yml` and `make test-deps-up`, not testcontainers (ADR-0016; revisit when the Podman user socket is enabled); one `compose.yml`, no `compose.dev.yml`. Origin rule: the browser's pages and ordinary JSON calls use the `localhost:3000` origin and its `/api/*` rewrite, but uploads and SSE go directly to the API origin (`NEXT_PUBLIC_API_ORIGIN`, default `http://localhost:8000`), so the API enables CORS for `APP_ORIGIN` only, with no credentials (ADR-0017, OQ-26 Branch B). Files are plain `/api/v1/...` paths: no file-token URLs.
 - **Rev 3.6 (2026-11-26, DECISIONS §8f/§8g):** local-only: no Tailscale or VPS; ports on `127.0.0.1`; Host/Origin middleware replaces the Tailscale-origin check (the earlier "removed `Origin`-check rules" line below referred to the public-edition CSRF check; the Rev 3.5 `Origin` check on state-changing requests is new and required); the `saveclock` CLI is a thin API client (no second code path); concurrency/threads are auto-detected with overrides; FFmpeg is the BtbN 9.0.x GPL static build pinned by sha256. Review checklist item 4 now says "never reads headers itself".
 
 - **Rev 3.3 (2026-11-08, DECISIONS §8d):** no signed file tokens (the API streams files directly; `blob_keys.py` path containment stays mandatory), no `op_id` or `Idempotency-Key` convention (plan `base_version` + `job_hash` only), `exports` folded into `renders`, one streamed upload, one eval script. §15 seam list updated.
@@ -37,72 +38,73 @@ A rule here is binding unless an ADR says otherwise. "MUST" = CI or review block
 
 ## 1. Repository structure (monorepo)
 
-Proposed tree from DECISIONS §7 (Rev 3). **Folders are created only when the first file that needs them is written** (walking-skeleton rule): no empty scaffolding, no pre-created feature folders.
+Tree from DECISIONS §7 (Rev 3), **as built after plans 001 and 002 (Rev 3.7)**. Entries marked *(planned)* are not in the repo yet and appear with the phase that needs them. **Folders are created only when the first file that needs them is written** (walking-skeleton rule): no empty scaffolding, no pre-created feature folders.
 
 ```
 saveclock/
 ├── apps/
-│   └── web/                          # Next.js 16.x (App Router), TypeScript strict
+│   └── web/                          # Next.js 16.x (App Router), TypeScript strict; Vitest + msw + axe
 │       ├── src/
-│       │   ├── app/                  # routes, layouts, loading/error boundaries (thin: compose only)
+│       │   ├── app/                  # routes (/, /settings, /healthz), layout, error.tsx, not-found.tsx (thin: compose only)
 │       │   ├── components/
-│       │   │   ├── ui/               # design-system primitives (Button, Dialog, Toast…) from DESIGN.md tokens
-│       │   │   └── features/         # project-upload/, beat-timeline/, preview-player/, export-dialog/
+│       │   │   ├── ui/               # design-system primitives built so far: Button, Card, Callout, StatusPill, icons
+│       │   │   └── features/         # app-frame/, disk-meter-section/, health-indicator/, project-list/, retry/, settings-sections/ (later: project-upload/, beat-timeline/, preview-player/, export-dialog/)
 │       │   ├── lib/
-│       │   │   ├── api/              # the ONE typed data boundary: generated client wrapper, error mapping
-│       │   │   ├── sse/              # EventSource wrapper + polling fallback
-│       │   │   ├── preview/          # proxy-clip sequencer synced to <audio> clock
-│       │   │   └── config.ts         # validated public env (zod)
-│       │   ├── hooks/
-│       │   └── styles/tokens.css     # design tokens
-│       ├── e2e/                      # Playwright
-│       └── package.json
+│       │   │   ├── api/              # the ONE typed data boundary: generated-client wrapper (browser, server, direct), endpoints, error mapping
+│       │   │   ├── host.ts, server-env.ts, config.ts, format.ts, focus.ts   # Host allowlist helpers, validated env (zod), formatting
+│       │   │   └── (sse/, preview/ planned: Phase 2/3)
+│       │   ├── proxy.ts              # Next proxy: Host allowlist for every page and /api (SEC-166)
+│       │   └── styles/               # tokens.css (design tokens), theme-color.ts
+│       ├── tests/                    # setup, msw handlers, a11y helper; unit tests sit beside the code as *.test.ts(x)
+│       ├── next.config.ts            # /api/* rewrite, security headers, CSP report-only
+│       └── package.json              # (hooks/ and e2e/ Playwright: planned, Phase 3)
 ├── services/
 │   └── api/                          # ONE Python package: HTTP + domain + worker entrypoints
-│       ├── pyproject.toml            # uv-managed; extras: [ml] (torch, transformers, beat-this) installed ONLY in the `worker` image target
-│       ├── uv.lock
-│       ├── alembic.ini
-│       ├── migrations/               # Alembic env + versions/
+│       ├── pyproject.toml            # uv-managed; extra [ml] (torch, transformers, beat-this) arrives with T-2.2, installed ONLY in the `worker` image target
+│       ├── uv.lock  alembic.ini  .python-version
+│       ├── migrations/               # Alembic env.py + versions/0001_baseline.py
 │       ├── src/saveclock/
-│       │   ├── main.py               # composition root: create_app()
-│       │   ├── config.py             # pydantic-settings, fail-fast
-│       │   ├── api/                  # routers (thin), deps (current_user = seeded owner; Host/Origin middleware, Rev 3.5), schemas (Pydantic I/O), errors
-│       │   │   └── v1/
-│       │   ├── services/             # business logic: projects, uploads, planning, renders, housekeeping (retention), files (direct, path-contained serving)
-│       │   ├── repositories/         # SQLAlchemy queries only; every method takes user_id when user-owned
-│       │   ├── models/               # SQLAlchemy ORM models (single source of schema truth)
-│       │   ├── domain/               # pure logic, no I/O: beat_grid, tempo, energy, planner, edit_plan models, keywords_fallback
-│       │   ├── adapters/             # external systems behind interfaces: blobstore (filesystem; s3 stub = Phase P), pexels, pixabay (flagged), llm (optional), ffmpeg, scenedetect, siglip, beat_this
-│       │   ├── workers/              # Dramatiq actors (thin wrappers → services), broker setup, middleware
-│       │   └── observability/        # logging, metrics, tracing
+│       │   ├── main.py               # composition root: create_app() (CORS, Host/Origin guard, headers, request id)
+│       │   ├── config.py             # pydantic-settings, fail-fast (source of infra/ENV.md)
+│       │   ├── container.py  deps.py  errors.py  ids.py  export.py
+│       │   ├── api/                  # deps (current_user = seeded owner), middleware (access guard, headers, request id), error_handlers, schemas/ (Pydantic I/O)
+│       │   │   └── v1/               # health, projects, settings, stub (stub routes only when APP_ENV is local or ci)
+│       │   ├── services/             # autotune, files (direct, path-contained serving), health, identity, projects, settings, stub
+│       │   ├── repositories/         # SQLAlchemy queries only; every method takes user_id when user-owned (jobs, projects, users)
+│       │   ├── models/               # SQLAlchemy ORM models: user, project, song, job (single source of schema truth)
+│       │   ├── adapters/             # blobstore/ (port, filesystem, blob_keys), db.py (later: pexels, pixabay, llm, ffmpeg, scenedetect, siglip, beat_this)
+│       │   ├── workers/              # Dramatiq: broker, main, heartbeat, healthcheck, stub actors
+│       │   └── observability/        # structured logging (metrics/tracing: later)
+│       │   (domain/ planned: Phase 2, pure logic: beat_grid, tempo, energy, planner, edit_plan models, keywords_fallback)
 │       └── tests/
-│           ├── unit/                 # domain + services with fakes
-│           ├── integration/          # PG + Redis via testcontainers, FFmpeg, FilesystemBlobStore on a temp dir
-│           ├── contract/             # OpenAPI snapshot, edit-plan schema, adapter VCR cassettes
-│           └── golden/               # synthetic click-track render tests (frame-exact cuts)
+│           ├── unit/                 # services with fakes, access guard, CORS, config, autotune, blobstore, conventions
+│           ├── integration/          # real PG + Redis from infra/compose/compose.test.yml (`make test-deps-up`), FilesystemBlobStore on a temp dir, worker chaos tests
+│           └── (contract/, golden/ planned: Phase 2)
 ├── packages/
 │   └── contracts/
-│       ├── openapi.json              # generated from FastAPI, committed
-│       ├── schemas/edit-plan.v1.schema.json   # generated from Pydantic, committed
-│       ├── src/                      # generated TS client + types (openapi-typescript / orval); never hand-edited
-│       └── package.json
+│       ├── openapi.json              # generated from FastAPI (scripts/export_openapi.py), committed
+│       ├── src/                      # generated TS client types (openapi-typescript); never hand-edited
+│       ├── package.json  tsconfig.json
+│       └── (schemas/edit-plan.v1.schema.json: planned, Phase 2)
 ├── infra/
-│   ├── docker/                       # Dockerfile.api (targets: api, worker), Dockerfile.web, .dockerignore
-│   ├── compose/                      # compose.yml (prod: web, api, worker, worker-maint, postgres, redis; ports on 127.0.0.1), compose.dev.yml (pg, redis, api, web; profiles light/full)
-│   ├── (tailscale/ removed in Rev 3.5)
-│   └── backup/                       # restic/rclone cron script + pg_dump wrapper (no secrets)
-├── eval/                             # golden set manifests + scripts (NO copyrighted audio committed)
-│   ├── manifests/                    # yaml: song id, source/license, annotator beats, hard-set flag
-│   └── scripts/                      # run Beat This, mir_eval F1, report
-├── docs/                             # DECISIONS, PRD, ROADMAP, CHECKLIST, SECURITY, QUALITY, DESIGN, UX-SPEC, ARCHITECTURE, STANDARDS, adr/
+│   ├── docker/                       # Dockerfile.api (targets: api, worker), Dockerfile.web, ffmpeg.pin, fetch_ffmpeg.py, cache/ (local FFmpeg archive, git-ignored)
+│   ├── compose/                      # compose.yml (the ONE stack: web, api, worker, worker-maint, migrate, postgres, redis; ports on 127.0.0.1) and compose.test.yml (Postgres on tmpfs + Redis for integration tests). No compose.dev.yml (ADR-0016)
+│   ├── postgres/init/                # 01-roles.sh: roles app_rw and migrator (run once on an empty data directory)
+│   ├── ENV.md                        # GENERATED from Settings by scripts/gen_env_docs.py; do not edit
+│   ├── UPDATING.md                   # monthly manual update note (lockfiles, digests, FFmpeg/torch bumps)
+│   └── (backup/ planned: plan 003, restic in a pinned container)
+├── eval/                             # (planned: Phase 2, T-2.12) golden set manifests + scripts (NO copyrighted audio committed)
+├── docs/                             # DECISIONS, PRD, ROADMAP, CHECKLIST, SECURITY, QUALITY, DESIGN, UX-SPEC, ARCHITECTURE, STANDARDS, KICKOFF, SPIKE-REPORT, adr/, mockups/, review/, archive/
 ├── plans/                            # NNN-*.md (authored with the `improve` skill) and NNN-*.design.md
-├── .github/ (optional)               # workflows (run `make check`), PR template, dependabot
-├── scripts/                          # check-config-malware.sh, make_click_track.py helpers, seed
-├── .pre-commit-config.yaml
-├── .env.example                      # placeholders only
-├── .gitignore  .editorconfig  .gitattributes
-├── Makefile (or justfile)            # make check / test / contracts / dev
-└── pnpm-workspace.yaml  package.json  # root: tooling only
+├── reports/  research_notes/  spike/ # Phase 0 material (feasibility report, notes, the validation spike)
+├── scripts/                          # gate and helper scripts: check-config-malware.sh, check_pins.py, check_banned_deps.py, lint_compose.py, check_image_contents.sh, verify_sandbox.sh, gen_env_docs.py, gen_env.sh, export_openapi.py, cov_floors.py, audit.sh, scan_bundle.sh, check_web_env.sh, check_lighthouse.py, measure_rewrite.py, smoke_web.py, wait_healthy.sh, sync_env_flags.sh, ...
+├── .claude/                          # local Claude Code state only (worktrees/); the `saveclock` project skill arrives with T-2.28
+├── .github/ (optional, not created) # workflows would run `make check`; the gate is local
+├── .env.example                      # GENERATED from Settings (placeholders only; `make env` copies it to .env and fills secrets)
+├── .gitignore  .gitleaks.toml  .editorconfig  .dockerignore  .npmrc  .nvmrc  .prettierrc.json  .prettierignore
+├── Makefile                          # make check-fast / check / dev / up / down / sandbox / images / env / env-docs / contracts / test-deps-up ...
+├── README.md  package.json  pnpm-workspace.yaml  pnpm-lock.yaml   # root: tooling only
+└── (.pre-commit-config.yaml: not created; the config-malware guard runs in `make check` instead, plan 001 Maintenance notes)
 ```
 
 Where things go (decision table):
@@ -126,7 +128,7 @@ Boundary rules enforced by `import-linter` (Python) and ESLint `no-restricted-im
 - **Version/tooling**: Python 3.12; `uv` for env + lockfile (`uv.lock` committed; CI uses `uv sync --locked`). One `pyproject.toml`; ML deps in an optional extra `ml`, installed only by the `worker` build target. The `api` target (also used by the maintenance worker and migrate job) contains **no torch, no ffmpeg, no model weights** — a CI guard fails the build if it does (ADR-0011). API/worker versions per ARCHITECTURE §0.
 - **Format/lint**: `ruff format` + `ruff check` with rule sets `E,F,I,UP,B,SIM,S,C4,PT,RUF,ASYNC,N,PL(selected),TCH,ANN` (security `S`, flake8-bandit; per-file ignores only in tests). Line length 100.
 - **Types**: `mypy --strict` (alternative `pyright` strict — pick one in the first PR and keep it; default **mypy**); pydantic plugin on. No `Any` in public signatures; `# type: ignore` only with `[code]` and a reason comment, tracked in review.
-- **Tests**: `pytest`, `pytest-asyncio`, `hypothesis` for domain (frame math, tempo fold), `testcontainers` for PG/Redis, `respx` for httpx adapters, VCR-style recorded fixtures for Pexels/Pixabay/Anthropic (recorded once, scrubbed). Markers: `unit`, `integration`, `golden`, `slow`.
+- **Tests**: `pytest`, `pytest-asyncio`, `hypothesis` for domain (frame math, tempo fold), real PG/Redis from `compose.test.yml` (ADR-0016; not testcontainers), `respx` for httpx adapters, VCR-style recorded fixtures for Pexels/Pixabay/Anthropic (recorded once, scrubbed). Markers: `unit`, `integration`, `golden`, `slow`.
 - **Layering** (strict, see §1): routers → services → repositories/adapters. Dependencies injected through FastAPI `Depends` (routers) or constructor args (services). No module-level singletons that do I/O; no heavy work at import (ML models loaded lazily on first use inside the worker process, cached in a module-level `functools.cache`d factory).
 - **Async policy**: API handlers are `async def` using SQLAlchemy async engine (`asyncpg`) and `httpx.AsyncClient`; CPU/ML/FFmpeg only in workers (sync). Never call blocking code in an async handler; use `run_in_threadpool` only for tiny things (there is no password hashing in this edition).
 - **Validation**: every request/response is a Pydantic v2 model with `model_config = ConfigDict(extra="forbid", frozen=True)` on inputs; constrained types (`conint`, `constr`, enums); responses use explicit `response_model` (no ORM leakage; mass-assignment impossible because input models list allowed fields only).
@@ -142,7 +144,7 @@ Boundary rules enforced by `import-linter` (Python) and ESLint `no-restricted-im
 
 - `tsconfig`: `strict`, `noUncheckedIndexedAccess`, `exactOptionalPropertyTypes`, `noImplicitOverride`, `noFallthroughCasesInSwitch`. **No `any`** (`@typescript-eslint/no-explicit-any: error`), no non-null `!` without comment, no `@ts-ignore` (`@ts-expect-error` with reason only).
 - Lint/format: ESLint (flat config; `next/core-web-vitals`, `@typescript-eslint/strict-type-checked`, `jsx-a11y`, `import`), Prettier (or Biome — pick one in PR #1; default ESLint + Prettier). `eslint-plugin-boundaries` for folder rules.
-- **API client is generated** from `packages/contracts/openapi.json` (openapi-typescript + openapi-fetch, or orval); wrapped once in `lib/api` which centralises: base URL (relative `/api/v1` in the browser, `API_INTERNAL_URL` for SSR), error-envelope parsing into a typed `ApiError`, request-id logging, and file-token URLs (`/api/v1/files/<token>` are used as-is for `<video>`/`<audio>`/downloads). No cookies, no CSRF header, no login redirect. Components never call `fetch` directly (ESLint `no-restricted-globals`).
+- **API client is generated** from `packages/contracts/openapi.json` (openapi-typescript + openapi-fetch, or orval); wrapped once in `lib/api` which centralises: base URL (relative `/api/v1` in the browser, `API_INTERNAL_URL` for SSR), error-envelope parsing into a typed `ApiError`, request-id logging, and file URLs (plain `/api/v1/...` paths, used as-is for `<video>`/`<audio>`/downloads; no tokens since Rev 3.3). Uploads and SSE use `directApiBase()` (`NEXT_PUBLIC_API_ORIGIN`), everything else the relative `/api/v1`. No cookies, no CSRF header, no login redirect. Components never call `fetch` directly (ESLint `no-restricted-globals`).
 - **Server vs client state**: server state with TanStack Query (keys per resource, mutation + invalidation); UI state with React state/Context; no global store unless an ADR justifies. SSE hook feeds the Query cache (`setQueryData`).
 - Validate untrusted data at boundaries with Zod (env, SSE payloads, localStorage); API responses are typed by the generated client — add Zod only where the schema is hand-written.
 - Components: small, composable, props typed; server components by default; `"use client"` only where needed (player, upload, SSE). Pages thin. Reuse-first per `sattva-frontend-design-system`; design tokens only (no raw hex in components). Accessibility: keyboard, focus, `prefers-reduced-motion`, ARIA live region for job progress; see `UX-SPEC.md`/`DESIGN.md`.
@@ -154,7 +156,7 @@ Boundary rules enforced by `import-linter` (Python) and ESLint `no-restricted-im
 
 | Topic | Rule |
 |---|---|
-| Base & versioning | `/api/v1` URL prefix (single origin for the browser via the Next.js `/api/*` rewrite; the `saveclock` CLI calls the API directly, ADR-0014). Breaking change → `/v2` alongside; additive changes (new optional fields, new endpoints) stay in v1. (One consumer today, so deprecation headers are optional until Phase P.) |
+| Base & versioning | `/api/v1` URL prefix (ordinary browser JSON via the Next.js `/api/*` rewrite on `localhost:3000`, uploads and SSE direct to the API origin, ADR-0017; the `saveclock` CLI calls the API directly, ADR-0014). Breaking change → `/v2` alongside; additive changes (new optional fields, new endpoints) stay in v1. (One consumer today, so deprecation headers are optional until Phase P.) |
 | Naming | plural nouns, kebab-case multiword, JSON `snake_case` fields, enums lowercase snake (statuses included) except export `mode` `A`/`B`. Actions that are not CRUD are sub-resources with POST (`/renders/{id}/cancel`). |
 | Verbs/status | GET 200; POST create 201 + `Location`; async accepted 202; PATCH 200; DELETE 204 (or 202 if async); 400 malformed; 403 forbidden (foreign `Host` or cross-site `Origin`); 404 missing **or not owned**; 409 state conflict; 413; 415; 422 validation; 500; 503; 507 insufficient storage. (401/429 are Phase P.) |
 | Errors | One envelope `{error:{code,message,details,request_id}}`, `code` is a stable machine string; messages are user-safe English (UI maps `code` → localized copy). |
@@ -166,7 +168,7 @@ Boundary rules enforced by `import-linter` (Python) and ESLint `no-restricted-im
 | Rate limits | none in this edition (one trusted user); the `RateLimit-*` headers return in Phase P. |
 | Long work | never inline; 202 + SSE / polling (`ARCHITECTURE.md` §12). Replan-local edits are the only synchronous domain work (pure, ≤ 2 s). |
 | OpenAPI | `operation_id` stable and explicit (drives TS client names); every response model and error response declared; error `code` is an OpenAPI enum (catalogue in ARCHITECTURE §7); tags per resource; CI regenerates `openapi.json` and **fails on diff** (contract drift gate). **ARCHITECTURE §7 is the one endpoint table**; other docs cite it, never redefine paths. |
-| Security | **No CORS** (same origin); **no cookies, no CSRF token**; every published port binds `127.0.0.1`, and the API rejects a `Host` outside `ALLOWED_HOSTS` and a state-changing request whose `Origin` is not `APP_ORIGIN` (Host/Origin middleware, SEC-165 to 167); files streamed directly by the API from allowlisted, path-contained keys (no signed tokens); `X-Content-Type-Options: nosniff`, `Referrer-Policy`, CSP on web; header test in `make check`. Details: `SECURITY.md`. |
+| Security | **CORS allows only `APP_ORIGIN`, no credentials** (Rev 3.7, OQ-26 Branch B: the browser calls the API directly for uploads and SSE); **no cookies, no CSRF token**; every published port binds `127.0.0.1`, and the API rejects a `Host` outside `ALLOWED_HOSTS` and a state-changing request whose `Origin` is not `APP_ORIGIN` (Host/Origin middleware, SEC-165 to 167); files streamed directly by the API from allowlisted, path-contained keys (no signed tokens); `X-Content-Type-Options: nosniff`, `Referrer-Policy`, CSP on web; header test in `make check`. Details: `SECURITY.md`. |
 
 ## 5. Database conventions
 
@@ -191,7 +193,7 @@ Boundary rules enforced by `import-linter` (Python) and ESLint `no-restricted-im
 | Layer | What | Tools | Share | Gate |
 |---|---|---|---|---|
 | Unit | domain (frame math, tempo fold, grid snap, planner invariants, edit-plan validator), services with fakes, Zod/pure TS | pytest + hypothesis, Vitest | ~70 % | every PR |
-| Integration | repositories on real PG, Dramatiq actors with `StubBroker`, `FilesystemBlobStore` on a temp dir, FFmpeg real binary, direct file serving with Range and path-containment tests | pytest + testcontainers | ~20 % | every PR |
+| Integration | repositories on real PG, Dramatiq actors with `StubBroker`, `FilesystemBlobStore` on a temp dir, FFmpeg real binary, direct file serving with Range and path-containment tests | pytest against `compose.test.yml` (Postgres + Redis; one cloned database per test), not testcontainers (ADR-0016) | ~20 % | every PR |
 | Contract | OpenAPI snapshot, edit-plan JSON schema vs fixtures, recorded Pexels/Pixabay/Anthropic responses, generated TS client compiles | pytest, `tsc` | gate on drift | every PR |
 | Golden render | synthetic click-track → plan → silent master → frame-exact cut assertions; Mode A remux A/V offset assertions (ARCHITECTURE §11.4) | pytest `golden` marker | ~3 tests | every PR touching planner/ffmpeg + nightly |
 | E2E | Playwright happy path; fake worker mode | Playwright | ~5 % | pre-merge to main + nightly |

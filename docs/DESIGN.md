@@ -1,6 +1,6 @@
 # SaveClock Studio — DESIGN.md (design brief)
 
-Status: DRAFT for approval (**Rev 3.6, personal edition, local-only**) · Date: 2026-11-26 · Consistent with `DECISIONS.md` Rev 3.6 (canonical). Siblings: `PRD.md`, `ROADMAP.md`, `CHECKLIST.md`, `ARCHITECTURE.md`, `STANDARDS.md`, `SECURITY.md`, `QUALITY.md`, `UX-SPEC.md` (screens), `mockups/index.html` (static mockup of the tokens below).
+Status: DRAFT for approval (**Rev 3.7, personal edition, local-only**) · Date: 2026-11-26 · Consistent with `DECISIONS.md` Rev 3.6 (canonical). Siblings: `PRD.md`, `ROADMAP.md`, `CHECKLIST.md`, `ARCHITECTURE.md`, `STANDARDS.md`, `SECURITY.md`, `QUALITY.md`, `UX-SPEC.md` (screens), `mockups/index.html` (static mockup of the tokens below).
 
 This is the brief the UI is built from. `UX-SPEC.md` says what each screen does; this file says what everything looks like and how it behaves. The public-edition design (Rev 2.2: sign-up, pricing, rights and fingerprint notices, 72 h countdown, landing page) is archived unchanged in `archive/public-edition-rev2.2/DESIGN.md` and returns only in Phase P.
 
@@ -8,6 +8,7 @@ This is the brief the UI is built from. `UX-SPEC.md` says what each screen does;
 
 ## Rev 3 changelog (2026-11-08) — personal edition
 
+- **Rev 3.7 (2026-11-26, plan 002, web shell; deviations recorded in place):** (1) **Bricolage Grotesque is one static 600 weight** for headings, the brand and the readout, latin subset only (`latin-ext` dropped), to meet the 70 KB first-paint font budget (§3.2); `h1` is therefore 600 not 650 and `readout` 600 not 700. (2) **S9 and S11 have no loading skeleton:** the server renders both in about 10 ms and a Suspense fallback broke LCP (§5; UX-SPEC S9/S11).
 - **Rev 3.6 (2026-11-26, DECISIONS §8f/§8g):** local-only: the app runs on the owner's own machine; no Tailscale and no phone-over-tailnet. The 540×960 preview proxy stays (360×640 only if playback stutters). Settings shows the auto-detected concurrency/thread values read-only (a plain `Card` list, no new component). The keyword field is typed or edited by the owner, with a hint that Claude Code can also set it. The mobile-first breakpoints (§4) are unchanged; their rationale is now narrow windows and responsive checks rather than a phone over a tailnet.
 - **Rev 3.3 (2026-11-08, DECISIONS §8d):** Settings is backed by `GET/PUT /settings` (key status, Pixabay switch, disk usage) plus `POST /housekeeping/run`; one streamed upload (progress bar and Cancel, no resume copy: a failed upload is re-sent); downloads are direct (no "link expired" state); live sign-in/16+/72 h/`ExpiryBadge`/fingerprint/pricing bullets deleted from the Rev 2 historical list (V3-03).
 - **Rev 3.2 (2026-11-08):** PRD story IDs reconciled (no "verify against PRD Rev 3" notes); "Report an issue" dropped (US-031 deferred); state list is the 14 ARCHITECTURE §4 states (no `expired`); Settings shows API-key status (from `GET /settings` since Rev 3.3).
@@ -98,21 +99,21 @@ Notes:
 
 ### 3.2 Typography
 
-- **Display and headings: "Bricolage Grotesque"** (Google Fonts, variable, weights 500–700; optical-size axis). Slightly quirky, tight-set; carries the personality in headlines and big numbers (BPM).
+- **Display and headings: "Bricolage Grotesque"** (Google Fonts). **Rev 3.7 deviation:** shipped as a **single static 600 weight, latin subset only** (22 KB instead of the 41 KB variable file), used for headings, the brand and the BPM readout, to meet the 70 KB font budget below; the variable 500–700 file with the optical-size axis is the upgrade if the budget allows. Slightly quirky, tight-set; carries the personality in headlines and big numbers (BPM).
 - **UI and body: "Instrument Sans"** (Google Fonts, variable 400–700). Neutral, readable at 14–16 px, good tabular figures.
 - **Numerals:** `font-variant-numeric: tabular-nums` on BPM, time codes, sizes. No monospace face is used (avoids the "data in mono" cliché).
-- **Fallback stack:** `system-ui, -apple-system, "Segoe UI", Roboto, sans-serif`. Fonts are **self-hosted** (`next/font/google` downloads at build; no runtime request to Google, which also avoids sending visitor IPs to a third party). The mockup loads Google Fonts only as a shortcut. Production uses `display: swap` and preloaded subsets (latin, latin-ext). Budget: ≤ 70 KB total woff2 for first paint (Bricolage 600 + Instrument 400/600 subset).
+- **Fallback stack:** `system-ui, -apple-system, "Segoe UI", Roboto, sans-serif`. Fonts are **self-hosted** (`next/font/google` downloads at build; no runtime request to Google, which also avoids sending visitor IPs to a third party). The mockup loads Google Fonts only as a shortcut. Production uses `display: swap` and preloaded subsets (latin only since Rev 3.7; `latin-ext` dropped). Budget: ≤ 70 KB total woff2 for first paint (Bricolage 600 + Instrument 400/600 subset).
 - Body ≥ 16 px on mobile inputs (prevents iOS zoom). Line length ≤ 70 ch. Headings use `text-wrap: balance`, paragraphs `text-wrap: pretty`.
 
 | Step | Size / line-height | Weight | Use |
 |---|---|---|---|
-| `h1` | clamp(1.75rem, 5vw, 2.5rem) / 1.1 | Bricolage 650 | screen titles |
+| `h1` | clamp(1.75rem, 5vw, 2.5rem) / 1.1 | Bricolage 600 (was 650; static weight, Rev 3.7) | screen titles |
 | `h2` | 1.375rem / 1.2 | Bricolage 600 | section titles |
 | `h3` | 1.125rem / 1.3 | Instrument 600 | card titles |
 | `body` | 1rem / 1.5 | Instrument 400 | default |
 | `small` | 0.875rem / 1.45 | Instrument 400 | help, meta |
 | `micro` | 0.75rem / 1.4 | Instrument 500 | timeline ruler numbers, attribution (never for essential instructions) |
-| `readout` | 2rem / 1 | Bricolage 700, tabular | BPM |
+| `readout` | 2rem / 1 | Bricolage 600 (was 700; static weight, Rev 3.7), tabular | BPM |
 
 Sentence case everywhere. No all-caps labels.
 
@@ -186,7 +187,7 @@ States for every interactive primitive: rest, hover, focus-visible, active, disa
 | `Toast` | info, success, error | `aria-live="polite"`; errors with an action; 6 s default, pause on hover/focus |
 | `Tooltip`, `Popover`, `DropdownMenu` | default | tooltips never hold essential info |
 | `Progress` | determinate bar, indeterminate (only < 10 s waits), step list | exposes `role="progressbar"` with `aria-valuenow` or `aria-busy` |
-| `Skeleton`, `Spinner` | | skeleton for lists/thumbnails, spinner only on buttons |
+| `Skeleton`, `Spinner` | | skeleton for lists/thumbnails, spinner only on buttons. **Rev 3.7:** S9 and S11 use no skeleton (server-rendered in about 10 ms; a Suspense fallback broke LCP), so no `Skeleton` component exists in the shell yet |
 | `Badge`, `StatusPill` | neutral, lock, warn, danger, tick | text + icon, not colour alone |
 | `Card` | flat, interactive | |
 | `Callout` | info, warn (low confidence, storage), danger, success | icon + title + body + optional actions; used for the low-confidence banner (with "Use detected beats" switch) and error states |
