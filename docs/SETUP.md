@@ -2,7 +2,7 @@
 
 This guide takes a fresh PC from `git clone` to a running, tested app. Every command here comes from the repo's own files (`Makefile`, `scripts/`, `infra/`). If a command and this guide disagree, the repo wins; fix the guide.
 
-**Status of the app.** Phase 1 (the walking skeleton) is built: web shell, API, workers, Postgres, Redis, backups. Phase 2 has started: song upload, validation and Beat This beat analysis are built (plan 004). Stock clips, the planner, render and the CLI are **not built yet (Phase 2)**. Today `make smoke-stub` pushes a stub job through every hop. Sections marked "not built yet (Phase 2)" will be completed as Phase 2 lands.
+**Status of the app.** Phase 1 (the walking skeleton) is built: web shell, API, workers, Postgres, Redis, backups. Phase 2 has started: song upload, validation, beat analysis (plan 004) and stock-clip search, ranking and normalizing (plan 005) are built. The planner, render and the CLI are **not built yet (Phase 2)**. Today `make smoke-stub` pushes a stub job through every hop. Sections marked "not built yet (Phase 2)" will be completed as Phase 2 lands.
 
 ## 1. What you need on the PC
 
@@ -104,10 +104,22 @@ mkdir -p ~/saveclock-models && cd ~/saveclock-models
 curl -fL -o beat_this-final0.ckpt https://cloud.cp.jku.at/public.php/dav/files/7ik4RrBKTS273gp/final0.ckpt
 sha256sum beat_this-final0.ckpt   # must print 8c328b45f59d8dd3dff219253ff6a8d6482be57d0133a29140e2febbf8eb8331
 cd -   # back to the repo
-make models-cache MODELS_SRC=$HOME/saveclock-models
+# then run make models-cache with MODELS_SRC and SIGLIP_SRC together (command below, after the SigLIP 2 download)
 ```
 
-Expected: `OK beat_this-final0.ckpt sha256 verified`. After that the copy lives in `infra/docker/cache/models/` (git-ignored) and `MODELS_SRC` is not needed again: `make models-cache` is skipped (`OK (cached models verified)`) when that folder already verifies. `MODELS_SRC` has no default; when the cache is absent and it is unset or not a folder, `make models-cache` stops with a message naming `MODELS_SRC`. The old laptop passes `MODELS_SRC=$HOME/saveclock-spike/downloads/models-beat_this`. The worker image is about 1.9 GB because it carries CPU-only torch.
+Expected: `OK beat_this-final0.ckpt sha256 verified`. After that the copy lives in `infra/docker/cache/models/` (git-ignored) and `MODELS_SRC` is not needed again: each model group of `make models-cache` is skipped when its cached files already verify, and the target ends `OK (cached models verified)`. `MODELS_SRC` and `SIGLIP_SRC` have no default; when a group is not cached and its variable is unset or not a folder, `make models-cache` (and so `make images`) stops with a message naming that variable and this section. The old laptop passes `MODELS_SRC=$HOME/saveclock-spike/downloads/models-beat_this` and `SIGLIP_SRC=$HOME/saveclock-downloads/siglip2`. The worker image is about 1.9 GB because it carries CPU-only torch.
+
+**SigLIP 2 (clip ranking, required since plan 005).** Seven files, about 1.5 GB, pinned to Hugging Face revision `75de2d55ec2d0b4efc50b3e9ad70dba96a7b2fa2` of `google/siglip2-base-patch16-224`. Sizes and SHA-256 are in `infra/docker/models.manifest.json`. Copy `~/saveclock-downloads/siglip2/` from the laptop, or download into a new empty folder:
+
+```sh
+mkdir -p ~/saveclock-downloads/siglip2 && cd ~/saveclock-downloads/siglip2
+R=https://huggingface.co/google/siglip2-base-patch16-224/resolve/75de2d55ec2d0b4efc50b3e9ad70dba96a7b2fa2
+for f in config.json model.safetensors preprocessor_config.json special_tokens_map.json tokenizer.json tokenizer.model tokenizer_config.json; do curl -fL -o "$f" "$R/$f"; done
+cd -
+make models-cache MODELS_SRC=$HOME/saveclock-models SIGLIP_SRC=$HOME/saveclock-downloads/siglip2
+```
+
+Expected: one `OK ... sha256 verified` line per file. A mismatch refuses; never edit the manifest to match. With both models the worker image is about 3.8 GB.
 
 ### 2c. The backup passphrase
 
@@ -313,7 +325,7 @@ After a `git pull` or checkout, run `make guard` (the config-malware check) befo
 
 ## 9. Variables you can set on the make command line
 
-`PROJECT` (compose project name, default `saveclock`; sets volume names), `API_PORT` (8000), `WEB_PORT` (3000), `FFMPEG_SRC` (no default, see 2a), `MODELS_SRC` (no default, see 2b), `TAG` (for `make rollback`), `DOCTOR_MIN_DISK_GB` (free disk `make doctor` requires, default 20), `CONTAINER` (`docker` if present, else `podman`, picked by the Makefile), `COMPOSE` (the compose command the Makefile builds: `<docker|podman> compose -p $PROJECT --env-file .env -f infra/compose/compose.yml`), `CONFIRM=yes` (only for `down-volumes`), `ALLOW_OFFLINE=1` (skips only the pnpm audit).
+`PROJECT` (compose project name, default `saveclock`; sets volume names), `API_PORT` (8000), `WEB_PORT` (3000), `FFMPEG_SRC` (no default, see 2a), `MODELS_SRC` and `SIGLIP_SRC` (no defaults, see 2b), `TAG` (for `make rollback`), `DOCTOR_MIN_DISK_GB` (free disk `make doctor` requires, default 20), `CONTAINER` (`docker` if present, else `podman`, picked by the Makefile), `COMPOSE` (the compose command the Makefile builds: `<docker|podman> compose -p $PROJECT --env-file .env -f infra/compose/compose.yml`), `CONFIRM=yes` (only for `down-volumes`), `ALLOW_OFFLINE=1` (skips only the pnpm audit).
 
 ## 10. Using it with Claude Code
 

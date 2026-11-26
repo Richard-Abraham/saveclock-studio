@@ -1,0 +1,33 @@
+{
+  "_note": "HAND-WRITTEN from the documented shape (https://pixabay.com/api/docs/, video section); no key existed to record a real response.",
+  "total": 2,
+  "totalHits": 2,
+  "hits": [
+    {
+      "id": 4101,
+      "pageURL": "https://pixabay.com/videos/id-4101/",
+      "type": "film",
+      "duration": 12,
+      "user_id": 555,
+      "user": "Example-Footage",
+      "videos": {
+        "large": {"url": "https://cdn.pixabay.com/video/2026/01/01/4101_large.mp4", "width": 2160, "height": 3840, "size": 9000000, "thumbnail": "https://cdn.pixabay.com/video/2026/01/01/4101_large.jpg"},
+        "medium": {"url": "https://cdn.pixabay.com/video/2026/01/01/4101_medium.mp4", "width": 1080, "height": 1920, "size": 4000000, "thumbnail": "https://cdn.pixabay.com/video/2026/01/01/4101_medium.jpg"},
+        "small": {"url": "https://cdn.pixabay.com/video/2026/01/01/4101_small.mp4", "width": 720, "height": 1280, "size": 2000000, "thumbnail": ""},
+        "tiny": {"url": "https://cdn.pixabay.com/video/2026/01/01/4101_tiny.mp4", "width": 360, "height": 640, "size": 500000, "thumbnail": ""}
+      }
+    },
+    {
+      "id": 4102,
+      "pageURL": "https://pixabay.com/videos/id-4102/",
+      "type": "film",
+      "duration": 30,
+      "user_id": 556,
+      "user": "Landscape-Only",
+      "videos": {
+        "large": {"url": "", "width": 0, "height": 0, "size": 0, "thumbnail": ""},
+        "medium": {"url": "https://cdn.pixabay.com/video/2026/01/02/4102_medium.mp4", "width": 1920, "height": 1080, "size": 7000000, "thumbnail": ""}
+      }
+    }
+  ]
+}

@@ -42,6 +42,21 @@ expect "ffmpeg: folder has the file" 10 - $FF --cache "$tmp/empty" --src "$tmp/f
 expect "ffmpeg: valid cache, unset src" 0 'cached copy verified' $FF --cache "$tmp/ffgood"
 expect "ffmpeg: corrupted cache, unset src" 2 'FFMPEG_SRC is not set' $FF --cache "$tmp/ffbad"
 expect "ffmpeg: --cached-only on empty cache" 1 'FFMPEG_SRC' $FF --cache "$tmp/empty" --cached-only
+# a manifest with the SigLIP-style group too: group files live under siglip/ in the cache, flat in the source folder
+printf 'sig a' >"$tmp/sig_a"
+asha="$(sha256sum "$tmp/sig_a" | cut -d' ' -f1)"
+printf '{"models":[{"file":"m.ckpt","bytes":%s,"sha256":"%s"},{"group":"g","file":"siglip/a.json","bytes":5,"sha256":"%s"}]}\n' "$msize" "$msha" "$asha" >"$tmp/manifest2"
+mkdir -p "$tmp/sigsrc" "$tmp/gcache/siglip" "$tmp/gcache_nosig"
+cp "$tmp/sig_a" "$tmp/sigsrc/a.json"; cp "$tmp/sig_a" "$tmp/gcache/siglip/a.json"; cp "$tmp/mblob" "$tmp/gcache/m.ckpt"; cp "$tmp/mblob" "$tmp/gcache_nosig/m.ckpt"
+MG="$CS models --manifest $tmp/manifest2"
+expect "siglip: unset src, empty cache" 2 'SIGLIP_SRC is not set.*docs/SETUP.md section 2b' $MG --group g --cache "$tmp/empty"
+expect "siglip: src is not a folder" 2 'SIGLIP_SRC=/nonexistent/x is not a folder' $MG --group g --cache "$tmp/empty" --src /nonexistent/x
+expect "siglip: folder lacks the file" 2 'SIGLIP_SRC=.* does not contain a.json' $MG --group g --cache "$tmp/empty" --src "$tmp/empty"
+expect "siglip: folder has the file (flat)" 10 - $MG --group g --cache "$tmp/empty" --src "$tmp/sigsrc"
+expect "siglip: cached under siglip/" 0 'cached copy verified' $MG --group g --cache "$tmp/gcache"
+expect "beat this group names MODELS_SRC" 2 'MODELS_SRC is not set' $MG --group none --cache "$tmp/empty"
+expect "all groups cached: ok" 0 'cached copy verified' $MG --cached-only --cache "$tmp/gcache"
+expect "beat this cached but siglip missing: refused, names SIGLIP_SRC" 1 'SIGLIP_SRC' $MG --cached-only --cache "$tmp/gcache_nosig"
 MM="$CS models --manifest $tmp/manifest"
 expect "models: unset src, empty cache" 2 'MODELS_SRC is not set.*docs/SETUP.md section 2b' $MM --cache "$tmp/empty"
 expect "models: src is not a folder" 2 'MODELS_SRC=/nonexistent/x is not a folder' $MM --cache "$tmp/empty" --src /nonexistent/x

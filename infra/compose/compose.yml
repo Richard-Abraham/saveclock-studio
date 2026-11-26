@@ -6,7 +6,9 @@
 networks:
   front: {}
   back:
-    internal: true # C9: the worker egress network arrives with T-2.6 (fetch)
+    internal: true
+  # outbound internet for the worker only (stock search/download, the keyword model): plan 005
+  egress: {}
 
 volumes:
   pgdata: {}
@@ -156,9 +158,16 @@ services:
       SCRATCH_ROOT: /scratch
       MODELS_DIR: /opt/models
       FAKE_ML: "${FAKE_ML:-false}"
+      # the provider keys reach the worker only, never the api (SEC-080); empty means unset
+      PEXELS_API_KEY: "${PEXELS_API_KEY:-}"
+      PIXABAY_API_KEY: "${PIXABAY_API_KEY:-}"
+      PIXABAY_ENABLED: "${PIXABAY_ENABLED:-}"
+      ANTHROPIC_API_KEY: "${ANTHROPIC_API_KEY:-}"
+      STOCK_HOST_ALLOWLIST: "${STOCK_HOST_ALLOWLIST:-}"
+      HF_HOME: /tmp/hf
     volumes:
       - "blobs:/data/blobs"
-    networks: [back]
+    networks: [back, egress]
     user: "10001:10001"
     read_only: true
     # per-job decode scratch (SEC-023: each job dir is created 0700 by the app); podman has no

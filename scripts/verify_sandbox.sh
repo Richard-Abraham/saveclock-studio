@@ -67,6 +67,25 @@ done
 chk "ffmpeg -version" worker 'ffmpeg -version | head -1'
 chk "ffmpeg encodes a synthetic clip" worker 'ffmpeg -hide_banner -loglevel error -f lavfi -i testsrc=duration=1:size=64x64 -f null -'
 
+# networks and secrets (plan 005): only the worker reaches the internet and holds provider keys
+nets() { # service -> its networks without the project prefix, sorted, space separated
+  $CONTAINER inspect --format '{{range $k, $v := .NetworkSettings.Networks}}{{$k}} {{end}}' "$(cid "$1")" 2>/dev/null \
+    | tr ' ' '\n' | sed "s/^${PROJECT:-saveclock}_//" | grep . | sort | tr '\n' ' ' | sed 's/ $//'
+}
+want_nets() { # service, expected networks
+  got="$(nets "$1")"
+  if [ "$got" = "$2" ]; then pass "networks: $1 is on '$got'"; else bad "networks: $1 is on '$got', want '$2'"; fi
+}
+want_nets worker "back egress"
+want_nets worker-maint back
+want_nets postgres back
+want_nets redis back
+for svc in api worker-maint; do
+  # names only, never values
+  names="$(in_svc "$svc" sh -c 'env' 2>/dev/null | cut -d= -f1 | grep -E 'API_KEY$' | tr '\n' ' ')"
+  if [ -z "$names" ]; then pass "$svc: no *_API_KEY variable in its environment"; else bad "$svc: has $names"; fi
+done
+
 # host side
 api_ports="$($CONTAINER port "$(cid api)" 2>/dev/null)"
 if echo "$api_ports" | grep -q "127.0.0.1:8000" && ! echo "$api_ports" | grep -vq "127.0.0.1:"; then pass "host: api publishes only 127.0.0.1:8000 ($api_ports)"

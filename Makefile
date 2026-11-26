@@ -27,7 +27,7 @@ CHECK_STAGES := $(FAST_STAGES) images image-guards hadolint
 
 .PHONY: help help-lint tooling-test rollback toolchain doctor-dev guard secrets banned doctor fmt-check lint types arch pins compose-lint test \
   migrations audit env env-docs env-docs-check contracts contracts-check test-deps-up \
-  test-deps-down ffmpeg-cache ffmpeg-bin models-cache test-ml images image-guards hadolint scan-images up dev down \
+  test-deps-down ffmpeg-cache ffmpeg-bin models-cache test-ml fake-stock images image-guards hadolint scan-images up dev down \
   down-volumes sandbox check-fast check web-install web-env web-lint web-test web-build \
   bundle-scan web-audit-prod measure-rewrite smoke-web web-audit stack-up seed smoke-stub \
   predeploy-scan backup backup-init backup-test restore-proof backup-install-timer backup-timer-uninstall rollback-demo fresh-clone-timing
@@ -103,6 +103,10 @@ test: ## run the unit and integration tests with coverage floors
 test-ml: ## run the real Beat This test (needs the ml extra and the weights)
 	MODELS_DIR="$(CURDIR)/infra/docker/cache/models" $(UV) run --extra ml pytest -q -m ml
 
+# the 8 generated stock clips FAKE_STOCK serves (never committed; plan 005)
+fake-stock: ffmpeg-bin ## generate the 8 fake stock clips FAKE_STOCK serves into .data/fake-stock
+	$(UV) run python ../../eval/scripts/make_fake_stock.py ../../.data/fake-stock
+
 # alembic check (models == migration) and a downgrade -1 / upgrade head round trip
 migrations: ## check models match migrations and the downgrade round trip
 	$(UV) run pytest -q -m migration_roundtrip
@@ -140,12 +144,20 @@ ffmpeg-bin: ffmpeg-cache ## extract the pinned FFmpeg for host tests
 	python3 infra/docker/fetch_ffmpeg.py infra/docker/ffmpeg.pin infra/docker/cache .data/ffmpeg
 
 # the Beat This weights from the owner's local download, sha256-checked against the manifest
-# folder holding the weights; no default (the old laptop passes ~/saveclock-spike/downloads/models-beat_this)
+# and the SigLIP 2 snapshot from the owner's one-time download at the pinned revision (plan 005)
+# folders holding the downloads; no defaults (the old laptop passes ~/saveclock-spike/downloads/models-beat_this
+# and ~/saveclock-downloads/siglip2)
 MODELS_SRC ?=
-models-cache: ## copy the Beat This weights into infra/docker/cache/models (needs MODELS_SRC=<folder> unless cached)
-	@python3 scripts/check_sources.py models --src "$(MODELS_SRC)"; rc=$$?; \
-	[ $$rc = 0 ] && { echo "OK (cached models verified)"; exit 0; }; [ $$rc = 10 ] || exit $$rc; \
-	python3 scripts/fetch_models.py infra/docker/models.manifest.json "$(MODELS_SRC)" infra/docker/cache/models
+SIGLIP_SRC ?=
+SIGLIP_GROUP := siglip2-base-patch16-224
+models-cache: ## copy the Beat This and SigLIP 2 weights into infra/docker/cache/models (needs MODELS_SRC and SIGLIP_SRC=<folder> unless cached)
+	@python3 scripts/check_sources.py models --group none --src "$(MODELS_SRC)"; rc=$$?; \
+	[ $$rc = 0 ] || { [ $$rc = 10 ] || exit $$rc; \
+	  python3 scripts/fetch_models.py infra/docker/models.manifest.json "$(MODELS_SRC)" infra/docker/cache/models none || exit $$?; }
+	@python3 scripts/check_sources.py models --group $(SIGLIP_GROUP) --src "$(SIGLIP_SRC)"; rc=$$?; \
+	[ $$rc = 0 ] || { [ $$rc = 10 ] || exit $$rc; \
+	  python3 scripts/fetch_models.py infra/docker/models.manifest.json "$(SIGLIP_SRC)" infra/docker/cache/models $(SIGLIP_GROUP) || exit $$?; }
+	@echo "OK (cached models verified)"
 
 images: ffmpeg-cache models-cache ## build the api, worker and web images
 	$(CONTAINER) build --target api -f infra/docker/Dockerfile.api \

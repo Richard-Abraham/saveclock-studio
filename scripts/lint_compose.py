@@ -40,7 +40,7 @@ def lint(path: Path) -> list[str]:
         for port in svc.get("ports", []) or []:
             if not isinstance(port, str) or not any(p.fullmatch(port) for p in PORT_OK):
                 problems.append(f"{name}: port {port!r} is not loopback-bound")
-        if path.name == "compose.yml" and name in {"postgres", "redis"} and svc.get("ports"):
+        if path.name == "compose.yml" and name not in {"api", "web"} and svc.get("ports"):
             problems.append(f"{name}: must not publish ports")
         labels = svc.get("labels") or {}
         label_keys = labels if isinstance(labels, list) else list(labels)
@@ -61,6 +61,16 @@ def lint(path: Path) -> list[str]:
             "worker-maint:", 1
         )[1].split("\n  ", 1)[0]:
             problems.append("worker-maint: must not get a /scratch (it never decodes)")
+        if path.name == "compose.yml":
+            nets = svc.get("networks") or []
+            nets = list(nets) if isinstance(nets, list | dict) else []
+            if "egress" in nets and name != "worker":
+                problems.append(f"{name}: only the worker may join the egress network")
+            if name == "worker" and "egress" not in nets:
+                problems.append("worker: must join the egress network (stock search, keywords)")
+            keys = [k for k in (svc.get("environment") or {}) if str(k).endswith("_API_KEY")]
+            if keys and name != "worker":
+                problems.append(f"{name}: provider keys may only reach the worker ({keys})")
         for key in THREAD_VARS & set(svc.get("environment") or {}):
             value = str(svc["environment"][key])
             if value.strip() == "" or value.endswith(":-}"):

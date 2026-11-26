@@ -1,0 +1,60 @@
+{
+  "_note": "HAND-WRITTEN from the documented shape (https://www.pexels.com/api/documentation/#videos-search); no key existed to record a real response. Replace with a recorded one when PEXELS_API_KEY is available.",
+  "page": 1,
+  "per_page": 40,
+  "total_results": 3,
+  "url": "https://www.pexels.com/search/videos/neon%20city/",
+  "videos": [
+    {
+      "id": 3001,
+      "width": 2160,
+      "height": 3840,
+      "duration": 14,
+      "url": "https://www.pexels.com/video/neon-city-street-3001/",
+      "image": "https://images.pexels.com/videos/3001/pictures/preview-0.jpg",
+      "user": {"id": 77, "name": "Ada Example", "url": "https://www.pexels.com/@ada-example"},
+      "video_files": [
+        {"id": 1, "quality": "sd", "file_type": "video/mp4", "width": 540, "height": 960, "fps": 25.0, "link": "https://videos.pexels.com/video-files/3001/3001-sd_540_960_25fps.mp4"},
+        {"id": 2, "quality": "hd", "file_type": "video/mp4", "width": 720, "height": 1280, "fps": 25.0, "link": "https://videos.pexels.com/video-files/3001/3001-hd_720_1280_25fps.mp4"},
+        {"id": 3, "quality": "hd", "file_type": "video/mp4", "width": 1080, "height": 1920, "fps": 25.0, "link": "https://videos.pexels.com/video-files/3001/3001-hd_1080_1920_25fps.mp4"},
+        {"id": 4, "quality": "uhd", "file_type": "video/mp4", "width": 2160, "height": 3840, "fps": 25.0, "link": "https://videos.pexels.com/video-files/3001/3001-uhd_2160_3840_25fps.mp4"},
+        {"id": 5, "quality": "hd", "file_type": "video/webm", "width": 1080, "height": 1920, "fps": 25.0, "link": "https://videos.pexels.com/video-files/3001/3001-hd.webm"}
+      ]
+    },
+    {
+      "id": 3002,
+      "width": 3840,
+      "height": 2160,
+      "duration": 20,
+      "url": "https://www.pexels.com/video/landscape-harbour-3002/",
+      "user": {"id": 78, "name": "Bo Example", "url": "https://www.pexels.com/@bo-example"},
+      "video_files": [
+        {"id": 6, "quality": "hd", "file_type": "video/mp4", "width": 1920, "height": 1080, "fps": 30.0, "link": "https://videos.pexels.com/video-files/3002/3002-hd_1920_1080_30fps.mp4"}
+      ]
+    },
+    {
+      "id": 3003,
+      "width": 1080,
+      "height": 1920,
+      "duration": 9,
+      "url": "https://www.pexels.com/video/small-only-3003/",
+      "user": {"id": 79, "name": "Cy Example", "url": "https://www.pexels.com/@cy-example"},
+      "video_files": [
+        {"id": 7, "quality": "sd", "file_type": "video/mp4", "width": 360, "height": 640, "fps": 24.0, "link": "https://videos.pexels.com/video-files/3003/3003-sd_360_640_24fps.mp4"},
+        {"id": 8, "quality": "sd", "file_type": "video/mp4", "width": 540, "height": 960, "link": "https://videos.pexels.com/video-files/3003/3003-sd_540_960.mp4"}
+      ]
+    },
+    {
+      "id": 3004,
+      "width": 1440,
+      "height": 2560,
+      "duration": 11,
+      "url": "https://www.pexels.com/video/mid-res-3004/",
+      "user": {"id": 80, "name": "Di Example", "url": "https://www.pexels.com/@di-example"},
+      "video_files": [
+        {"id": 9, "quality": "hd", "file_type": "video/mp4", "width": 720, "height": 1280, "link": "https://videos.pexels.com/video-files/3004/3004-hd_720_1280.mp4"},
+        {"id": 10, "quality": "hd", "file_type": "video/mp4", "width": 900, "height": 1600, "link": "https://videos.pexels.com/video-files/3004/3004-hd_900_1600.mp4"}
+      ]
+    }
+  ]
+}
