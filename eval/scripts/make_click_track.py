@@ -70,7 +70,15 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--out", type=Path, required=True)
     args = p.parse_args(argv)
     write_wav(args.out, render(args.bpm, args.duration, args.sr, args.lead), args.sr)
-    print(json.dumps({"bpm": args.bpm, "duration_s": args.duration, **grid(args.bpm, args.duration, args.lead)}))
+    print(
+        json.dumps(
+            {
+                "bpm": args.bpm,
+                "duration_s": args.duration,
+                **grid(args.bpm, args.duration, args.lead),
+            }
+        )
+    )
     return 0
 
 
