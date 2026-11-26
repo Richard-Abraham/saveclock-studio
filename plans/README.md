@@ -11,7 +11,7 @@ confirms the change summary; nothing is ever pushed without an explicit instruct
 | Plan | Title | Priority | Effort | Depends on | Gate / approval | Status |
 |------|-------|----------|--------|------------|-----------------|--------|
 | 000  | Phase 0 validation spike (`plans/000-phase0-validation-spike.md`) | P1 | L | none | G0 = GO (`docs/SPIKE-REPORT.md`) | DONE |
-| 001  | Walking skeleton: backend and infrastructure (`001-skeleton-infra-backend.md`) | P1 | L | 000 | owner "go"; DB CHANGE notice acknowledged before the `0001_baseline` commit | TODO |
+| 001  | Walking skeleton: backend and infrastructure (`001-skeleton-infra-backend.md`) | P1 | L | 000 | owner "go"; DB CHANGE notice acknowledged before the `0001_baseline` commit | DONE (merged c8e64fb; reviewer re-ran `make check`: 134 passed, CHECK OK; ponytail-review: 5 bugs + 11 trims fixed) |
 | 002  | Walking skeleton: web shell on a single origin (`002-skeleton-web-shell.md`) | P1 | L | 001, design spec, T-1.1a | **design-gated: blocked until `plans/002-skeleton-web-shell.design.md` exists and is APPROVED (or marked `WRITTEN-REVIEW-WAIVED` per ROADMAP T-1.1a)** | TODO (BLOCKED on the design spec) |
 | 003  | Bring-up on the owner's machine, nightly backup, restore proof, G1 evidence (`003-skeleton-bringup-backup-g1.md`) | P1 | M | 001, 002 | owner inputs (backup folder, passphrase file, timer OK, second LAN device); ends with the owner's G1 decision | TODO |
 

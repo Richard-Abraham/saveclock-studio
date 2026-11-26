@@ -37,3 +37,6 @@ htmlcov/
 coverage.json
 .env.derived
 *.part
+
+# local agent worktrees
+.claude/worktrees/
