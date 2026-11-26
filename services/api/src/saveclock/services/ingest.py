@@ -29,6 +29,7 @@ from saveclock.adapters.blobstore.blob_keys import (
     song_source_key,
 )
 from saveclock.adapters.blobstore.port import BlobStore
+from saveclock.adapters.events import EventPublisher
 from saveclock.adapters.ffmpeg import (
     DecodeFailed,
     FfCanceled,
@@ -62,11 +63,15 @@ from saveclock.models import JobQueue, JobStage, ProjectStatus
 from saveclock.repositories.jobs import JobRepository
 from saveclock.repositories.projects import ProjectRepository
 from saveclock.repositories.songs import SongRepository
+from saveclock.services import project_state
 from saveclock.services.context import WorkerContext, cancel_probe, end_unwanted, hand_off
+from saveclock.services.events import ProgressEmitter, ProgressTicker
 from saveclock.services.projects import ui_status
 from saveclock.services.scratch import scratch_dir
 
 log = structlog.get_logger()
+
+VALIDATE_EXPECTED_S = 10.0  # a typical song; the ticker only needs the right order of magnitude
 
 MB = 1024 * 1024
 QUEUE_DEPTH = 8
@@ -205,6 +210,7 @@ async def receive_upload(
     blobs: BlobStore,
     enqueuer: Enqueuer,
     settings: Settings,
+    publisher: EventPublisher | None = None,
 ) -> Upload:
     projects = ProjectRepository(session)
     if await projects.get(user_id=user_id, project_id=project_id) is None:
@@ -219,14 +225,15 @@ async def receive_upload(
     await projects.release_stale_upload(
         user_id=user_id, project_id=project_id, older_than_s=STALE_UPLOAD_S
     )
-    if not await projects.transition(
+    if not await project_state.transition(  # commits: the other upload's 409 must see it now
+        session,
+        publisher,
         user_id=user_id,
         project_id=project_id,
         from_=UPLOAD_FROM,
         to=ProjectStatus.UPLOADING.value,
     ):
         raise Conflict(ConflictReason.UPLOAD_IN_PROGRESS)
-    await session.commit()  # the other upload's 409 must see `uploading` now
     incoming = song_incoming_key(project_id)
     try:
         head, buffered, rest = await _head_and_rest(body)
@@ -256,11 +263,14 @@ async def receive_upload(
             project_id=project_id,
             values={"upload_completed_at": datetime.now(UTC)},
         )
-        if not await projects.transition(
+        if not await project_state.transition(
+            session,
+            publisher,
             user_id=user_id,
             project_id=project_id,
             from_=ProjectStatus.UPLOADING.value,
             to=ProjectStatus.VALIDATING.value,
+            commit=False,
         ):
             raise Conflict(ConflictReason.WRONG_STATE)
         job_id = new_id()
@@ -274,15 +284,18 @@ async def receive_upload(
         await session.commit()  # the worker must see the rows before the message exists
     except BaseException:
         await session.rollback()
+        session.info.pop(project_state.PENDING, None)
         blobs.delete(incoming)
-        await projects.transition(
+        await project_state.transition(
+            session,
+            publisher,
             user_id=user_id,
             project_id=project_id,
             from_=ProjectStatus.UPLOADING.value,
             to=ProjectStatus.CREATED.value,
         )
-        await session.commit()
         raise
+    await project_state.announce_pending(session, publisher)
     await asyncio.to_thread(enqueuer.send, "validate_audio", str(job_id), str(user_id))
     return Upload(job_id, ui_status(ProjectStatus.VALIDATING.value).value)
 
@@ -402,24 +415,33 @@ async def validate_song(ctx: WorkerContext, job_id: UUID, user_id: UUID) -> None
         await end_unwanted(ctx, user_id, job_id)
         return
     cancel = cancel_probe(ctx, user_id, job_id)
+    emitter = ProgressEmitter(ctx.publisher, project_id)
     try:
-        with scratch_dir(ctx.settings.scratch_root, job_id) as scratch:
+        with (
+            scratch_dir(ctx.settings.scratch_root, job_id) as scratch,
+            ProgressTicker(emitter, "checking_file", expected_s=VALIDATE_EXPECTED_S),
+        ):
             outcome = await asyncio.to_thread(_validate_blocking, ctx, project_id, scratch, cancel)
     except FfCanceled:
         await end_unwanted(ctx, user_id, job_id)
         return
+    await emitter.aemit("checking_file", 1.0, force=True)
     async with ctx.sessionmaker() as session:
         jobs, projects = JobRepository(session), ProjectRepository(session)
         if isinstance(outcome, Rejected):
-            await projects.transition(
+            await project_state.transition(
+                session,
+                ctx.publisher,
                 user_id=user_id,
                 project_id=project_id,
                 from_=ProjectStatus.VALIDATING.value,
                 to=ProjectStatus.REJECTED.value,
                 reason=outcome.reason.value,
+                commit=False,
             )
             await jobs.fail(user_id=user_id, job_id=job_id, error_code="file_rejected")
             await session.commit()
+            await project_state.announce_pending(session, ctx.publisher)
             log.info("validate.rejected", reason=outcome.reason.value)
             return
         songs = SongRepository(session)
@@ -440,13 +462,17 @@ async def validate_song(ctx: WorkerContext, job_id: UUID, user_id: UUID) -> None
                 project_id=project_id,
                 title=display_title(song.original_filename),
             )
-        moved = await projects.transition(
+        moved = await project_state.transition(
+            session,
+            ctx.publisher,
             user_id=user_id,
             project_id=project_id,
             from_=ProjectStatus.VALIDATING.value,
             to=ProjectStatus.ANALYZING.value,
+            commit=False,
         )
         await session.commit()
+        await project_state.announce_pending(session, ctx.publisher)
         canceled = not moved and ProjectStatus.CANCELED.value == await _status(
             projects, user_id, project_id
         )

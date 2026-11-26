@@ -162,6 +162,56 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/projects/{project_id}/events": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Stream Events
+         * @description `retry: 3000`, then a `state` snapshot, then live events of the project until a terminal
+         *     one (`failed`, `render_ready`, `mode_a_ready`) or 15 minutes. `: ping` every 15 s when idle;
+         *     `Last-Event-ID` is ignored (the snapshot is authoritative). At most 5 streams at once: the
+         *     sixth is 409 `conflict` with `details.reason = too_many_streams`.
+         */
+        get: operations["stream_events"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/projects/{project_id}/plan": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Plan
+         * @description The latest version, or `?version=N`. 409 `conflict` (`details.reason = no_plan_yet`) before
+         *     the first draft exists.
+         */
+        get: operations["get_plan"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * Patch Plan
+         * @description Apply `ops` to the working version: 200 with the new plan. A replan-local edit is
+         *     synchronous and always allowed; `set_keywords` (exactly one op, project `draft_ready`) starts
+         *     a replan job and answers 202 `{job_id}`; while a render runs it is 409 `conflict`.
+         */
+        patch: operations["patch_plan"];
+        trace?: never;
+    };
     "/api/v1/projects/{project_id}/retry": {
         parameters: {
             query?: never;
@@ -268,6 +318,55 @@ export interface components {
             /** Llm Enabled */
             llm_enabled: boolean;
         };
+        /** Attribution */
+        Attribution: {
+            /** Author */
+            author: string | null;
+            /** Author Url */
+            author_url: string | null;
+            /** Page Url */
+            page_url: string;
+        };
+        /** Audio */
+        Audio: {
+            trim: components["schemas"]["AudioTrim"];
+        };
+        /** AudioTrim */
+        AudioTrim: {
+            /** Duration Frames */
+            duration_frames: number;
+            /** Start S */
+            start_s: number;
+        };
+        /** BeatGrid */
+        BeatGrid: {
+            /** Beats S */
+            beats_s: number[];
+            /** Confidence */
+            confidence: number;
+            /** Downbeats S */
+            downbeats_s: number[];
+            /** Fallback */
+            fallback: ("energy_grid" | "even_grid" | "phrase_only") | null;
+            /** Source */
+            source: string;
+            /** Tempo Bpm */
+            tempo_bpm: number;
+            /** Tempo Octave Adjust */
+            tempo_octave_adjust: number;
+        };
+        /** BeatRef */
+        BeatRef: {
+            /** Beat Index */
+            beat_index: number;
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "downbeat" | "beat";
+            /** T S */
+            t_s: number;
+        };
         /** ByArea */
         ByArea: {
             /** Renders */
@@ -276,6 +375,26 @@ export interface components {
             songs: number;
             /** Work */
             work: number;
+        };
+        /** Clip */
+        Clip: {
+            attribution: components["schemas"]["Attribution"];
+            /** In Frame */
+            in_frame: number;
+            /** Keywords */
+            keywords: string[];
+            /** Locked */
+            locked: boolean;
+            /** Mezzanine Frames */
+            mezzanine_frames: number;
+            /** Mezzanine Key */
+            mezzanine_key: string;
+            /** Provider */
+            provider: string;
+            /** Provider Id */
+            provider_id: string;
+            /** Score */
+            score: number;
         };
         /** ConfidenceOut */
         ConfidenceOut: {
@@ -293,6 +412,20 @@ export interface components {
         Configured: {
             /** Configured */
             configured: boolean;
+        };
+        /** Cut */
+        Cut: {
+            beat_ref: components["schemas"]["BeatRef"];
+            clip: components["schemas"]["Clip"];
+            /** Effects */
+            effects?: string[];
+            /** Index */
+            index: number;
+            /** Out End Frame */
+            out_end_frame: number;
+            /** Out Start Frame */
+            out_start_frame: number;
+            section: components["schemas"]["SectionRef"];
         };
         /** Disk */
         Disk: {
@@ -355,6 +488,111 @@ export interface components {
             pexels: components["schemas"]["Configured"];
             pixabay: components["schemas"]["Configured"];
         };
+        /** LockClip */
+        LockClip: {
+            /** Cut Index */
+            cut_index: number;
+            /** Locked */
+            locked: boolean;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            op: "lock_clip";
+        };
+        /** Output */
+        Output: {
+            /** Crf */
+            crf: number;
+            /** Preset */
+            preset: string;
+        };
+        /** Overlays */
+        Overlays: {
+            /** Credits Text */
+            credits_text: string | null;
+        };
+        /** PlanOptions */
+        PlanOptions: {
+            /** Density */
+            density: number;
+            /** Keywords Override */
+            keywords_override: string[] | null;
+            /** Style */
+            style: string;
+        };
+        /**
+         * PlanOut
+         * @description The edit plan (ARCH §5) plus whether a render froze this version.
+         */
+        PlanOut: {
+            audio: components["schemas"]["Audio"];
+            beat_grid: components["schemas"]["BeatGrid"];
+            /** Content Hash */
+            content_hash: string;
+            /**
+             * Created By
+             * @enum {string}
+             */
+            created_by: "planner" | "user";
+            /** Cuts */
+            cuts: components["schemas"]["Cut"][];
+            /** Fps */
+            fps: number;
+            /** Frozen */
+            frozen: boolean;
+            /** Lead Frames */
+            lead_frames: number;
+            options: components["schemas"]["PlanOptions"];
+            output: components["schemas"]["Output"];
+            overlays: components["schemas"]["Overlays"];
+            /**
+             * Plan Id
+             * Format: uuid
+             */
+            plan_id: string;
+            /**
+             * Project Id
+             * Format: uuid
+             */
+            project_id: string;
+            provenance: components["schemas"]["Provenance"];
+            resolution: components["schemas"]["Resolution"];
+            /** Schema Version */
+            schema_version: string;
+            segment: components["schemas"]["Segment"];
+            song: components["schemas"]["Song"];
+            /** Total Frames */
+            total_frames: number;
+            /** Version */
+            version: number;
+        };
+        /**
+         * PlanPatch
+         * @description `ops` are all local, or exactly one `set_keywords` (a replan that fetches footage).
+         */
+        PlanPatch: {
+            /** Base Version */
+            base_version: number;
+            /** Ops */
+            ops: (components["schemas"]["SetTempoOctave"] | components["schemas"]["SetBpm"] | components["schemas"]["UseDetectedBeats"] | components["schemas"]["SetDensity"] | components["schemas"]["SetSegment"] | components["schemas"]["LockClip"] | components["schemas"]["SetKeywords"])[];
+        };
+        /** PlanSummaryOut */
+        PlanSummaryOut: {
+            /** Frozen */
+            frozen: boolean;
+            /**
+             * Keyword Source
+             * @enum {string}
+             */
+            keyword_source: "explicit" | "llm" | "table";
+            /** N Cuts */
+            n_cuts: number;
+            /** Total Frames */
+            total_frames: number;
+            /** Version */
+            version: number;
+        };
         /** ProjectCreate */
         ProjectCreate: {
             options?: components["schemas"]["ProjectOptions"] | null;
@@ -363,7 +601,7 @@ export interface components {
         };
         /**
          * ProjectDetail
-         * @description `plan` and `render` are placeholders that plans 006 and 007 fill in additively.
+         * @description `render` stays empty until plan 007 adds it, additively.
          */
         ProjectDetail: {
             analysis: components["schemas"]["AnalysisSummary"] | null;
@@ -390,8 +628,7 @@ export interface components {
             options: {
                 [key: string]: unknown;
             };
-            /** Plan */
-            plan?: null;
+            plan?: components["schemas"]["PlanSummaryOut"] | null;
             /** Render */
             render?: null;
             song: components["schemas"]["SongMeta"] | null;
@@ -463,6 +700,35 @@ export interface components {
             /** Title */
             title?: string | null;
         };
+        /** Provenance */
+        Provenance: {
+            /**
+             * Keyword Source
+             * @enum {string}
+             */
+            keyword_source: "explicit" | "llm" | "table";
+            /** Llm Model */
+            llm_model: string | null;
+            /** Planner Version */
+            planner_version: string;
+            /** Seed */
+            seed: number;
+        };
+        /** ReplanAccepted */
+        ReplanAccepted: {
+            /**
+             * Job Id
+             * Format: uuid
+             */
+            job_id: string;
+        };
+        /** Resolution */
+        Resolution: {
+            /** Height */
+            height: number;
+            /** Width */
+            width: number;
+        };
         /** SectionOut */
         SectionOut: {
             /** End S */
@@ -479,6 +745,28 @@ export interface components {
             /** Start S */
             start_s: number;
         };
+        /** SectionRef */
+        SectionRef: {
+            /** Id */
+            id: string;
+            /**
+             * Label
+             * @enum {string}
+             */
+            label: "e1" | "e2" | "e3" | "e4";
+        };
+        /** Segment */
+        Segment: {
+            /** End S */
+            end_s: number;
+            /** Start S */
+            start_s: number;
+            /**
+             * Start Snapped To
+             * @constant
+             */
+            start_snapped_to: "downbeat";
+        };
         /** SegmentOut */
         SegmentOut: {
             /** End S */
@@ -488,6 +776,72 @@ export interface components {
             /** Total Frames */
             total_frames: number;
         };
+        /** SetBpm */
+        SetBpm: {
+            /** Bpm */
+            bpm?: number | null;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            op: "set_bpm";
+            /** Use Even Grid */
+            use_even_grid?: boolean | null;
+        };
+        /** SetDensity */
+        SetDensity: {
+            /** Level */
+            level: number;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            op: "set_density";
+        };
+        /** SetKeywords */
+        SetKeywords: {
+            /** Keywords */
+            keywords: string[];
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            op: "set_keywords";
+            /** Section Id */
+            section_id?: string | null;
+            /** Vibe Chips */
+            vibe_chips?: string[] | null;
+        };
+        /** SetSegment */
+        SetSegment: {
+            /**
+             * Auto
+             * @default false
+             */
+            auto: boolean;
+            /** Duration S */
+            duration_s?: number | null;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            op: "set_segment";
+            /** Start S */
+            start_s?: number | null;
+        };
+        /** SetTempoOctave */
+        SetTempoOctave: {
+            /**
+             * Octave
+             * @enum {integer}
+             */
+            octave: -1 | 0 | 1;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            op: "set_tempo_octave";
+        };
         /** SettingsOut */
         SettingsOut: {
             disk: components["schemas"]["Disk"];
@@ -496,6 +850,15 @@ export interface components {
             keys: components["schemas"]["Keys"];
             stock: components["schemas"]["Stock"];
             tuning: components["schemas"]["Tuning"] | null;
+        };
+        /** Song */
+        Song: {
+            /** Duration S */
+            duration_s: number;
+            /** Sample Rate */
+            sample_rate: number;
+            /** Sha256 */
+            sha256: string;
         };
         /** SongMeta */
         SongMeta: {
@@ -602,6 +965,16 @@ export interface components {
              */
             job_id: string;
             ui_status: components["schemas"]["UiStatus"];
+        };
+        /** UseDetectedBeats */
+        UseDetectedBeats: {
+            /** On */
+            on: boolean;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            op: "use_detected_beats";
         };
         /** Volume */
         Volume: {
@@ -1137,7 +1510,7 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorResponse"];
                 };
             };
-            /** @description conflict; details.reason is one of not_ready, wrong_state, upload_in_progress, retry_limit */
+            /** @description conflict; details.reason is one of not_ready, wrong_state, upload_in_progress, retry_limit, job_active, no_plan_yet, too_many_streams, render_active */
             409: {
                 headers: {
                     [name: string]: unknown;
@@ -1204,7 +1577,7 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorResponse"];
                 };
             };
-            /** @description conflict; details.reason is one of not_ready, wrong_state, upload_in_progress, retry_limit */
+            /** @description conflict; details.reason is one of not_ready, wrong_state, upload_in_progress, retry_limit, job_active, no_plan_yet, too_many_streams, render_active */
             409: {
                 headers: {
                     [name: string]: unknown;
@@ -1271,7 +1644,223 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorResponse"];
                 };
             };
-            /** @description conflict; details.reason is one of not_ready, wrong_state, upload_in_progress, retry_limit */
+            /** @description conflict; details.reason is one of not_ready, wrong_state, upload_in_progress, retry_limit, job_active, no_plan_yet, too_many_streams, render_active */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description validation_error (details.fields) */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description internal_error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    stream_events: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                project_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/event-stream": string;
+                };
+            };
+            /** @description forbidden; details.reason is one of host_not_allowed, origin_mismatch, cross_site */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description conflict; details.reason is one of not_ready, wrong_state, upload_in_progress, retry_limit, job_active, no_plan_yet, too_many_streams, render_active */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description validation_error (details.fields) */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description internal_error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    get_plan: {
+        parameters: {
+            query?: {
+                version?: number | null;
+            };
+            header?: never;
+            path: {
+                project_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PlanOut"];
+                };
+            };
+            /** @description forbidden; details.reason is one of host_not_allowed, origin_mismatch, cross_site */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description conflict; details.reason is one of not_ready, wrong_state, upload_in_progress, retry_limit, job_active, no_plan_yet, too_many_streams, render_active */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description validation_error (details.fields) */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description internal_error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    patch_plan: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                project_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PlanPatch"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PlanOut"];
+                };
+            };
+            /** @description set_keywords: a replan job was started */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReplanAccepted"];
+                };
+            };
+            /** @description forbidden; details.reason is one of host_not_allowed, origin_mismatch, cross_site */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description conflict (details.reason: wrong_state, job_active, render_active), plan_version_conflict (details.current_version) or lock_conflict (details.reason) */
             409: {
                 headers: {
                     [name: string]: unknown;
@@ -1338,7 +1927,7 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorResponse"];
                 };
             };
-            /** @description conflict; details.reason is one of not_ready, wrong_state, upload_in_progress, retry_limit */
+            /** @description conflict; details.reason is one of not_ready, wrong_state, upload_in_progress, retry_limit, job_active, no_plan_yet, too_many_streams, render_active */
             409: {
                 headers: {
                     [name: string]: unknown;
@@ -1422,7 +2011,7 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorResponse"];
                 };
             };
-            /** @description conflict; details.reason is one of not_ready, wrong_state, upload_in_progress, retry_limit */
+            /** @description conflict; details.reason is one of not_ready, wrong_state, upload_in_progress, retry_limit, job_active, no_plan_yet, too_many_streams, render_active */
             409: {
                 headers: {
                     [name: string]: unknown;

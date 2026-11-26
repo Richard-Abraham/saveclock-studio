@@ -163,6 +163,167 @@
         "title": "AnthropicKey",
         "type": "object"
       },
+      "Attribution": {
+        "additionalProperties": false,
+        "properties": {
+          "author": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Author"
+          },
+          "author_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Author Url"
+          },
+          "page_url": {
+            "title": "Page Url",
+            "type": "string"
+          }
+        },
+        "required": [
+          "author",
+          "author_url",
+          "page_url"
+        ],
+        "title": "Attribution",
+        "type": "object"
+      },
+      "Audio": {
+        "additionalProperties": false,
+        "properties": {
+          "trim": {
+            "$ref": "#/components/schemas/AudioTrim"
+          }
+        },
+        "required": [
+          "trim"
+        ],
+        "title": "Audio",
+        "type": "object"
+      },
+      "AudioTrim": {
+        "additionalProperties": false,
+        "properties": {
+          "duration_frames": {
+            "title": "Duration Frames",
+            "type": "integer"
+          },
+          "start_s": {
+            "title": "Start S",
+            "type": "number"
+          }
+        },
+        "required": [
+          "start_s",
+          "duration_frames"
+        ],
+        "title": "AudioTrim",
+        "type": "object"
+      },
+      "BeatGrid": {
+        "additionalProperties": false,
+        "properties": {
+          "beats_s": {
+            "items": {
+              "type": "number"
+            },
+            "title": "Beats S",
+            "type": "array"
+          },
+          "confidence": {
+            "title": "Confidence",
+            "type": "number"
+          },
+          "downbeats_s": {
+            "items": {
+              "type": "number"
+            },
+            "title": "Downbeats S",
+            "type": "array"
+          },
+          "fallback": {
+            "anyOf": [
+              {
+                "enum": [
+                  "energy_grid",
+                  "even_grid",
+                  "phrase_only"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fallback"
+          },
+          "source": {
+            "title": "Source",
+            "type": "string"
+          },
+          "tempo_bpm": {
+            "title": "Tempo Bpm",
+            "type": "number"
+          },
+          "tempo_octave_adjust": {
+            "title": "Tempo Octave Adjust",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "source",
+          "tempo_bpm",
+          "tempo_octave_adjust",
+          "confidence",
+          "beats_s",
+          "downbeats_s",
+          "fallback"
+        ],
+        "title": "BeatGrid",
+        "type": "object"
+      },
+      "BeatRef": {
+        "additionalProperties": false,
+        "properties": {
+          "beat_index": {
+            "minimum": 0.0,
+            "title": "Beat Index",
+            "type": "integer"
+          },
+          "kind": {
+            "enum": [
+              "downbeat",
+              "beat"
+            ],
+            "title": "Kind",
+            "type": "string"
+          },
+          "t_s": {
+            "title": "T S",
+            "type": "number"
+          }
+        },
+        "required": [
+          "beat_index",
+          "kind",
+          "t_s"
+        ],
+        "title": "BeatRef",
+        "type": "object"
+      },
       "ByArea": {
         "additionalProperties": false,
         "properties": {
@@ -185,6 +346,64 @@
           "renders"
         ],
         "title": "ByArea",
+        "type": "object"
+      },
+      "Clip": {
+        "additionalProperties": false,
+        "properties": {
+          "attribution": {
+            "$ref": "#/components/schemas/Attribution"
+          },
+          "in_frame": {
+            "minimum": 0.0,
+            "title": "In Frame",
+            "type": "integer"
+          },
+          "keywords": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Keywords",
+            "type": "array"
+          },
+          "locked": {
+            "title": "Locked",
+            "type": "boolean"
+          },
+          "mezzanine_frames": {
+            "minimum": 1.0,
+            "title": "Mezzanine Frames",
+            "type": "integer"
+          },
+          "mezzanine_key": {
+            "title": "Mezzanine Key",
+            "type": "string"
+          },
+          "provider": {
+            "title": "Provider",
+            "type": "string"
+          },
+          "provider_id": {
+            "title": "Provider Id",
+            "type": "string"
+          },
+          "score": {
+            "title": "Score",
+            "type": "number"
+          }
+        },
+        "required": [
+          "provider",
+          "provider_id",
+          "mezzanine_key",
+          "mezzanine_frames",
+          "in_frame",
+          "keywords",
+          "score",
+          "locked",
+          "attribution"
+        ],
+        "title": "Clip",
         "type": "object"
       },
       "ConfidenceOut": {
@@ -231,6 +450,51 @@
           "configured"
         ],
         "title": "Configured",
+        "type": "object"
+      },
+      "Cut": {
+        "additionalProperties": false,
+        "properties": {
+          "beat_ref": {
+            "$ref": "#/components/schemas/BeatRef"
+          },
+          "clip": {
+            "$ref": "#/components/schemas/Clip"
+          },
+          "effects": {
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 0,
+            "title": "Effects",
+            "type": "array"
+          },
+          "index": {
+            "minimum": 0.0,
+            "title": "Index",
+            "type": "integer"
+          },
+          "out_end_frame": {
+            "title": "Out End Frame",
+            "type": "integer"
+          },
+          "out_start_frame": {
+            "title": "Out Start Frame",
+            "type": "integer"
+          },
+          "section": {
+            "$ref": "#/components/schemas/SectionRef"
+          }
+        },
+        "required": [
+          "index",
+          "out_start_frame",
+          "out_end_frame",
+          "beat_ref",
+          "section",
+          "clip"
+        ],
+        "title": "Cut",
         "type": "object"
       },
       "Disk": {
@@ -408,6 +672,322 @@
         "title": "Keys",
         "type": "object"
       },
+      "LockClip": {
+        "additionalProperties": false,
+        "properties": {
+          "cut_index": {
+            "minimum": 0.0,
+            "title": "Cut Index",
+            "type": "integer"
+          },
+          "locked": {
+            "title": "Locked",
+            "type": "boolean"
+          },
+          "op": {
+            "const": "lock_clip",
+            "title": "Op",
+            "type": "string"
+          }
+        },
+        "required": [
+          "op",
+          "cut_index",
+          "locked"
+        ],
+        "title": "LockClip",
+        "type": "object"
+      },
+      "Output": {
+        "additionalProperties": false,
+        "properties": {
+          "crf": {
+            "title": "Crf",
+            "type": "integer"
+          },
+          "preset": {
+            "title": "Preset",
+            "type": "string"
+          }
+        },
+        "required": [
+          "crf",
+          "preset"
+        ],
+        "title": "Output",
+        "type": "object"
+      },
+      "Overlays": {
+        "additionalProperties": false,
+        "properties": {
+          "credits_text": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Credits Text"
+          }
+        },
+        "required": [
+          "credits_text"
+        ],
+        "title": "Overlays",
+        "type": "object"
+      },
+      "PlanOptions": {
+        "additionalProperties": false,
+        "properties": {
+          "density": {
+            "maximum": 1.0,
+            "minimum": -2.0,
+            "title": "Density",
+            "type": "integer"
+          },
+          "keywords_override": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Keywords Override"
+          },
+          "style": {
+            "title": "Style",
+            "type": "string"
+          }
+        },
+        "required": [
+          "density",
+          "style",
+          "keywords_override"
+        ],
+        "title": "PlanOptions",
+        "type": "object"
+      },
+      "PlanOut": {
+        "additionalProperties": false,
+        "description": "The edit plan (ARCH \u00a75) plus whether a render froze this version.",
+        "properties": {
+          "audio": {
+            "$ref": "#/components/schemas/Audio"
+          },
+          "beat_grid": {
+            "$ref": "#/components/schemas/BeatGrid"
+          },
+          "content_hash": {
+            "pattern": "^[0-9a-f]{64}$",
+            "title": "Content Hash",
+            "type": "string"
+          },
+          "created_by": {
+            "enum": [
+              "planner",
+              "user"
+            ],
+            "title": "Created By",
+            "type": "string"
+          },
+          "cuts": {
+            "items": {
+              "$ref": "#/components/schemas/Cut"
+            },
+            "minItems": 1,
+            "title": "Cuts",
+            "type": "array"
+          },
+          "fps": {
+            "title": "Fps",
+            "type": "integer"
+          },
+          "frozen": {
+            "title": "Frozen",
+            "type": "boolean"
+          },
+          "lead_frames": {
+            "minimum": 0.0,
+            "title": "Lead Frames",
+            "type": "integer"
+          },
+          "options": {
+            "$ref": "#/components/schemas/PlanOptions"
+          },
+          "output": {
+            "$ref": "#/components/schemas/Output"
+          },
+          "overlays": {
+            "$ref": "#/components/schemas/Overlays"
+          },
+          "plan_id": {
+            "format": "uuid",
+            "title": "Plan Id",
+            "type": "string"
+          },
+          "project_id": {
+            "format": "uuid",
+            "title": "Project Id",
+            "type": "string"
+          },
+          "provenance": {
+            "$ref": "#/components/schemas/Provenance"
+          },
+          "resolution": {
+            "$ref": "#/components/schemas/Resolution"
+          },
+          "schema_version": {
+            "title": "Schema Version",
+            "type": "string"
+          },
+          "segment": {
+            "$ref": "#/components/schemas/Segment"
+          },
+          "song": {
+            "$ref": "#/components/schemas/Song"
+          },
+          "total_frames": {
+            "minimum": 1.0,
+            "title": "Total Frames",
+            "type": "integer"
+          },
+          "version": {
+            "minimum": 1.0,
+            "title": "Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "schema_version",
+          "plan_id",
+          "project_id",
+          "version",
+          "created_by",
+          "fps",
+          "lead_frames",
+          "resolution",
+          "song",
+          "segment",
+          "beat_grid",
+          "options",
+          "cuts",
+          "total_frames",
+          "audio",
+          "overlays",
+          "output",
+          "provenance",
+          "content_hash",
+          "frozen"
+        ],
+        "title": "PlanOut",
+        "type": "object"
+      },
+      "PlanPatch": {
+        "additionalProperties": false,
+        "description": "`ops` are all local, or exactly one `set_keywords` (a replan that fetches footage).",
+        "properties": {
+          "base_version": {
+            "minimum": 1.0,
+            "title": "Base Version",
+            "type": "integer"
+          },
+          "ops": {
+            "items": {
+              "discriminator": {
+                "mapping": {
+                  "lock_clip": "#/components/schemas/LockClip",
+                  "set_bpm": "#/components/schemas/SetBpm",
+                  "set_density": "#/components/schemas/SetDensity",
+                  "set_keywords": "#/components/schemas/SetKeywords",
+                  "set_segment": "#/components/schemas/SetSegment",
+                  "set_tempo_octave": "#/components/schemas/SetTempoOctave",
+                  "use_detected_beats": "#/components/schemas/UseDetectedBeats"
+                },
+                "propertyName": "op"
+              },
+              "oneOf": [
+                {
+                  "$ref": "#/components/schemas/SetTempoOctave"
+                },
+                {
+                  "$ref": "#/components/schemas/SetBpm"
+                },
+                {
+                  "$ref": "#/components/schemas/UseDetectedBeats"
+                },
+                {
+                  "$ref": "#/components/schemas/SetDensity"
+                },
+                {
+                  "$ref": "#/components/schemas/SetSegment"
+                },
+                {
+                  "$ref": "#/components/schemas/LockClip"
+                },
+                {
+                  "$ref": "#/components/schemas/SetKeywords"
+                }
+              ]
+            },
+            "maxItems": 32,
+            "minItems": 1,
+            "title": "Ops",
+            "type": "array"
+          }
+        },
+        "required": [
+          "base_version",
+          "ops"
+        ],
+        "title": "PlanPatch",
+        "type": "object"
+      },
+      "PlanSummaryOut": {
+        "additionalProperties": false,
+        "properties": {
+          "frozen": {
+            "title": "Frozen",
+            "type": "boolean"
+          },
+          "keyword_source": {
+            "enum": [
+              "explicit",
+              "llm",
+              "table"
+            ],
+            "title": "Keyword Source",
+            "type": "string"
+          },
+          "n_cuts": {
+            "title": "N Cuts",
+            "type": "integer"
+          },
+          "total_frames": {
+            "title": "Total Frames",
+            "type": "integer"
+          },
+          "version": {
+            "title": "Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "version",
+          "frozen",
+          "total_frames",
+          "n_cuts",
+          "keyword_source"
+        ],
+        "title": "PlanSummaryOut",
+        "type": "object"
+      },
       "ProjectCreate": {
         "additionalProperties": false,
         "properties": {
@@ -439,7 +1019,7 @@
       },
       "ProjectDetail": {
         "additionalProperties": false,
-        "description": "`plan` and `render` are placeholders that plans 006 and 007 fill in additively.",
+        "description": "`render` stays empty until plan 007 adds it, additively.",
         "properties": {
           "analysis": {
             "anyOf": [
@@ -477,8 +1057,14 @@
             "type": "object"
           },
           "plan": {
-            "title": "Plan",
-            "type": "null"
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PlanSummaryOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "render": {
             "title": "Render",
@@ -700,6 +1286,81 @@
         "title": "ProjectPatch",
         "type": "object"
       },
+      "Provenance": {
+        "additionalProperties": false,
+        "properties": {
+          "keyword_source": {
+            "enum": [
+              "explicit",
+              "llm",
+              "table"
+            ],
+            "title": "Keyword Source",
+            "type": "string"
+          },
+          "llm_model": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Llm Model"
+          },
+          "planner_version": {
+            "title": "Planner Version",
+            "type": "string"
+          },
+          "seed": {
+            "title": "Seed",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "llm_model",
+          "keyword_source",
+          "planner_version",
+          "seed"
+        ],
+        "title": "Provenance",
+        "type": "object"
+      },
+      "ReplanAccepted": {
+        "additionalProperties": false,
+        "properties": {
+          "job_id": {
+            "format": "uuid",
+            "title": "Job Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "job_id"
+        ],
+        "title": "ReplanAccepted",
+        "type": "object"
+      },
+      "Resolution": {
+        "additionalProperties": false,
+        "properties": {
+          "height": {
+            "title": "Height",
+            "type": "integer"
+          },
+          "width": {
+            "title": "Width",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "width",
+          "height"
+        ],
+        "title": "Resolution",
+        "type": "object"
+      },
       "SectionOut": {
         "additionalProperties": false,
         "properties": {
@@ -740,6 +1401,56 @@
         "title": "SectionOut",
         "type": "object"
       },
+      "SectionRef": {
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "label": {
+            "enum": [
+              "e1",
+              "e2",
+              "e3",
+              "e4"
+            ],
+            "title": "Label",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "label"
+        ],
+        "title": "SectionRef",
+        "type": "object"
+      },
+      "Segment": {
+        "additionalProperties": false,
+        "properties": {
+          "end_s": {
+            "title": "End S",
+            "type": "number"
+          },
+          "start_s": {
+            "title": "Start S",
+            "type": "number"
+          },
+          "start_snapped_to": {
+            "const": "downbeat",
+            "title": "Start Snapped To",
+            "type": "string"
+          }
+        },
+        "required": [
+          "start_s",
+          "end_s",
+          "start_snapped_to"
+        ],
+        "title": "Segment",
+        "type": "object"
+      },
       "SegmentOut": {
         "additionalProperties": false,
         "properties": {
@@ -762,6 +1473,186 @@
           "total_frames"
         ],
         "title": "SegmentOut",
+        "type": "object"
+      },
+      "SetBpm": {
+        "additionalProperties": false,
+        "properties": {
+          "bpm": {
+            "anyOf": [
+              {
+                "maximum": 300.0,
+                "minimum": 40.0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Bpm"
+          },
+          "op": {
+            "const": "set_bpm",
+            "title": "Op",
+            "type": "string"
+          },
+          "use_even_grid": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Use Even Grid"
+          }
+        },
+        "required": [
+          "op"
+        ],
+        "title": "SetBpm",
+        "type": "object"
+      },
+      "SetDensity": {
+        "additionalProperties": false,
+        "properties": {
+          "level": {
+            "maximum": 1.0,
+            "minimum": -2.0,
+            "title": "Level",
+            "type": "integer"
+          },
+          "op": {
+            "const": "set_density",
+            "title": "Op",
+            "type": "string"
+          }
+        },
+        "required": [
+          "op",
+          "level"
+        ],
+        "title": "SetDensity",
+        "type": "object"
+      },
+      "SetKeywords": {
+        "additionalProperties": false,
+        "properties": {
+          "keywords": {
+            "items": {
+              "pattern": "^[a-z][a-z \\-]{1,30}$",
+              "type": "string"
+            },
+            "maxItems": 8,
+            "minItems": 1,
+            "title": "Keywords",
+            "type": "array"
+          },
+          "op": {
+            "const": "set_keywords",
+            "title": "Op",
+            "type": "string"
+          },
+          "section_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Section Id"
+          },
+          "vibe_chips": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Vibe Chips"
+          }
+        },
+        "required": [
+          "op",
+          "keywords"
+        ],
+        "title": "SetKeywords",
+        "type": "object"
+      },
+      "SetSegment": {
+        "additionalProperties": false,
+        "properties": {
+          "auto": {
+            "default": false,
+            "title": "Auto",
+            "type": "boolean"
+          },
+          "duration_s": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Duration S"
+          },
+          "op": {
+            "const": "set_segment",
+            "title": "Op",
+            "type": "string"
+          },
+          "start_s": {
+            "anyOf": [
+              {
+                "minimum": 0.0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Start S"
+          }
+        },
+        "required": [
+          "op"
+        ],
+        "title": "SetSegment",
+        "type": "object"
+      },
+      "SetTempoOctave": {
+        "additionalProperties": false,
+        "properties": {
+          "octave": {
+            "enum": [
+              -1,
+              0,
+              1
+            ],
+            "title": "Octave",
+            "type": "integer"
+          },
+          "op": {
+            "const": "set_tempo_octave",
+            "title": "Op",
+            "type": "string"
+          }
+        },
+        "required": [
+          "op",
+          "octave"
+        ],
+        "title": "SetTempoOctave",
         "type": "object"
       },
       "SettingsOut": {
@@ -799,6 +1690,31 @@
           "intermediate_ttl_days"
         ],
         "title": "SettingsOut",
+        "type": "object"
+      },
+      "Song": {
+        "additionalProperties": false,
+        "properties": {
+          "duration_s": {
+            "title": "Duration S",
+            "type": "number"
+          },
+          "sample_rate": {
+            "title": "Sample Rate",
+            "type": "integer"
+          },
+          "sha256": {
+            "pattern": "^[0-9a-f]{64}$",
+            "title": "Sha256",
+            "type": "string"
+          }
+        },
+        "required": [
+          "sha256",
+          "duration_s",
+          "sample_rate"
+        ],
+        "title": "Song",
         "type": "object"
       },
       "SongMeta": {
@@ -1070,6 +1986,26 @@
           "ui_status"
         ],
         "title": "UploadAccepted",
+        "type": "object"
+      },
+      "UseDetectedBeats": {
+        "additionalProperties": false,
+        "properties": {
+          "on": {
+            "title": "On",
+            "type": "boolean"
+          },
+          "op": {
+            "const": "use_detected_beats",
+            "title": "Op",
+            "type": "string"
+          }
+        },
+        "required": [
+          "op",
+          "on"
+        ],
+        "title": "UseDetectedBeats",
         "type": "object"
       },
       "Volume": {
@@ -1757,7 +2693,7 @@
                 }
               }
             },
-            "description": "conflict; details.reason is one of not_ready, wrong_state, upload_in_progress, retry_limit"
+            "description": "conflict; details.reason is one of not_ready, wrong_state, upload_in_progress, retry_limit, job_active, no_plan_yet, too_many_streams, render_active"
           },
           "422": {
             "content": {
@@ -1841,7 +2777,7 @@
                 }
               }
             },
-            "description": "conflict; details.reason is one of not_ready, wrong_state, upload_in_progress, retry_limit"
+            "description": "conflict; details.reason is one of not_ready, wrong_state, upload_in_progress, retry_limit, job_active, no_plan_yet, too_many_streams, render_active"
           },
           "422": {
             "content": {
@@ -1924,7 +2860,7 @@
                 }
               }
             },
-            "description": "conflict; details.reason is one of not_ready, wrong_state, upload_in_progress, retry_limit"
+            "description": "conflict; details.reason is one of not_ready, wrong_state, upload_in_progress, retry_limit, job_active, no_plan_yet, too_many_streams, render_active"
           },
           "422": {
             "content": {
@@ -1950,6 +2886,293 @@
         "summary": "Cancel",
         "tags": [
           "projects"
+        ]
+      }
+    },
+    "/api/v1/projects/{project_id}/events": {
+      "get": {
+        "description": "`retry: 3000`, then a `state` snapshot, then live events of the project until a terminal\none (`failed`, `render_ready`, `mode_a_ready`) or 15 minutes. `: ping` every 15 s when idle;\n`Last-Event-ID` is ignored (the snapshot is authoritative). At most 5 streams at once: the\nsixth is 409 `conflict` with `details.reason = too_many_streams`.",
+        "operationId": "stream_events",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Project Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "text/event-stream": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "forbidden; details.reason is one of host_not_allowed, origin_mismatch, cross_site"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "not found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "conflict; details.reason is one of not_ready, wrong_state, upload_in_progress, retry_limit, job_active, no_plan_yet, too_many_streams, render_active"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "validation_error (details.fields)"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "internal_error"
+          }
+        },
+        "summary": "Stream Events",
+        "tags": [
+          "events"
+        ]
+      }
+    },
+    "/api/v1/projects/{project_id}/plan": {
+      "get": {
+        "description": "The latest version, or `?version=N`. 409 `conflict` (`details.reason = no_plan_yet`) before\nthe first draft exists.",
+        "operationId": "get_plan",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Project Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "version",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "minimum": 1,
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Version"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlanOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "forbidden; details.reason is one of host_not_allowed, origin_mismatch, cross_site"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "not found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "conflict; details.reason is one of not_ready, wrong_state, upload_in_progress, retry_limit, job_active, no_plan_yet, too_many_streams, render_active"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "validation_error (details.fields)"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "internal_error"
+          }
+        },
+        "summary": "Get Plan",
+        "tags": [
+          "plan"
+        ]
+      },
+      "patch": {
+        "description": "Apply `ops` to the working version: 200 with the new plan. A replan-local edit is\nsynchronous and always allowed; `set_keywords` (exactly one op, project `draft_ready`) starts\na replan job and answers 202 `{job_id}`; while a render runs it is 409 `conflict`.",
+        "operationId": "patch_plan",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Project Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PlanPatch"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlanOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReplanAccepted"
+                }
+              }
+            },
+            "description": "set_keywords: a replan job was started"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "forbidden; details.reason is one of host_not_allowed, origin_mismatch, cross_site"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "not found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "conflict (details.reason: wrong_state, job_active, render_active), plan_version_conflict (details.current_version) or lock_conflict (details.reason)"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "validation_error (details.fields)"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "internal_error"
+          }
+        },
+        "summary": "Patch Plan",
+        "tags": [
+          "plan"
         ]
       }
     },
@@ -2007,7 +3230,7 @@
                 }
               }
             },
-            "description": "conflict; details.reason is one of not_ready, wrong_state, upload_in_progress, retry_limit"
+            "description": "conflict; details.reason is one of not_ready, wrong_state, upload_in_progress, retry_limit, job_active, no_plan_yet, too_many_streams, render_active"
           },
           "422": {
             "content": {
@@ -2160,7 +3383,7 @@
                 }
               }
             },
-            "description": "conflict; details.reason is one of not_ready, wrong_state, upload_in_progress, retry_limit"
+            "description": "conflict; details.reason is one of not_ready, wrong_state, upload_in_progress, retry_limit, job_active, no_plan_yet, too_many_streams, render_active"
           },
           "413": {
             "content": {

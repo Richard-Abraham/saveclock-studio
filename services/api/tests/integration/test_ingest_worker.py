@@ -38,7 +38,8 @@ from tests.integration.conftest import REDIS_URL, Db, Harness
 pytestmark = pytest.mark.integration
 OWNER = UUID("00000000-0000-4000-8000-000000000001")
 OTHER = UUID("00000000-0000-4000-8000-0000000000bb")
-QUEUES = ["analysis", "fetch", "render"]
+# no `fetch` worker: the draft job (plan 006) stays queued here, so these tests keep to ingest
+QUEUES = ["analysis", "render"]
 
 
 @pytest.fixture
@@ -156,19 +157,18 @@ async def test_upload_to_analysis_chain(
     assert a["segment"]["total_frames"] == 900
     assert len(await rows(harness.db, "SELECT id FROM analyses")) == 1
 
-    # every job ended ok; the draft job is the named placeholder (plan 006 replaces it)
+    # validate and analyze ended ok; the draft job waits for a `fetch` worker (none runs here)
     deadline = time.monotonic() + 30
     while time.monotonic() < deadline:
         jobs = await rows(harness.db, "SELECT stage, state, timings FROM jobs ORDER BY created_at")
-        if [j["state"] for j in jobs] == ["ok", "ok", "ok"]:
+        if [j["state"] for j in jobs] == ["ok", "ok", "queued"]:
             break
         await asyncio.sleep(0.3)
     assert [(j["stage"], j["state"]) for j in jobs] == [
         ("validate", "ok"),
         ("analyze", "ok"),
-        ("draft", "ok"),
+        ("draft", "queued"),
     ]
-    assert json.loads(jobs[2]["timings"])["placeholder"] is True
     assert json.loads(jobs[1]["timings"])["beat_this_ms"] >= 0
     assert await project_status(harness.db, pid) == "planning"
 

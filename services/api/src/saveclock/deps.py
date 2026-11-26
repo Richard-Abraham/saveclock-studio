@@ -6,6 +6,7 @@ from redis.asyncio import Redis
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker
 
 from saveclock.adapters.blobstore.port import BlobStore
+from saveclock.adapters.events import EventPublisher
 from saveclock.adapters.queue import Enqueuer
 from saveclock.services.health import Check
 from saveclock.services.settings import UsageCache
@@ -22,6 +23,7 @@ class Deps:
     enqueuer: Enqueuer
     enqueue_stub: Enqueue | None = None  # set only when APP_ENV is local or ci
     usage_cache: UsageCache = field(default_factory=UsageCache)
+    publisher: EventPublisher | None = None
 
     async def close(self) -> None:
         await self.redis.aclose()

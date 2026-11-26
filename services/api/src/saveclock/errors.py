@@ -73,6 +73,10 @@ class ConflictReason(StrEnum):
     WRONG_STATE = "wrong_state"
     UPLOAD_IN_PROGRESS = "upload_in_progress"
     RETRY_LIMIT = "retry_limit"
+    JOB_ACTIVE = "job_active"  # uq_jobs_active: another draft, replan or render is running
+    NO_PLAN_YET = "no_plan_yet"
+    TOO_MANY_STREAMS = "too_many_streams"
+    RENDER_ACTIVE = "render_active"  # a replan-fetch while a render runs (P6-11)
 
 
 # ARCH §7: which codes a client (or the job runner) may retry; derived from the code, no column.
@@ -145,6 +149,34 @@ class FileRejected(AppError):
 
     def __init__(self, reason: FileRejectReason, message: str = "file rejected") -> None:
         super().__init__(message, {"reason": reason.value})
+
+
+class PlanVersionConflict(AppError):
+    """A stale `base_version`: the client refetches (ARCH §7)."""
+
+    code = ErrorCode.PLAN_VERSION_CONFLICT
+
+    def __init__(self, current_version: int) -> None:
+        super().__init__("plan version conflict", {"current_version": current_version})
+
+
+class LockConflictError(AppError):
+    """A replan cannot honour a locked clip (ARCH §5 invariant 7)."""
+
+    code = ErrorCode.LOCK_CONFLICT
+
+    def __init__(self, reason: str) -> None:
+        super().__init__("a locked clip cannot stay", {"reason": reason})
+
+
+class ValidationFailed(AppError):
+    """A well-formed request that the domain refuses (422 `validation_error` with a reason)."""
+
+    code = ErrorCode.VALIDATION_ERROR
+
+    def __init__(self, reason: str, rule: str | None = None) -> None:
+        details = {"reason": reason, **({"rule": rule} if rule else {})}
+        super().__init__("request refused", details)
 
 
 class UpstreamUnavailable(AppError):

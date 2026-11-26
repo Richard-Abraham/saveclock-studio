@@ -10,17 +10,21 @@ from uuid import UUID
 
 import dramatiq
 import structlog
+from redis import Redis
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 from sqlalchemy.pool import NullPool
 
 from saveclock.adapters.blobstore.filesystem import FilesystemBlobStore
+from saveclock.adapters.events import EventPublisher
 from saveclock.adapters.ffmpeg import Tools
 from saveclock.adapters.queue import DramatiqEnqueuer
 from saveclock.config import Settings
 from saveclock.models import JobQueue, ProjectStatus
 from saveclock.repositories.jobs import JobRepository
-from saveclock.repositories.projects import ProjectRepository
+from saveclock.repositories.plans import PlanRepository
+from saveclock.services import project_state
 from saveclock.services.context import WorkerContext
+from saveclock.services.plans import restore_keywords_override
 
 log = structlog.get_logger()
 
@@ -31,12 +35,19 @@ MAX_BACKOFF_MS = 30_000
 FAILED_ACTOR = "pipeline_failed"
 
 
-def actor_options(queue: JobQueue, time_limit_ms: int) -> dict[str, Any]:
+def actor_options(
+    queue: JobQueue,
+    time_limit_ms: int,
+    *,
+    max_retries: int = MAX_RETRIES,
+    min_backoff_ms: int = MIN_BACKOFF_MS,
+    max_backoff_ms: int = MAX_BACKOFF_MS,
+) -> dict[str, Any]:
     return {
         "queue_name": queue.value,
-        "max_retries": MAX_RETRIES,
-        "min_backoff": MIN_BACKOFF_MS,
-        "max_backoff": MAX_BACKOFF_MS,
+        "max_retries": max_retries,
+        "min_backoff": min_backoff_ms,
+        "max_backoff": max_backoff_ms,
         "time_limit": time_limit_ms,
         "on_retry_exhausted": FAILED_ACTOR,
     }
@@ -52,6 +63,7 @@ def run_with_context(
 
     async def go() -> None:
         engine = create_async_engine(settings.database_url.get_secret_value(), poolclass=NullPool)
+        publisher = EventPublisher(sync=Redis.from_url(settings.redis_url.get_secret_value()))
         try:
             ctx = WorkerContext(
                 sessionmaker=async_sessionmaker(engine, expire_on_commit=False),
@@ -59,9 +71,11 @@ def run_with_context(
                 tools=Tools(settings.ffmpeg_bin, settings.ffprobe_bin),
                 enqueuer=DramatiqEnqueuer(broker),
                 settings=settings,
+                publisher=publisher,
             )
             await body(ctx)
         finally:
+            publisher.close()
             await engine.dispose()
 
     asyncio.run(go())
@@ -77,27 +91,44 @@ def register_failure_hook(broker: dramatiq.Broker, settings: Settings) -> None:
             engine = create_async_engine(
                 settings.database_url.get_secret_value(), poolclass=NullPool
             )
+            publisher = EventPublisher(sync=Redis.from_url(settings.redis_url.get_secret_value()))
             try:
                 async with async_sessionmaker(engine, expire_on_commit=False)() as session:
                     jobs = JobRepository(session)
                     job = await jobs.get(user_id=user_id, job_id=job_id)
                     await jobs.mark_dead(user_id=user_id, job_id=job_id)
                     if job is not None and job.project_id is not None:
-                        projects = ProjectRepository(session)
+                        planned = (
+                            await PlanRepository(session).latest(
+                                user_id=user_id, project_id=job.project_id
+                            )
+                            is not None
+                        )
+                        # a replan that dies keeps the plan the owner had (and drops its keywords)
+                        planning_to = (
+                            ProjectStatus.DRAFT_READY if planned else ProjectStatus.FAILED_PLAN
+                        )
                         for from_, to in (
                             (ProjectStatus.VALIDATING, ProjectStatus.FAILED_ANALYSIS),
                             (ProjectStatus.ANALYZING, ProjectStatus.FAILED_ANALYSIS),
-                            (ProjectStatus.PLANNING, ProjectStatus.FAILED_PLAN),  # the draft job
+                            (ProjectStatus.PLANNING, planning_to),  # the draft job
                         ):
-                            await projects.transition(
+                            moved = await project_state.transition(
+                                session,
+                                publisher,
                                 user_id=user_id,
                                 project_id=job.project_id,
                                 from_=from_.value,
                                 to=to.value,
                                 reason="retries_exhausted",
+                                commit=False,
                             )
+                            if moved and planned and to is ProjectStatus.DRAFT_READY:
+                                await restore_keywords_override(session, user_id, job.project_id)
                     await session.commit()
+                    await project_state.announce_pending(session, publisher)
             finally:
+                publisher.close()
                 await engine.dispose()
 
         asyncio.run(run())

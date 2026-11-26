@@ -27,8 +27,8 @@ DepsDep = Annotated[Deps, Depends(get_deps)]
 
 
 async def _detail(session: AsyncSession, user: CurrentUser, project_id: UUID) -> ProjectDetail:
-    project, song, analysis = await svc.get_detail(session, user.id, project_id)
-    return ProjectDetail.of(project, song, analysis)
+    project, song, analysis, plan = await svc.get_detail(session, user.id, project_id)
+    return ProjectDetail.of(project, song, analysis, plan)
 
 
 @router.get("", operation_id="list_projects")
@@ -85,8 +85,10 @@ async def patch(
     status_code=status.HTTP_202_ACCEPTED,
     responses={**CONFLICT_RESPONSE},
 )
-async def cancel(project_id: UUID, user: UserDep, session: SessionDep) -> ProjectDetail:
-    await svc.cancel(session, user.id, project_id)
+async def cancel(
+    project_id: UUID, user: UserDep, session: SessionDep, deps: DepsDep
+) -> ProjectDetail:
+    await svc.cancel(session, user.id, project_id, deps.publisher)
     return await _detail(session, user, project_id)
 
 
@@ -99,5 +101,5 @@ async def cancel(project_id: UUID, user: UserDep, session: SessionDep) -> Projec
 async def retry(
     project_id: UUID, user: UserDep, session: SessionDep, deps: DepsDep
 ) -> ProjectDetail:
-    await svc.retry(session, user.id, project_id, deps.enqueuer)
+    await svc.retry(session, user.id, project_id, deps.enqueuer, deps.publisher)
     return await _detail(session, user, project_id)

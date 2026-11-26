@@ -25,6 +25,7 @@ from tests.conftest import ENV, FFMPEG_DIR, client_for, make_app
 from tests.factories.stock import fake_stock
 
 if TYPE_CHECKING:
+    from tests.integration.draft_harness import Draft
     from tests.integration.footage_harness import Footage
 
 API_DIR = Path(__file__).resolve().parents[2]
@@ -245,3 +246,16 @@ async def footage(
     yield harness
     harness.redis.close()
     await engine.dispose()  # type: ignore[attr-defined]
+
+
+@pytest.fixture
+async def draft(
+    api: ApiEnv, ffmpeg_tools: Tools, fake_clips: Path, tmp_path: Path
+) -> AsyncIterator["Draft"]:
+    """The automatic draft in-process (plan 006): fake stock, fake Beat This, real the rest."""
+    from tests.integration.draft_harness import build_draft_env
+
+    d, engine = await build_draft_env(api, ffmpeg_tools, fake_clips, tmp_path)
+    yield d
+    d.redis.close()
+    await engine.dispose()

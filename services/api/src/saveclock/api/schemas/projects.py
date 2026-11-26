@@ -5,6 +5,7 @@ from uuid import UUID
 from pydantic import BaseModel, ConfigDict, Field
 
 from saveclock.models import Analysis, Fallback, Project, Song
+from saveclock.services.plans import PlanSummary
 from saveclock.services.projects import UiStatus, ui_status
 
 Keyword = Annotated[str, Field(pattern=r"^[a-z][a-z \-]{1,30}$")]
@@ -94,8 +95,28 @@ class AnalysisSummary(BaseModel):
         )
 
 
+class PlanSummaryOut(BaseModel):
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    version: int
+    frozen: bool
+    total_frames: int
+    n_cuts: int
+    keyword_source: Literal["explicit", "llm", "table"]
+
+    @classmethod
+    def of(cls, s: PlanSummary) -> "PlanSummaryOut":
+        return cls(
+            version=s.version,
+            frozen=s.frozen,
+            total_frames=s.total_frames,
+            n_cuts=s.n_cuts,
+            keyword_source=s.keyword_source,
+        )
+
+
 class ProjectDetail(BaseModel):
-    """`plan` and `render` are placeholders that plans 006 and 007 fill in additively."""
+    """`render` stays empty until plan 007 adds it, additively."""
 
     model_config = ConfigDict(extra="forbid", frozen=True)
 
@@ -107,13 +128,19 @@ class ProjectDetail(BaseModel):
     options: dict[str, Any]
     song: SongMeta | None
     analysis: AnalysisSummary | None
-    plan: None = None
+    plan: PlanSummaryOut | None = None
     render: None = None
     last_activity_at: datetime
     created_at: datetime
 
     @classmethod
-    def of(cls, p: Project, song: Song | None, analysis: Analysis | None) -> "ProjectDetail":
+    def of(
+        cls,
+        p: Project,
+        song: Song | None,
+        analysis: Analysis | None,
+        plan: PlanSummary | None = None,
+    ) -> "ProjectDetail":
         return cls(
             id=p.id,
             title=p.title,
@@ -123,6 +150,7 @@ class ProjectDetail(BaseModel):
             options=p.options,
             song=SongMeta.of(song) if song else None,
             analysis=AnalysisSummary.of(analysis) if analysis else None,
+            plan=PlanSummaryOut.of(plan) if plan else None,
             last_activity_at=p.last_activity_at,
             created_at=p.created_at,
         )
