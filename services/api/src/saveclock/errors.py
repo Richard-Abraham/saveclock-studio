@@ -170,3 +170,15 @@ class RangeNotSatisfiable(BadRequest):
         super().__init__(
             "range not satisfiable", {"size": size}, {"content-range": f"bytes */{size}"}
         )
+
+
+class StockUnavailable(AppError):
+    """The stock provider could not answer (job error `stock_unavailable`, retryable)."""
+
+    code = ErrorCode.STOCK_UNAVAILABLE
+
+
+class ClipUnavailable(AppError):
+    """A clip could not be fetched or prepared (job error `clip_unavailable`)."""
+
+    code = ErrorCode.CLIP_UNAVAILABLE

@@ -1324,6 +1324,8 @@ ml = [
 dev = [
     { name = "import-linter" },
     { name = "mypy" },
+    { name = "opencv-python-headless" },
+    { name = "pillow" },
     { name = "pip-audit" },
     { name = "pytest" },
     { name = "pytest-asyncio" },
@@ -1331,6 +1333,7 @@ dev = [
     { name = "pyyaml" },
     { name = "respx" },
     { name = "ruff" },
+    { name = "scenedetect" },
     { name = "scipy" },
     { name = "soundfile" },
     { name = "types-pyyaml" },
@@ -1368,6 +1371,8 @@ provides-extras = ["ml"]
 dev = [
     { name = "import-linter", specifier = ">=2.17" },
     { name = "mypy", specifier = ">=2.4.1" },
+    { name = "opencv-python-headless", specifier = ">=5.1.0.95" },
+    { name = "pillow", specifier = ">=13.0.0" },
     { name = "pip-audit", specifier = ">=2.10.1" },
     { name = "pytest", specifier = ">=9.2.0" },
     { name = "pytest-asyncio", specifier = ">=1.5.0" },
@@ -1375,6 +1380,7 @@ dev = [
     { name = "pyyaml", specifier = ">=6.0.4" },
     { name = "respx", specifier = ">=0.23.1" },
     { name = "ruff", specifier = ">=0.17.6" },
+    { name = "scenedetect", specifier = ">=0.7.3" },
     { name = "scipy", specifier = ">=1.18.1" },
     { name = "soundfile", specifier = ">=0.14.0" },
     { name = "types-pyyaml", specifier = ">=6.0.12.20261122" },

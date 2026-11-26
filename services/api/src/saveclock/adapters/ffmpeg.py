@@ -20,6 +20,8 @@ from pathlib import Path
 from typing import Any
 
 from saveclock.domain.audio_rules import AudioProbe, StreamInfo
+from saveclock.domain.video_checks import moov_before_mdat
+from saveclock.domain.windows import Window
 
 COMMON = ["-hide_banner", "-nostdin", "-loglevel", "error", "-protocol_whitelist", "file", "-y"]
 PROBE_COMMON = ["-v", "error", "-hide_banner", "-protocol_whitelist", "file"]
@@ -248,3 +250,158 @@ def canonicalize(
         out_flac.unlink(missing_ok=True)
         msg = f"decode failed: {res.stderr[-STDERR_TAIL:]}"
         raise DecodeFailed(msg)
+
+
+# --- stock clips: probe, sample, normalize to the mezzanine (ARCH §11, plan 005) ------------------
+
+MP4_FMT = "mov,mp4,m4a,3gp,3g2,mj2"  # forced input format for every stock clip: never auto-detect
+SAMPLE_TIMEOUT_S = 60
+MEZZ_TIMEOUT_S = 120
+SAMPLE_VF = "fps=1,scale=224:-2"
+MEZZ_VF = (
+    "fps=30,scale=1080:1920:force_original_aspect_ratio=increase:flags=bicubic,"
+    "crop=1080:1920,setsar=1,format=yuv420p"
+)
+# x264 only: the libopenh264 fallback of the spike is not ported
+MEZZ_ENCODE = (
+    *("-c:v", "libx264", "-preset", "veryfast", "-crf", "14", "-profile:v", "high"),
+    *("-g", "15", "-keyint_min", "15", "-sc_threshold", "0", "-bf", "2"),
+)
+STOCK_ENTRIES = (
+    "stream=codec_type,codec_name,width,height,r_frame_rate,avg_frame_rate,duration"
+    ":stream_tags=rotate:stream_side_data=rotation:format=duration,size"
+)
+ROTATED = (90, 270)
+
+
+@dataclass(frozen=True)
+class StockProbe:
+    width: int  # as displayed (rotation applied)
+    height: int
+    duration_s: float
+    fps: float | None
+    size_bytes: int | None
+
+
+def _fraction(value: Any) -> float | None:  # noqa: ANN401
+    try:
+        num, den = str(value).split("/")
+        return float(num) / float(den) if float(den) else None
+    except (ValueError, ZeroDivisionError):
+        return None
+
+
+def probe_stock(tools: Tools, path: Path) -> StockProbe:
+    """ffprobe of a downloaded clip with a forced mp4-family `-f`. Exactly one video stream
+    (audio is ignored later by `-map 0:v:0`); displayed size accounts for a rotation flag."""
+    data = _probe_json(tools, path, MP4_FMT, "-show_entries", STOCK_ENTRIES)
+    videos = [s for s in data.get("streams", []) if s.get("codec_type") == "video"]
+    if len(videos) != 1:
+        msg = "expected exactly one video stream"
+        raise ProbeFailed(msg)
+    v = videos[0]
+    width, height = _num(v.get("width"), int), _num(v.get("height"), int)
+    duration = _num(v.get("duration"), float) or _num(data.get("format", {}).get("duration"), float)
+    if not width or not height or not duration:
+        msg = "video stream has no size or duration"
+        raise ProbeFailed(msg)
+    rotation = _num(v.get("tags", {}).get("rotate"), int)
+    for side in v.get("side_data_list", []):
+        rotation = _num(side.get("rotation"), float) if "rotation" in side else rotation
+    if rotation is not None and abs(int(rotation)) % 360 in ROTATED:
+        width, height = height, width
+    return StockProbe(
+        width,
+        height,
+        float(duration),
+        _fraction(v.get("avg_frame_rate")) or _fraction(v.get("r_frame_rate")),
+        _num(data.get("format", {}).get("size"), int),
+    )
+
+
+def sample_frames(
+    tools: Tools,
+    src: Path,
+    out_dir: Path,
+    start_s: float,
+    n: int = 8,
+    *,
+    cancel: Callable[[], bool] | None = None,
+) -> list[Path]:
+    """`n` frames (one per second from `start_s`), 224 px wide. `-ss` is an output option, which
+    is slower than an input seek but frame accurate."""
+    out_dir.mkdir(parents=True, exist_ok=True)
+    pattern = out_dir / "frame_%02d.jpg"
+    cmd = ffmpeg_cmd(
+        tools,
+        *("-f", MP4_FMT, "-i", str(src)),
+        *("-map", "0:v:0", "-an", "-sn", "-dn", "-ss", f"{start_s}"),
+        *("-vf", SAMPLE_VF, "-frames:v", str(n), str(pattern)),
+    )
+    run(cmd, SAMPLE_TIMEOUT_S, cancel=cancel)
+    return sorted(out_dir.glob("frame_*.jpg"))
+
+
+def mezz_cmd(tools: Tools, src: Path, window: Window, out: Path) -> list[str]:
+    """The mezzanine template (ARCH §11 Normalize): 1080x1920, 30 fps CFR, x264 High, GOP 15."""
+    return ffmpeg_cmd(
+        tools,
+        *("-f", MP4_FMT, "-i", str(src)),
+        *("-map", "0:v:0", "-an", "-sn", "-dn"),
+        *("-ss", f"{window.start_s}", "-t", f"{window.len_s}"),
+        *("-vf", MEZZ_VF),
+        *("-r", "30", "-fps_mode", "cfr"),
+        *MEZZ_ENCODE,
+        *("-video_track_timescale", "30000", "-movflags", "+faststart", str(out)),
+    )
+
+
+def build_mezz(
+    tools: Tools,
+    src: Path,
+    window: Window,
+    out: Path,
+    *,
+    cancel: Callable[[], bool] | None = None,
+    timeout: float = MEZZ_TIMEOUT_S,
+) -> None:
+    try:
+        run(mezz_cmd(tools, src, window, out), timeout, cancel=cancel)
+    except FfError:
+        out.unlink(missing_ok=True)
+        raise
+
+
+def probe_video(tools: Tools, path: Path) -> dict[str, Any]:
+    """Everything `domain.video_checks.video_checks` needs: streams, format, packet PTS values,
+    the decoded frame count and whether `moov` precedes `mdat`."""
+    info = _probe_json(
+        tools,
+        path,
+        MP4_FMT,
+        *("-count_frames", "-show_format", "-show_streams"),
+        *(
+            "-show_entries",
+            "stream=codec_type,codec_name,profile,pix_fmt,width,height,sample_aspect_ratio,"
+            "r_frame_rate,avg_frame_rate,time_base,nb_read_frames,start_time"
+            ":format=duration,format_name,nb_streams",
+        ),
+    )
+    packets = _probe_json(
+        tools,
+        path,
+        MP4_FMT,
+        *(
+            "-select_streams",
+            "v:0",
+            "-show_packets",
+            "-show_entries",
+            "packet=pts,dts,duration,flags",
+        ),
+    )
+    return {
+        "streams": info["streams"],
+        "format": info["format"],
+        "pts": [int(p["pts"]) for p in packets["packets"]],
+        "moov_first": moov_before_mdat(path),
+    }

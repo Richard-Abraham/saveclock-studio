@@ -8,13 +8,16 @@ usage (from services/api): python ../../eval/scripts/make_fake_stock.py <out-dir
 prints the 8 clip names, one per line.
 """
 
+import json
 import sys
+from collections.abc import Iterable
 from dataclasses import dataclass
 from pathlib import Path
 
 from saveclock.adapters.ffmpeg import Tools, ffmpeg_cmd, run
 
 RED, GREEN, BLUE, YELLOW = "0xd02020", "0x20c020", "0x2020d0", "0xe0d020"
+GRADIENT_S = 4.0
 GRID = "drawgrid=w=48:h=48:t=2:c=white@0.6"
 ENCODE = ("-c:v", "libx264", "-preset", "ultrafast", "-crf", "44", "-g", "600", "-an")
 
@@ -30,7 +33,7 @@ class FakeClip:
 
     @property
     def seconds(self) -> float:
-        return sum(s for _, s in self.segments)
+        return GRADIENT_S if self.gradient else sum(s for _, s in self.segments)
 
 
 SPECS: tuple[FakeClip, ...] = (
@@ -55,7 +58,7 @@ EXTRA: dict[str, FakeClip] = {
 def make_clip(tools: Tools, spec: FakeClip, out: Path) -> Path:
     size = spec.size
     if spec.gradient:
-        inputs = ["-f", "lavfi", "-i", f"gradients=s={size}:r={spec.fps}:d=4:speed=0.01:seed=7"]
+        inputs = ["-f", "lavfi", "-i", f"gradients=s={size}:r={spec.fps}:d={GRADIENT_S}:speed=0.01:seed=7"]
         chain = f"{GRID},format=yuv420p"
     else:
         inputs = []
@@ -75,14 +78,26 @@ def make_clip(tools: Tools, spec: FakeClip, out: Path) -> Path:
     return out
 
 
-def make_all(tools: Tools, out_dir: Path) -> list[Path]:
+def make_all(tools: Tools, out_dir: Path, extra: Iterable[FakeClip] = ()) -> list[Path]:
+    """The clips plus `index.json` (the metadata FAKE_STOCK serves; known from the specs)."""
     out_dir.mkdir(parents=True, exist_ok=True)
-    paths = []
-    for spec in SPECS:
+    paths, index = [], []
+    for spec in (*SPECS, *extra):
         path = out_dir / f"{spec.name}.mp4"
         if not path.exists():
             make_clip(tools, spec, path)
         paths.append(path)
+        width, height = (int(v) for v in spec.size.split("x"))
+        index.append(
+            {
+                "name": spec.name,
+                "width": width,
+                "height": height,
+                "duration_s": spec.seconds,
+                "fps": spec.fps,
+            }
+        )
+    (out_dir / "index.json").write_text(json.dumps({"clips": index}, indent=1))
     return paths
 
 

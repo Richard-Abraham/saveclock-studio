@@ -9,17 +9,23 @@ from collections.abc import AsyncIterator, Iterator
 from contextlib import asynccontextmanager
 from dataclasses import dataclass, replace
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 import asyncpg
 import httpx
 import pytest
 from redis.asyncio import Redis
 
+from saveclock.adapters.ffmpeg import Tools
 from saveclock.adapters.queue import FakeEnqueuer
 from saveclock.config import Settings
 from saveclock.container import build_deps
 from saveclock.main import create_app
 from tests.conftest import ENV, FFMPEG_DIR, client_for, make_app
+from tests.factories.stock import fake_stock
+
+if TYPE_CHECKING:
+    from tests.integration.footage_harness import Footage
 
 API_DIR = Path(__file__).resolve().parents[2]
 PG_HOST, PG_PORT = "127.0.0.1", 55432
@@ -216,3 +222,26 @@ def harness(
     h = Harness(migrated_db, blob_root, tmp_path)
     yield h
     h.kill_all()
+
+
+# --- footage (plan 005): real database, FFmpeg and generated clips; the model is a double ---
+
+
+@pytest.fixture(scope="session")
+def fake_clips(ffmpeg_tools: Tools, tmp_path_factory: pytest.TempPathFactory) -> Path:
+    """The 8 clips of `make fake-stock` plus the two extras, generated once per test session."""
+    directory = tmp_path_factory.mktemp("fake-stock")
+    fake_stock.make_all(ffmpeg_tools, directory, extra=fake_stock.EXTRA.values())
+    return directory
+
+
+@pytest.fixture
+async def footage(
+    api: ApiEnv, ffmpeg_tools: Tools, fake_clips: Path, tmp_path: Path
+) -> AsyncIterator["Footage"]:
+    from tests.integration.footage_harness import build_footage
+
+    harness, engine = await build_footage(api, ffmpeg_tools, fake_clips, tmp_path)
+    yield harness
+    harness.redis.close()
+    await engine.dispose()  # type: ignore[attr-defined]

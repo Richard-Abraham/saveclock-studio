@@ -54,6 +54,8 @@ packages = ["src/saveclock"]
 dev = [
     "import-linter>=2.17",
     "mypy>=2.4.1",
+    "opencv-python-headless>=5.1.0.95",
+    "pillow>=13.0.0",
     "pip-audit>=2.10.1",
     "pytest>=9.2.0",
     "pytest-asyncio>=1.5.0",
@@ -61,6 +63,7 @@ dev = [
     "pyyaml>=6.0.4",
     "respx>=0.23.1",
     "ruff>=0.17.6",
+    "scenedetect>=0.7.3",
     "scipy>=1.18.1",  # the unit tests run FakeBeatModel and the DSP without the ml extra
     "soundfile>=0.14.0",
     "types-pyyaml>=6.0.12.20261122",
@@ -99,8 +102,9 @@ module = ["asyncpg", "asyncpg.*"]
 ignore_missing_imports = true  # asyncpg ships no stubs; only the tests use it directly
 
 [[tool.mypy.overrides]]
-module = ["beat_this", "beat_this.*", "soundfile", "scipy", "scipy.*", "torch", "torch.*"]
-ignore_missing_imports = true  # beat_this ships no py.typed; the ml extra is not in the dev env
+module = ["beat_this", "beat_this.*", "soundfile", "scipy", "scipy.*", "torch", "torch.*", "transformers", "transformers.*", "scenedetect", "scenedetect.*", "cv2", "PIL", "PIL.*"]
+ignore_missing_imports = true  # beat_this ships no py.typed; the ml extra is not in the dev env; transformers and scenedetect
+# are untyped or absent depending on the environment
 
 [tool.pytest.ini_options]
 markers = [
