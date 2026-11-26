@@ -166,6 +166,8 @@ async def test_happy_path_through_all_four_queues(harness: Harness, api: httpx.A
     hops = await poll(api, job_id, all_ok, 30)
     assert [h["queue"] for h in hops] == ["analysis", "fetch", "render", "maintenance"]
     assert all(h["run_ms"] is not None for h in hops)
+    # uq_jobs_active (0002) is in place: no hop may use `draft` while the next one is enqueued
+    assert [h["stage"] for h in hops] == ["analyze", "swap_normalize", "render", "sweep"]
     dl = await api.get(f"/api/v1/_stub/jobs/{job_id}/download")
     assert dl.status_code == 200
     assert dl.text == f"stub job {job_id}\n"

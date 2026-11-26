@@ -56,11 +56,21 @@ class Job(TimestampMixin, Base):
         CheckConstraint(in_clause("state", JobState), name="state"),
         Index("ix_jobs_project_id_stage", "project_id", "stage"),
         Index("ix_jobs_state", "state", postgresql_where=text("state IN ('queued','running')")),
+        # at most one active job per project among the stages that rewrite its plan or render
+        Index(
+            "uq_jobs_active",
+            "project_id",
+            unique=True,
+            postgresql_where=text(
+                "state IN ('queued','running') "
+                "AND stage IN ('draft','replan','rehydrate','render','remux')"
+            ),
+        ),
     )
 
     id: Mapped[UUID] = mapped_column(Uuid, primary_key=True)
     project_id: Mapped[UUID | None] = mapped_column(ForeignKey("projects.id", ondelete="CASCADE"))
-    render_id: Mapped[UUID | None] = mapped_column(Uuid)  # plain column; FK to renders in 0002
+    render_id: Mapped[UUID | None] = mapped_column(ForeignKey("renders.id", ondelete="SET NULL"))
     stage: Mapped[str] = mapped_column(Text, nullable=False)
     queue: Mapped[str] = mapped_column(Text, nullable=False)
     attempt: Mapped[int] = mapped_column(SmallInteger, nullable=False, server_default=text("0"))

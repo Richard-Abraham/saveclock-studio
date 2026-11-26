@@ -8,6 +8,7 @@ dependencies = [
     "asyncpg>=0.32.0",
     "dramatiq[redis]>=2,<3",
     "fastapi>=0.165.0",
+    "numpy>=2.5.4",
     "pydantic>=2.14,<3",
     "pydantic-settings>=2.16.3",
     "redis>=8.2.0",
@@ -16,6 +17,25 @@ dependencies = [
     "uuid-utils>=1.2.0",
     "uvicorn[standard]>=0.54.0",
 ]
+
+[project.optional-dependencies]
+# the worker image only (torch CPU build from the pytorch-cpu index); the api image never installs it
+ml = [
+    "beat-this>=1.1.0",
+    "torch>=2.15.0",
+    "torchaudio>=2.11.1",
+    "soundfile>=0.14.0",
+    "scipy>=1.18.1",
+]
+
+[[tool.uv.index]]
+name = "pytorch-cpu"
+url = "https://download.pytorch.org/whl/cpu"
+explicit = true
+
+[tool.uv.sources]
+torch = { index = "pytorch-cpu" }
+torchaudio = { index = "pytorch-cpu" }
 
 [build-system]
 requires = ["hatchling"]
@@ -66,8 +86,14 @@ mypy_path = "src"
 module = ["asyncpg", "asyncpg.*"]
 ignore_missing_imports = true  # asyncpg ships no stubs; only the tests use it directly
 
+[[tool.mypy.overrides]]
+module = ["beat_this", "beat_this.*", "soundfile", "scipy", "scipy.*", "torch", "torch.*"]
+ignore_missing_imports = true  # beat_this ships no py.typed; the ml extra is not in the dev env
+
 [tool.pytest.ini_options]
 markers = [
+  "ffmpeg: needs the pinned FFmpeg binary (make ffmpeg-bin)",
+  "ml: needs torch and the model weights (make test-ml)",
   "unit: no I/O",
   "integration: needs postgres/redis/files",
   "golden: golden-file tests",
