@@ -11,7 +11,6 @@ from saveclock.api.deps import current_user, get_deps, get_session
 from saveclock.api.schemas.common import ERROR_RESPONSES
 from saveclock.api.schemas.stub import StubChain, StubHop, StubJobIn, StubJobOut
 from saveclock.deps import Deps
-from saveclock.errors import InternalError
 from saveclock.services.files import serve
 from saveclock.services.identity import CurrentUser
 from saveclock.services.stub import create_stub_job, download_key, get_chain
@@ -26,8 +25,7 @@ async def create(
     session: Annotated[AsyncSession, Depends(get_session)],
     deps: Annotated[Deps, Depends(get_deps)],
 ) -> StubJobOut:
-    if deps.enqueue_stub is None:
-        raise InternalError("stub jobs are not enabled")
+    assert deps.enqueue_stub is not None  # noqa: S101 - the router is only mounted when it is set
     job_id, project_id = await create_stub_job(session, user.id, body.sleep_s, deps.enqueue_stub)
     return StubJobOut(job_id=job_id, project_id=project_id)
 
