@@ -139,7 +139,13 @@ class FilesystemBlobStore:
         return sorted(str(p.relative_to(self.root)) for p in self._files(prefix))
 
     def usage(self, prefix: str = "") -> int:
-        return sum(p.stat().st_size for p in self._files(prefix))
+        total = 0
+        for path in self._files(prefix):
+            if path.name.endswith(".part"):  # an upload in flight is not usage
+                continue
+            with contextlib.suppress(FileNotFoundError):  # deleted since the walk
+                total += path.stat().st_size
+        return total
 
     def local_path(self, key: str) -> Path:
         return self._resolve(key)

@@ -308,3 +308,19 @@ def test_concurrent_probes_never_raise(tmp_path: Path) -> None:
             future.result()
     assert list(tmp_path.iterdir()) == []
 
+
+@pytest.mark.unit
+def test_usage_ignores_part_files_and_vanishing_files(
+    store: BlobStore, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    store.put("work/p1/a.bin", iter([b"abc"]), max_bytes=10)
+    (tmp_path / "root" / "work" / "p1" / "b.bin.part").write_bytes(b"x" * 100)
+    assert store.usage() == 3  # an in-flight upload is not usage
+    real_files = FilesystemBlobStore._files
+
+    def with_a_ghost(self: FilesystemBlobStore, prefix: str):  # type: ignore[no-untyped-def]
+        yield from real_files(self, prefix)
+        yield self.root / "work" / "p1" / "vanished.bin"  # deleted between walk and stat
+
+    monkeypatch.setattr(FilesystemBlobStore, "_files", with_a_ghost)
+    assert store.usage() == 3
