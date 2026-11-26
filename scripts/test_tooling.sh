@@ -93,14 +93,17 @@ expect "doctor: no node/pnpm/uv probe" 1 - grep -nE '\b(node|pnpm|uv)\b|nvmrc' s
 # ---- make rollback ------------------------------------------------------------------------
 # make exits 2 for any failed recipe line, so the refusals are told apart by their message.
 mkdir -p "$tmp/rb"
-printf '#!/bin/sh\n[ "$1 $2" = "image inspect" ] && case "$3" in saveclock-web:*) exit 1 ;; esac\nexit 0\n' >"$tmp/rb/missing_web"
-printf '#!/bin/sh\nexit 0\n' >"$tmp/rb/all_exist"
+# The stubs also answer ps/inspect and COMPOSE_BIN is `true`, so even a broken refusal can never reach a real
+# stack: it would run `true` for compose and finish at once (a test must never start the owner's containers).
+stub='case "$1" in ps) echo stubc ;; inspect) echo healthy ;; esac\n'
+printf '#!/bin/sh\n%b[ "$1 $2" = "image inspect" ] && case "$3" in saveclock-web:*) exit 1 ;; esac\nexit 0\n' "$stub" >"$tmp/rb/missing_web"
+printf '#!/bin/sh\n%bexit 0\n' "$stub" >"$tmp/rb/all_exist"
 chmod +x "$tmp/rb/missing_web" "$tmp/rb/all_exist"
-RB="make --no-print-directory rollback"
+RB="make --no-print-directory rollback COMPOSE_BIN=true PROJECT=saveclock-stub-never"
 expect "rollback: no TAG" 2 'usage: make rollback TAG=sha-' $RB CONTAINER="$tmp/rb/all_exist"
 expect "rollback: TAG=latest" 2 'TAG must look like sha-' $RB TAG=latest CONTAINER="$tmp/rb/all_exist"
 expect "rollback: web image missing" 2 'REFUSING: image saveclock-web:sha-abcdef1 does not exist' $RB TAG=sha-abcdef1 CONTAINER="$tmp/rb/missing_web"
-expect "rollback: all images exist (dry run)" 0 'IMAGE_TAG=sha-abcdef1.*stack-up' make -n rollback TAG=sha-abcdef1 CONTAINER="$tmp/rb/all_exist"
+expect "rollback: all images exist (dry run)" 0 'IMAGE_TAG=sha-abcdef1.*stack-up' make -n rollback COMPOSE_BIN=true TAG=sha-abcdef1 CONTAINER="$tmp/rb/all_exist"
 
 # ---- audit.sh export (the ml extra is audited, PyTorch local versions are stripped) ---------
 AE="$tmp/audit_export"
