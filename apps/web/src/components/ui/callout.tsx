@@ -24,7 +24,7 @@ export function Callout({ variant, title, children, actions, id, className = "" 
     <div
       className={`flex flex-col gap-3 rounded-card border p-4 sm:flex-row sm:items-start ${v.box} ${className}`}
     >
-      <Icon name={v.icon} className={`mt-0.5 ${variant === "danger" ? "text-danger" : ""}`} />
+      <Icon name={v.icon} className={`mt-1 ${variant === "danger" ? "text-danger" : ""}`} />
       <div className="min-w-0 flex-1">
         {title ? <p className="font-semibold">{title}</p> : null}
         <p id={id}>{children}</p>

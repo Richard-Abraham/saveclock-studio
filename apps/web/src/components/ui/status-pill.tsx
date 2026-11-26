@@ -24,7 +24,7 @@ export function StatusPill({
   const t = TONE[tone];
   return (
     <span
-      className={`inline-flex items-center gap-1.5 rounded-pill px-3 py-1 text-small font-medium ${t.box}`}
+      className={`inline-flex items-center gap-2 rounded-pill px-3 py-1 text-small font-medium whitespace-nowrap ${t.box}`}
     >
       <Icon name={icon} className={`size-4 ${t.icon}`} />
       <span>{children}</span>
