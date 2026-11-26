@@ -197,9 +197,14 @@ web-build: guard
 bundle-scan:
 	scripts/scan_bundle.sh
 
+# Offline is a failure, not a silent skip; ALLOW_OFFLINE=1 accepts it on purpose. NPM_REGISTRY is
+# overridable so the offline path can be exercised.
+NPM_REGISTRY ?= https://registry.npmjs.org/
 web-audit-prod: guard
-	@if ! curl -sfI --max-time 8 https://registry.npmjs.org/ >/dev/null 2>&1; then \
-	  echo "SKIPPED (offline): pnpm audit needs the network"; else pnpm audit --prod; fi
+	@if ! curl -sfI --max-time 8 $(NPM_REGISTRY) >/dev/null 2>&1; then \
+	  if [ "$(ALLOW_OFFLINE)" = 1 ]; then echo "SKIPPED (offline, ALLOW_OFFLINE=1): pnpm audit needs the network"; \
+	  else echo "pnpm audit needs the network; set ALLOW_OFFLINE=1 to skip it on purpose"; exit 1; fi; \
+	else pnpm audit --prod; fi
 
 # stack-dependent (run after `make dev`); plan 003's bring-up runs them too
 web-headers:
