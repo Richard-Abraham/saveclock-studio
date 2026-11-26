@@ -288,7 +288,7 @@ List the built tags with `podman images saveclock-api` (or `docker images savecl
 make rollback TAG=sha-<commit>
 ```
 
-The command refuses unless all three images (api, worker, web) exist locally with that tag (`REFUSING: image saveclock-<service>:<tag> does not exist locally`), then runs `stack-up` with `IMAGE_TAG=<tag>`. It never touches the database or volumes. Migrations are not reversed: the `migrate` step runs `alembic upgrade head` from the tag's own api image before any other container is replaced, so an image older than the database schema fails there and nothing changes (restore a backup only as a deliberate decision, `infra/backup/README.md`). `make rollback-demo` shows the method end to end.
+The command refuses unless all three images (api, worker, web) exist locally with that tag (`REFUSING: image saveclock-<service>:<tag> does not exist locally`), then runs `stack-up` with `IMAGE_TAG=<tag>`. It never restores or drops data (no `down`, no volume operation), but `stack-up` runs the `migrate` step, so it runs that tag's migrations: a newer tag migrates the schema up. Migrations are never reversed. The `migrate` step runs `alembic upgrade head` from the tag's own api image before any other container is replaced, so an image older than the database schema fails there and changes nothing (restore a backup only as a deliberate decision, `infra/backup/README.md`). `make rollback-demo` shows the method end to end.
 
 After a `git pull` or checkout, run `make guard` (the config-malware check) before any node tool.
 
@@ -307,7 +307,7 @@ After a `git pull` or checkout, run `make guard` (the config-malware check) befo
   3. Rebuild the web image with `make images`. The `NEXT_PUBLIC_*` origins are baked into the web image at build time and the browser bundle does not read `.env` at run time. `make image-guards` fails when the baked origins differ from `.env`.
   4. Restart with `make dev`.
   5. Why: the API compares the `Origin` of every state-changing request (POST, PUT, PATCH, DELETE) with `APP_ORIGIN`, port included (`403` otherwise), and CORS allows exactly that origin. The Host allowlist (`ALLOWED_HOSTS`) ignores the port, so a port change needs no `ALLOWED_HOSTS` change.
-  6. A different host name (for example a LAN IP) is not supported without editing the `ALLOWED_HOSTS` of the api and the web in the compose file, and the browser must use the same name as `APP_ORIGIN`.
+  6. A different host name (for example a LAN IP) is not supported without editing the `ALLOWED_HOSTS` of the api and the web in the compose file, and the browser must use the same name as `APP_ORIGIN`. The web also reads `ALLOWED_HOSTS` when its image is built (`apps/web/next.config.ts`, which bakes the rewrites), so after any change to it edit `.env`, run `make images`, then `make stack-up` (or `make dev`).
   7. `make restore-proof` uses 18000/13000 on purpose and its scratch stack does not rebuild images.
 - **Rootless Podman cannot publish ports under 1024.** None are used.
 

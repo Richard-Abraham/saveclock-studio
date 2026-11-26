@@ -131,7 +131,7 @@ ffmpeg-cache: ## copy the pinned FFmpeg tarball into infra/docker/cache (needs F
 	[ $$rc = 0 ] && { echo "OK (cached copy verified)"; exit 0; }; [ $$rc = 10 ] || exit $$rc; \
 	pin_sha=$$(sed -n 's/^SHA256=//p' infra/docker/ffmpeg.pin); \
 	name=$$(sed -n 's|^URL=.*/||p' infra/docker/ffmpeg.pin); \
-	echo "$$pin_sha  $(FFMPEG_SRC)/$$name" | sha256sum -c - || { echo "REFUSING: source tarball does not match the pin"; exit 1; }; \
+	(cd "$(FFMPEG_SRC)" && echo "$$pin_sha  $$name" | sha256sum -c -) || { echo "REFUSING: source tarball does not match the pin"; exit 1; }; \
 	cp "$(FFMPEG_SRC)/$$name" infra/docker/cache/ && \
 	echo "$$pin_sha  infra/docker/cache/$$name" | sha256sum -c - && echo OK
 
@@ -308,12 +308,14 @@ backup-timer-uninstall: ## remove the nightly backup timer
 rollback-demo: ## demonstrate a rollback between two image tags
 	$(STACK_ENV) bash scripts/rollback_demo.sh
 
-rollback: ## run the stack on already built images: make rollback TAG=sha-<commit> (never touches the database)
-	@[ -n "$(TAG)" ] || { echo "usage: make rollback TAG=sha-<commit>   (built tags: $(CONTAINER) images saveclock-api)"; exit 2; }
-	@echo "$(TAG)" | grep -Eq '^sha-[0-9a-f]{7,40}$$' || { echo "TAG must look like sha-<commit>, got: $(TAG)"; exit 2; }
-	@for s in api worker web; do $(CONTAINER) image inspect saveclock-$$s:$(TAG) >/dev/null 2>&1 || \
-	  { echo "REFUSING: image saveclock-$$s:$(TAG) does not exist locally. Check that commit out and run make images, or pick a tag from: $(CONTAINER) images"; exit 1; }; done
-	IMAGE_TAG=$(TAG) $(MAKE) --no-print-directory stack-up
+# make exports command-line variables, so TAG reaches the shell as $$TAG and is never pasted into the
+# command text: a crafted TAG is judged by the regex before anything parses it.
+rollback: ## run the stack on already built images: make rollback TAG=sha-<commit> (never restores or drops data; runs that tag's migrations)
+	@[ -n "$$TAG" ] || { echo "usage: make rollback TAG=sha-<commit>   (built tags: $(CONTAINER) images saveclock-api)"; exit 2; }
+	@printf '%s\n' "$$TAG" | grep -Eq '^sha-[0-9a-f]{7,40}$$' || { echo "TAG must look like sha-<commit>, got: $$TAG"; exit 2; }
+	@for s in api worker web; do $(CONTAINER) image inspect "saveclock-$$s:$$TAG" >/dev/null 2>&1 || \
+	  { echo "REFUSING: image saveclock-$$s:$$TAG does not exist locally. Check that commit out and run make images, or pick a tag from: $(CONTAINER) images"; exit 1; }; done
+	IMAGE_TAG="$$TAG" $(MAKE) --no-print-directory stack-up
 
 fresh-clone-timing: ## time a fresh clone to a running stack
 	PROJECT=$(PROJECT) CONTAINER=$(CONTAINER) bash scripts/fresh_clone_timing.sh

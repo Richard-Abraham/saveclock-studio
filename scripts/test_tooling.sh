@@ -62,6 +62,10 @@ expect "help-lint: two described targets" 0 'HELP LINT OK \(2 targets\)' $HL "$t
 expect "help-lint: undescribed target is named" 1 'target b \(Makefile line 3\)' $HL "$tmp/mk_missing"
 expect "help-lint: empty ## text" 1 'target a ' $HL "$tmp/mk_empty_text"
 expect "help-lint: variables and .PHONY are ignored" 0 'HELP LINT OK \(1 targets\)' $HL "$tmp/mk_ignored"
+printf 'a: ##x\n\t@true\n' >"$tmp/mk_nospace"
+printf 'a b: ## does both\n\t@true\n' >"$tmp/mk_multi"
+expect "help-lint: ## without a space after it" 1 'target a ' $HL "$tmp/mk_nospace"
+expect "help-lint: multi-name rule is refused" 1 'one target per line' $HL "$tmp/mk_multi"
 expect "help-lint: empty file" 1 'no targets found' $HL "$tmp/mk_none"
 expect "help-lint: the real Makefile" 0 'HELP LINT OK' $HL Makefile
 expect "make help lists check" 0 '^  check ' make --no-print-directory help
@@ -85,6 +89,7 @@ python3 -c 'import socket,sys,time; s=socket.socket(); s.bind(("127.0.0.1", int(
 holder=$!
 sleep 1
 expect "doctor: port in use" 1 "port $AP is in use" dr "$tmp/stub_ok" "$AP" DOCTOR_SKIP=cache
+expect "doctor: probes BIND_ADDR, not a fixed address" 0 'DOCTOR OK' dr "$tmp/stub_ok" "$AP" DOCTOR_SKIP=cache BIND_ADDR=127.0.0.2
 kill "$holder" 2>/dev/null; holder=""
 expect "doctor: too little disk" 1 'GB free' dr "$tmp/stub_ok" "$AP" DOCTOR_SKIP=cache DOCTOR_MIN_DISK_GB=999999
 expect "doctor: empty cache names FFMPEG_SRC" 1 'FFMPEG_SRC' dr "$tmp/stub_ok" "$AP" DOCTOR_CACHE_DIR="$tmp/empty"
@@ -103,7 +108,13 @@ RB="make --no-print-directory rollback COMPOSE_BIN=true PROJECT=saveclock-stub-n
 expect "rollback: no TAG" 2 'usage: make rollback TAG=sha-' $RB CONTAINER="$tmp/rb/all_exist"
 expect "rollback: TAG=latest" 2 'TAG must look like sha-' $RB TAG=latest CONTAINER="$tmp/rb/all_exist"
 expect "rollback: web image missing" 2 'REFUSING: image saveclock-web:sha-abcdef1 does not exist' $RB TAG=sha-abcdef1 CONTAINER="$tmp/rb/missing_web"
-expect "rollback: all images exist (dry run)" 0 'IMAGE_TAG=sha-abcdef1.*stack-up' make -n rollback COMPOSE_BIN=true TAG=sha-abcdef1 CONTAINER="$tmp/rb/all_exist"
+expect "rollback: crafted TAG is refused, not shell-parsed" 2 'TAG must look like sha-' $RB "TAG=sha-abcdef1; touch $tmp/pwned" CONTAINER="$tmp/rb/all_exist"
+expect "rollback: crafted TAG ran nothing" 0 - test ! -e "$tmp/pwned"
+expect "rollback: TAG with a quote is refused, not shell-parsed" 2 'TAG must look like sha-' $RB "TAG=x\"; touch $tmp/pwned2; echo \"" CONTAINER="$tmp/rb/all_exist"
+expect "rollback: quote TAG ran nothing" 0 - test ! -e "$tmp/pwned2"
+# a real run: every image "exists" (stub), compose is `true`, so it reaches the stack-up commands and stops there
+expect "rollback: all images exist, reaches stack-up" 0 'run --rm migrate' $RB TAG=sha-abcdef1 CONTAINER="$tmp/rb/all_exist"
+expect "rollback: stack-up runs with IMAGE_TAG" 0 'IMAGE_TAG=.*stack-up' $RB TAG=sha-abcdef1 CONTAINER="$tmp/rb/all_exist"
 
 # ---- audit.sh export (the ml extra is audited, PyTorch local versions are stripped) ---------
 AE="$tmp/audit_export"
@@ -113,6 +124,10 @@ expect "audit export: torch" 0 - grep -qE '^torch==' "$AE"
 expect "audit export: torchaudio" 0 - grep -qE '^torchaudio==' "$AE"
 expect "audit export: beat-this" 0 - grep -qE '^beat-this==' "$AE"
 expect "audit export: no +cpu" 1 - grep -q '+cpu' "$AE"
+# a failing `uv export` must fail the audit, never leave an empty requirements file behind a green run
+mkdir -p "$tmp/uvfail"
+printf '#!/bin/sh\nexit 1\n' >"$tmp/uvfail/uv"; chmod +x "$tmp/uvfail/uv"
+expect "audit export: uv failure fails the script" 1 - env PATH="$tmp/uvfail:$PATH" AUDIT_EXPORT_ONLY=1 scripts/audit.sh
 
 [ "$fail" = 0 ] && { echo "ALL TOOLING TESTS PASSED"; exit 0; }
 echo "TOOLING TESTS FAILED"; exit 1

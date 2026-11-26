@@ -12,6 +12,9 @@ WEB_PORT="${WEB_PORT:-3000}"
 min_gb="${DOCTOR_MIN_DISK_GB:-20}"
 cache="${DOCTOR_CACHE_DIR:-infra/docker/cache}"
 skip=",${DOCTOR_SKIP:-},"
+# the address compose publishes on (.env, default 127.0.0.1); the port probe must bind the same one
+bind="${BIND_ADDR:-$(sed -n 's/^BIND_ADDR=//p' .env 2>/dev/null | tail -1)}"
+bind="${bind:-127.0.0.1}"
 here="$(cd "$(dirname "$0")" && pwd)"
 bad=0
 ok() { echo "ok   $1"; }
@@ -37,7 +40,7 @@ running() { # is a container of compose project $PROJECT running?
 }
 if skipped ports; then echo "skip ports"; else
   for p in "$API_PORT" "$WEB_PORT"; do
-    if python3 -c 'import socket,sys; s=socket.socket(); s.bind(("127.0.0.1", int(sys.argv[1])))' "$p" 2>/dev/null; then
+    if python3 -c 'import socket,sys; s=socket.socket(); s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1); s.bind((sys.argv[2], int(sys.argv[1])))' "$p" "$bind" 2>/dev/null; then
       ok "port $p is free"
     elif running; then
       ok "port $p (held by the running $PROJECT stack)"
