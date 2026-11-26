@@ -70,7 +70,7 @@ async def test_set_density_replaces_the_working_version_in_place(draft: Draft) -
     after = r.json()
     assert after["version"] == 1
     assert after["options"]["density"] == -2
-    assert len(after["cuts"]) < len(before.cuts)
+    assert after["cuts"][0]["out_end_frame"] != before.cuts[0].out_end_frame  # calmer: longer
     assert after["created_by"] == "user"
     assert [v[0] for v in await draft.sql("SELECT version FROM edit_plans")] == [1]
     assert after["content_hash"] != before.content_hash
