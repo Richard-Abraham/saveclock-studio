@@ -11,7 +11,7 @@
 
 ## FFmpeg and torch
 FFmpeg and torch bumps are manual, high-priority reviews. Re-run the G0-25 hostile-input tests before changing `infra/docker/ffmpeg.pin`. The sha256 in that file is the only place the hash is written; the build verifies it and fails on any mismatch (SEC-170).
-- The URL in `ffmpeg.pin` is provenance only (BtbN prunes old autobuilds). The tarball must exist in `infra/docker/cache/` (git-ignored). `make ffmpeg-cache` copies it from `~/saveclock-spike/downloads/ffmpeg-9.0.x-static/` after verifying the hash. On a new machine, copy the tarball over by hand first.
+- The URL in `ffmpeg.pin` is provenance only (BtbN prunes old autobuilds). The tarball must exist in `infra/docker/cache/` (git-ignored). `make ffmpeg-cache FFMPEG_SRC=<folder holding the tarball>` copies it after verifying the hash (`FFMPEG_SRC` has no default; the old laptop uses `~/saveclock-spike/downloads/ffmpeg-9.0.x-static/`). On a new machine, copy the tarball over by hand first.
 
 ## CVE watch list
 Postgres 16, Redis 7, Python 3.12, FFmpeg 9.0.x (static build), uvicorn, FastAPI/Starlette, SQLAlchemy/asyncpg, Dramatiq. `make scan-images` runs Trivy on the built images (HIGH and CRITICAL); triage the report, do not auto-fix.

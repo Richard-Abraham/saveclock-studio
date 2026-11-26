@@ -19,14 +19,14 @@ This guide takes a fresh PC from `git clone` to a running, tested app. Every com
 | `make`, `git`, `curl`, `python3` | any recent | Makefile, clone, readiness checks, `smoke-*` scripts |
 | `podman` + `podman-compose` (or `docker` + compose v2) | Podman 5.8, podman-compose 1.6 tested | builds and runs the containers |
 | `openssl` | any | `make env` makes the random secrets |
-| `uv` | **0.11.24** exactly | `make doctor` checks it |
-| Python 3.12 | installed by `uv` | `uv` fetches it on first use; nothing to install by hand |
-| `node` | **v22.23.1** exactly (`.nvmrc`) | see the note below |
-| `pnpm` | **10.30.3** exactly | see the note below |
+| `uv` | **0.11.24** exactly | developers only (`make doctor-dev`, `make check`) |
+| Python 3.12 | installed by `uv` | developers only; `uv` fetches it on first use |
+| `node` | **v22.23.1** exactly (`.nvmrc`) | developers only (`make doctor-dev`, `make check`) |
+| `pnpm` | **10.30.3** exactly | developers only (`make doctor-dev`, `make check`) |
 
-Note: the web image is built inside a container, so `node` and `pnpm` are not needed to run the app. But `make doctor` (`scripts/check_toolchain.sh`) checks them and stops with `FAIL` if they are missing or a different version. Either install them (below), or skip `make doctor` and carry on. This is listed under "Unclear" in the notes at the end.
+Note: the images are built inside containers, so `uv`, `node` and `pnpm` are not needed to run the app. `make doctor` checks only what running needs: container runtime and compose, `make`, `git`, `curl`, `openssl`, `python3`, free ports, disk, and the cached FFmpeg tarball and model weights. `make doctor-dev` adds the pinned uv, Python, node and pnpm (`scripts/check_toolchain.sh`), which `make check` needs.
 
-Install node and pnpm the way you like. One way: install node 22.23.1 (nvm, fnm, or your distro), then `corepack enable` (`package.json` pins `pnpm@10.30.3`).
+To install node and pnpm (developers), do it the way you like. One way: install node 22.23.1 (nvm, fnm, or your distro), then `corepack enable` (`package.json` pins `pnpm@10.30.3`).
 
 ### To run `make check` (the full quality gate)
 
@@ -84,7 +84,7 @@ make ffmpeg-cache FFMPEG_SRC=<folder that holds the file>
 
 It checks the SHA-256, refuses a mismatch (`REFUSING: source tarball does not match the pin`), copies the file to `infra/docker/cache/`, and prints `OK`. Running it again prints `OK (cached copy verified)`.
 
-`FFMPEG_SRC` defaults to `~/saveclock-spike/downloads/ffmpeg-9.0.x-static`, which does not exist on a new PC, so always pass it.
+`FFMPEG_SRC` has no default. When the cached copy is absent and `FFMPEG_SRC` is unset or not a folder, `make ffmpeg-cache` (and so `make images`) stops with a message naming `FFMPEG_SRC`. The old laptop passes `FFMPEG_SRC=$HOME/saveclock-spike/downloads/ffmpeg-9.0.x-static` (or exports it once).
 
 **If you lost the file.** This is a deliberate re-pin, not a routine step:
 
@@ -107,7 +107,7 @@ cd -   # back to the repo
 make models-cache MODELS_SRC=$HOME/saveclock-models
 ```
 
-Expected: `OK beat_this-final0.ckpt sha256 verified`. After that the copy lives in `infra/docker/cache/models/` (git-ignored) and `MODELS_SRC` is not needed again. The worker image is about 1.9 GB because it carries CPU-only torch.
+Expected: `OK beat_this-final0.ckpt sha256 verified`. After that the copy lives in `infra/docker/cache/models/` (git-ignored) and `MODELS_SRC` is not needed again: `make models-cache` is skipped (`OK (cached models verified)`) when that folder already verifies. `MODELS_SRC` has no default; when the cache is absent and it is unset or not a folder, `make models-cache` stops with a message naming `MODELS_SRC`. The old laptop passes `MODELS_SRC=$HOME/saveclock-spike/downloads/models-beat_this`. The worker image is about 1.9 GB because it carries CPU-only torch.
 
 ### 2c. The backup passphrase
 
@@ -137,13 +137,14 @@ Never commit `.env`. `make secrets` fails if a `.env*` file is tracked.
    cd saveclock-studio
    ```
 
-2. Check the host tools (needs uv, node and pnpm at the pinned versions, see section 1):
+2. Check the host tools. `make doctor` checks what running the app needs (it also checks the cached FFmpeg and models, so run it after sections 2a and 2b). If you will run `make check`, use `make doctor-dev` as well (needs uv, node and pnpm at the pinned versions, see section 1):
 
    ```bash
    make doctor
+   make doctor-dev
    ```
 
-   Expected last line: `TOOLCHAIN OK (0.11.24, Python 3.12.x, node v22.23.1, pnpm 10.30.3)`.
+   Expected last line of `make doctor`: `DOCTOR OK`. `make doctor-dev` prints `DOCTOR OK` and then `TOOLCHAIN OK (0.11.24, Python 3.12.x, node v22.23.1, pnpm 10.30.3)`.
 
 3. Create `.env` with random secrets (it refuses to overwrite an existing `.env`):
 
@@ -275,8 +276,19 @@ The G1 decision is a provisional GO. These are still yours to do, and the G1 dec
 | Status | `podman ps` (or `docker ps`) |
 | Update the app | `git pull`, then `make dev` (rebuilds the images and re-runs migrations) |
 | Update dependencies, base images, FFmpeg | monthly, by hand, per `infra/UPDATING.md` (`uv lock --upgrade`, `make check`, `make audit`, `make scan-images`) |
-| Roll back | `make rollback-demo` shows the method: set `IMAGE_TAG=sha-<commit>` and run `make stack-up` (images are tagged `sha-<commit>` at build) |
+| Roll back | `make rollback TAG=sha-<commit>` (images are tagged `sha-<commit>` at build; see "Rolling back" below) |
 | Pre-deploy scan | `make predeploy-scan` before any push; it must end `PREDEPLOY SCAN CLEAN` |
+| Every target | `make help` |
+
+### Rolling back
+
+List the built tags with `podman images saveclock-api` (or `docker images saveclock-api`), then:
+
+```bash
+make rollback TAG=sha-<commit>
+```
+
+The command refuses unless all three images (api, worker, web) exist locally with that tag (`REFUSING: image saveclock-<service>:<tag> does not exist locally`), then runs `stack-up` with `IMAGE_TAG=<tag>`. It never touches the database or volumes. Migrations are not reversed: the `migrate` step runs `alembic upgrade head` from the tag's own api image before any other container is replaced, so an image older than the database schema fails there and nothing changes (restore a backup only as a deliberate decision, `infra/backup/README.md`). `make rollback-demo` shows the method end to end.
 
 After a `git pull` or checkout, run `make guard` (the config-malware check) before any node tool.
 
@@ -289,12 +301,19 @@ After a `git pull` or checkout, run `make guard` (the config-malware check) befo
 - **SELinux denies a bind mount.** Bind mounts of repo files need the `:z` option (the Postgres init script already has it). If you add your own bind mount on a Fedora PC, add `:z`. The backup scripts use `--security-opt label=disable` for restic.
 - **gitleaks reports keys in `apps/web/.next/`.** That folder is git-ignored Next.js build output with generated preview keys. It is allowlisted in `.gitleaks.toml`; do not widen the allowlist.
 - **`REFUSING: source tarball does not match the pin`, or the image build asks you to run `make ffmpeg-cache`.** The FFmpeg tarball is missing from `infra/docker/cache/` or has the wrong hash. See section 2a.
-- **Port already in use.** Free 3000/8000, or run on other ports: `API_PORT=18000 WEB_PORT=13000 make dev` (use the same values on every command, and add `NEXT_PUBLIC_API_ORIGIN` and `APP_ORIGIN` in `.env` to match, then rebuild with `make images`).
+- **Changing the ports (or "port already in use").** In this order:
+  1. Set `API_PORT` and `WEB_PORT` (on the command line or in `.env`) and use the same values on every command, for example `API_PORT=18000 WEB_PORT=13000 make dev`.
+  2. In `.env` set `APP_ORIGIN=http://localhost:<WEB_PORT>` and `NEXT_PUBLIC_API_ORIGIN=http://localhost:<API_PORT>`.
+  3. Rebuild the web image with `make images`. The `NEXT_PUBLIC_*` origins are baked into the web image at build time and the browser bundle does not read `.env` at run time. `make image-guards` fails when the baked origins differ from `.env`.
+  4. Restart with `make dev`.
+  5. Why: the API compares the `Origin` of every state-changing request (POST, PUT, PATCH, DELETE) with `APP_ORIGIN`, port included (`403` otherwise), and CORS allows exactly that origin. The Host allowlist (`ALLOWED_HOSTS`) ignores the port, so a port change needs no `ALLOWED_HOSTS` change.
+  6. A different host name (for example a LAN IP) is not supported without editing the `ALLOWED_HOSTS` of the api and the web in the compose file, and the browser must use the same name as `APP_ORIGIN`.
+  7. `make restore-proof` uses 18000/13000 on purpose and its scratch stack does not rebuild images.
 - **Rootless Podman cannot publish ports under 1024.** None are used.
 
 ## 9. Variables you can set on the make command line
 
-`PROJECT` (compose project name, default `saveclock`; sets volume names), `API_PORT` (8000), `WEB_PORT` (3000), `FFMPEG_SRC` (see 2a), `CONTAINER` (`docker` if present, else `podman`, picked by the Makefile), `COMPOSE` (the compose command the Makefile builds: `<docker|podman> compose -p $PROJECT --env-file .env -f infra/compose/compose.yml`), `CONFIRM=yes` (only for `down-volumes`), `ALLOW_OFFLINE=1` (skips only the pnpm audit).
+`PROJECT` (compose project name, default `saveclock`; sets volume names), `API_PORT` (8000), `WEB_PORT` (3000), `FFMPEG_SRC` (no default, see 2a), `MODELS_SRC` (no default, see 2b), `TAG` (for `make rollback`), `DOCTOR_MIN_DISK_GB` (free disk `make doctor` requires, default 20), `CONTAINER` (`docker` if present, else `podman`, picked by the Makefile), `COMPOSE` (the compose command the Makefile builds: `<docker|podman> compose -p $PROJECT --env-file .env -f infra/compose/compose.yml`), `CONFIRM=yes` (only for `down-volumes`), `ALLOW_OFFLINE=1` (skips only the pnpm audit).
 
 ## 10. Using it with Claude Code
 
