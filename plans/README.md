@@ -105,6 +105,8 @@ Critical path facts:
 
 ## Open decisions and risks the owner should know about
 
+- **Phase 2 stops at G2 and waits for the owner** (noted 2026-11-27): plan 009 builds the code and tools, but G2 needs the owner's two review sheets (100 segments with no internal cuts; keyword relevance), a multi-hour ~100-render soak on the machine that will really be used (the other PC, after the push), and the owner's go/no-go.
+
 - The BtbN download URL for the pinned ffmpeg returns 404 today; the local cached tarball (sha256 `bf5e935a…8d77`) is the only source, so keep a copy outside `~/saveclock-spike` before deleting the spike scratch directory.
 - OQ-26 (SSE and 100 MB upload through the Next.js rewrite) is measured in 002; if it fails the owner must approve Branch B (API on its own localhost origin with CORS) before anything is built.
 - Behind the rewrite the API sees `Host: api:8000`, so the Host allowlist must also run at the web edge (002 conflict W14).
