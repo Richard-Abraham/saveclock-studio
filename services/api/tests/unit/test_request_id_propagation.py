@@ -55,3 +55,20 @@ def test_nothing_bound_means_no_request_id_option() -> None:
     structlog.contextvars.clear_contextvars()
     message = plain.send()
     assert "request_id" not in message.options
+
+
+@pytest.mark.unit
+def test_context_is_empty_after_a_message_finishes() -> None:
+    broker = _broker()
+
+    @dramatiq.actor(broker=broker, actor_name="done", queue_name="a")
+    def done() -> None:
+        return None
+
+    middleware = JobLogMiddleware()
+    message = done.message().copy(options={"request_id": "req-9"})
+    structlog.contextvars.clear_contextvars()
+    middleware.before_process_message(broker, message)  # type: ignore[arg-type]
+    assert structlog.contextvars.get_contextvars()["request_id"] == "req-9"
+    middleware.after_process_message(broker, message)  # type: ignore[arg-type]
+    assert structlog.contextvars.get_contextvars() == {}
