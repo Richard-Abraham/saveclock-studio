@@ -107,6 +107,12 @@ ck "GET /projects lists $want_projects project(s) as in counts.json (got $got_pr
 ck "the web shell at :13000 lists the project title" bash -c 'curl -s http://localhost:13000/ | grep -qF -- "$1"' _ "${title:-Projects}"
 if manifest_ok; then echo "PASS sha256sum -c manifest.sha256: every restored file is OK ($(wc -l < "$WORK/manifest.out") files)"
 else echo "FAIL sha256sum -c manifest.sha256"; grep -v ': OK$' "$WORK/manifest.out" | sed 's/^/  /'; fails=$((fails + 1)); fi
+# counts.json is written right after the dump, a moment before the manifest is computed from the live
+# files; a blob that appears in between makes the numbers differ, so the race can only false-FAIL.
+want_files="$(jq -r .blob_files "$counts")"
+ok_files="$(grep -c ': OK$' "$WORK/manifest.out" || true)"
+ck "counts.json blob_files ($want_files) is >= 1 and equals the OK lines of sha256sum -c ($ok_files)" \
+  test "$want_files" -ge 1 -a "$want_files" = "$ok_files"
 ck "the stub download through the scratch API is the literal body" \
   test "$(curl -s "http://127.0.0.1:18000/api/v1/_stub/jobs/$stub_id/download")" = "stub job $stub_id"
 ck "exactly one owner row (users=$owners)" test "$owners" = 1
