@@ -1,0 +1,35 @@
+# Integration-test dependencies only (project saveclock-test). Throwaway passwords: the DB holds no real data.
+# shortcut: test compose instead of testcontainers (C17), upgrade to testcontainers when the
+# Podman user socket is enabled and the owner wants it.
+services:
+  postgres:
+    image: docker.io/library/postgres:16@sha256:07abc3f43c9395b0bdbbab36bc25ddb0e8d83cd4fcafb5fb7d6abe14ff156dd8
+    environment:
+      POSTGRES_DB: saveclock
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: test-superuser-pw
+      POSTGRES_APP_PASSWORD: test-app-pw
+      POSTGRES_MIGRATOR_PASSWORD: test-migrator-pw
+    volumes:
+      - "../postgres/init:/docker-entrypoint-initdb.d:ro,z"
+    tmpfs:
+      - /var/lib/postgresql/data
+    ports:
+      - "127.0.0.1:55432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d saveclock"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+  redis:
+    image: docker.io/library/redis:7@sha256:6b645a37f49b0546582468706b32e71a8b7fbb5ba4583d0f9e27a8004716b738
+    command: ["redis-server", "--requirepass", "test-redis-pw", "--maxmemory-policy", "noeviction"]
+    environment:
+      REDISCLI_AUTH: test-redis-pw
+    ports:
+      - "127.0.0.1:56379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 2s
+      timeout: 3s
+      retries: 30

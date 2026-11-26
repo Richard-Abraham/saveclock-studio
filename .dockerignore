@@ -1,0 +1,23 @@
+.git
+.env
+.env.*
+!.env.example
+secrets
+.data
+spike
+docs
+research_notes
+reports
+apps
+plans
+node_modules
+**/.venv
+**/__pycache__
+**/.mypy_cache
+**/.pytest_cache
+**/.ruff_cache
+services/api/tests
+services/api/coverage.json
+.claude
+# shortcut: the 152 MB cache is in the build context for both targets, upgrade to a pre-built
+# ffmpeg image or additional_contexts if Docker-daemon build times hurt.

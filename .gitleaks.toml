@@ -1,0 +1,9 @@
+# Extends the default rules. The only allowlisted path is the local, git-ignored `.env`, which
+# `make env` fills with throwaway random passwords. `make secrets` separately fails if any
+# `.env*` file other than `.env.example` is tracked, so it can never be committed unnoticed.
+[extend]
+useDefault = true
+
+[allowlist]
+description = "local git-ignored .env with generated throwaway passwords"
+paths = ['''^\.env$''']
