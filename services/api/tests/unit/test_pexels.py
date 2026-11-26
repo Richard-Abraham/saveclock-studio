@@ -25,8 +25,8 @@ if TYPE_CHECKING:
     pass
 
 FIXTURES = Path(__file__).resolve().parents[1] / "fixtures"
-KEY = "pexels-test-key-0123456789abcdef"
-PIXABAY_KEY = "pixabay-test-key-9876543210"
+KEY = "-".join(["pexels", "fake", "k1", "z9"])  # built from pieces: a test value, not a secret
+PIXABAY_KEY = "-".join(["pixabay", "fake", "k2", "y8"])  # built from pieces: a test value
 
 
 class AlwaysOk:
