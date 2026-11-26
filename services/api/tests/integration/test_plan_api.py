@@ -330,3 +330,12 @@ async def test_a_foreign_origin_is_refused(draft: Draft) -> None:
     )
     assert r.status_code == 403
     assert r.json()["error"]["details"]["reason"] == "origin_mismatch"
+
+
+async def test_an_identical_patch_on_a_frozen_version_makes_no_new_version(draft: Draft) -> None:
+    pid = await draft.drafted()
+    await draft.freeze(pid)
+    same = await patch(draft, pid, 1, {"op": "set_density", "level": 0})  # what v1 already is
+    assert same.status_code == 200
+    assert (same.json()["version"], same.json()["frozen"]) == (1, True)
+    assert [r[0] for r in await draft.sql("SELECT version FROM edit_plans")] == [1]

@@ -445,7 +445,8 @@ async def _local_edit(
     except (LockConflict, PlanOpError, PlanError, GridError, NoUsableClips) as exc:
         raise _refused(exc) from exc
     digest = content_hash(built.plan)
-    if digest == bytes(latest.content_hash):  # identical result: no new row, no new version
+    same_cuts = content_hash(built.plan.model_copy(update={"version": latest.version}))
+    if bytes(latest.content_hash) in {digest, same_cuts}:  # identical: no new row or version
         return PatchResult(view_of(latest), None)
     plans = PlanRepository(session)
     payload = built.plan.model_dump(mode="json")
