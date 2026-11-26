@@ -154,6 +154,7 @@ describe("SettingsContent (the S11 body, rendered from real API responses)", () 
     render(await SettingsContent());
     expect(screen.getByRole("progressbar", { name: "Disk usage" })).toHaveAttribute("aria-valuenow", "93");
     expect(screen.getByText(/Disk is 93% full\./)).toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "Open Settings" })).not.toBeInTheDocument();
   });
 
   it("shows the error with Retry when the settings cannot be loaded", async () => {

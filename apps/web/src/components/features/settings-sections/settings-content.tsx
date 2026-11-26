@@ -19,7 +19,7 @@ export async function SettingsContent() {
   }
   return (
     <div className="mt-6 flex flex-col gap-6">
-      <DiskWarning volume={settings.data.disk.volume} />
+      <DiskWarning volume={settings.data.disk.volume} link={false} />
       <SettingsSections settings={settings.data} />
     </div>
   );
