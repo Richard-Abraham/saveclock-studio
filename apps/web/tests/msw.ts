@@ -2,9 +2,9 @@ import type { ErrorEnvelope, HealthReady, ProjectItem, ProjectList, SettingsOut 
 import { http, HttpResponse } from "msw";
 import { setupServer } from "msw/node";
 
-/** The API as the server components see it (the default API_INTERNAL_URL origin). */
+/** The API on the internal network, as the server components call it (the default API_INTERNAL_URL origin). */
 export const API = "http://api:8000";
-/** The API as the browser sees it through the rewrite (the test's browser client base URL). */
+/** The web origin the browser client is pointed at in these tests (relative URLs do not exist outside a browser). */
 export const WEB = "http://localhost:3000";
 
 export const server = setupServer();
@@ -60,7 +60,7 @@ export const json = {
   ready: () => HttpResponse.json({ status: "ok", checks: { postgres: "ok" } } satisfies HealthReady),
 };
 
-/** Both read-only screens' data, on both origins, in one call. */
+/** Both read-only screens' data on the internal API origin, in one call. */
 export function serveApi(opts: { settings?: SettingsOut; projects?: ProjectItem[] } = {}) {
   const settings = opts.settings ?? settingsFixture();
   const projects = opts.projects ?? [];
