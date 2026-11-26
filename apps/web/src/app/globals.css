@@ -49,7 +49,7 @@ html {
   background: var(--bg);
   color: var(--ink);
   /* A fixed bottom nav (below lg) must never hide a focused control (WCAG 2.4.11). */
-  scroll-padding-bottom: calc(3.25rem + env(safe-area-inset-bottom));
+  scroll-padding-bottom: calc(3.25rem + 1px + env(safe-area-inset-bottom));
 }
 
 @media (min-width: 64rem) {
@@ -81,6 +81,7 @@ main:focus:not(:focus-visible) {
 a,
 button {
   touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
 }
 
 p {
@@ -93,14 +94,22 @@ h2 {
 }
 
 /* Inline text link: Tick, always underlined (never colour alone). */
-.link {
-  color: var(--tick);
+.link,
+.link-warn {
   text-decoration: underline;
   text-underline-offset: 0.2em;
   text-decoration-thickness: 1px;
   transition-property: color, text-decoration-thickness;
   transition-duration: var(--dur-fast);
   transition-timing-function: var(--ease-out);
+}
+
+.link-warn:hover {
+  text-decoration-thickness: 2px;
+}
+
+.link {
+  color: var(--tick);
 }
 
 .link:hover {
