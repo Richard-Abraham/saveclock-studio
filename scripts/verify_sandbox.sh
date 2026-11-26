@@ -21,9 +21,11 @@ chk() { # label, service, sh-snippet that must exit 0
 for spec in api:536870912:100000 worker:4294967296:300000 worker-maint:268435456:100000; do
   IFS=: read -r svc mem quota <<<"$spec"
   chk "uid is 10001" "$svc" '[ "$(id -u)" = 10001 ]'
-  chk "no capabilities (CapEff 0)" "$svc" 'grep -q "^CapEff:[[:space:]]*0000000000000000$" /proc/self/status'
+  # CapEff is 0 for any non-root user, so it cannot prove cap_drop: the bounding set (CapBnd) can.
+  chk "no capabilities (CapEff and CapBnd 0)" "$svc" 'grep -q "^CapEff:[[:space:]]*0000000000000000$" /proc/self/status && grep -q "^CapBnd:[[:space:]]*0000000000000000$" /proc/self/status'
   chk "no-new-privileges" "$svc" 'grep -q "^NoNewPrivs:[[:space:]]*1$" /proc/self/status'
-  chk "root filesystem is read-only" "$svc" '! touch /x 2>/dev/null'
+  # uid 10001 cannot write to / anyway, so a failed touch proves nothing: read the mount flags.
+  chk "root filesystem is mounted read-only" "$svc" 'awk '"'"'$5=="/" {print $6}'"'"' /proc/self/mountinfo | grep -qE "^ro(,|$)"'
   chk "/data/blobs is writable" "$svc" 'touch /data/blobs/.sandbox && rm /data/blobs/.sandbox'
   chk "/tmp is writable" "$svc" 'touch /tmp/.sandbox && rm /tmp/.sandbox'
   chk "no container socket" "$svc" '[ ! -e /var/run/docker.sock ] && [ ! -e /run/podman/podman.sock ]'

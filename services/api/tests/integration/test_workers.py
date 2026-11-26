@@ -191,6 +191,26 @@ async def test_redelivery_is_idempotent(harness: Harness, api: httpx.AsyncClient
     assert [h["attempt"] for h in hops] == [1, 1, 1, 1]  # the second run was refused
 
 
+async def test_redelivery_after_a_crash_between_enqueue_and_finish(
+    harness: Harness, api: httpx.AsyncClient
+) -> None:
+    """The next hop was already created, but this hop never reached `ok`: it runs again."""
+    job_id = await create_job(api)
+    actors = local_actors(harness.db, harness.blob_root)
+    first = actors.by_queue[JobQueue.ANALYSIS]
+    await asyncio.to_thread(first.fn, str(job_id), str(OWNER))
+    conn = await asyncpg.connect(harness.db.raw("postgres"))
+    try:
+        await conn.execute("UPDATE jobs SET state = 'running' WHERE id = $1", job_id)
+    finally:
+        await conn.close()
+    await asyncio.to_thread(first.fn, str(job_id), str(OWNER))  # must not raise or duplicate
+    assert await job_rows(harness.db) == 2
+    hops = (await api.get(f"/api/v1/_stub/jobs/{job_id}")).json()["hops"]
+    assert [h["state"] for h in hops] == ["ok", "queued", "pending", "pending"]
+    assert hops[0]["attempt"] == 2
+
+
 @pytest.mark.slow
 async def test_kill_9_mid_job_is_redelivered(harness: Harness, api: httpx.AsyncClient) -> None:
     first = harness.start_worker([*MAIN_QUEUES, "maintenance"])
