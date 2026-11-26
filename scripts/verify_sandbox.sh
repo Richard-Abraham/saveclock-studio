@@ -17,9 +17,13 @@ chk() { # label, service, sh-snippet that must exit 0
   if in_svc "$2" sh -c "$3" >/dev/null 2>&1; then pass "$2: $1"; else bad "$2: $1"; return 1; fi
 }
 
-# service:memory-bytes:cpu-quota
-for spec in api:536870912:100000 worker:4294967296:300000 worker-maint:268435456:100000; do
-  IFS=: read -r svc mem quota <<<"$spec"
+cid() { # service -> container id (podman-compose and docker compose both label the service)
+  $CONTAINER ps -q --filter "label=com.docker.compose.service=$1" --filter "label=io.podman.compose.project=saveclock" 2>/dev/null | head -1
+}
+for svc in api worker worker-maint; do
+  # compose owns the limits: read what it actually created, then prove the cgroup enforces them
+  read -r mem quota <<<"$($CONTAINER inspect --format '{{.HostConfig.Memory}} {{.HostConfig.CpuQuota}}' "$(cid "$svc")")"
+  if [ "${mem:-0}" = 0 ] || [ "${quota:-0}" = 0 ]; then bad "$svc: container has no memory/cpu limit (mem=$mem quota=$quota)"; continue; fi
   chk "uid is 10001" "$svc" '[ "$(id -u)" = 10001 ]'
   # CapEff is 0 for any non-root user, so it cannot prove cap_drop: the bounding set (CapBnd) can.
   chk "no capabilities (CapEff and CapBnd 0)" "$svc" 'grep -q "^CapEff:[[:space:]]*0000000000000000$" /proc/self/status && grep -q "^CapBnd:[[:space:]]*0000000000000000$" /proc/self/status'
@@ -52,9 +56,6 @@ chk "ffmpeg -version" worker 'ffmpeg -version | head -1'
 chk "ffmpeg encodes a synthetic clip" worker 'ffmpeg -hide_banner -loglevel error -f lavfi -i testsrc=duration=1:size=64x64 -f null -'
 
 # host side
-cid() { # service -> container id (podman-compose and docker compose both label the service)
-  $CONTAINER ps -q --filter "label=com.docker.compose.service=$1" --filter "label=io.podman.compose.project=saveclock" 2>/dev/null | head -1
-}
 api_ports="$($CONTAINER port "$(cid api)" 2>/dev/null)"
 if echo "$api_ports" | grep -q "127.0.0.1:8000" && ! echo "$api_ports" | grep -vq "127.0.0.1:"; then pass "host: api publishes only 127.0.0.1:8000 ($api_ports)"
 else bad "host: api ports are '$api_ports'"; fi
