@@ -165,6 +165,7 @@ async def test_owner_row_is_seeded_once(migrated_db: Db) -> None:
     assert [tuple(r) for r in rows] == [(OWNER_ID, "owner@saveclock.local", OWNER_NAME)]
 
 
+@pytest.mark.migration_roundtrip
 async def test_alembic_check_and_roundtrip(migrated_db: Db) -> None:
     before = await snapshot(migrated_db)
     check = migrated_db.alembic("check")
@@ -177,6 +178,7 @@ async def test_alembic_check_and_roundtrip(migrated_db: Db) -> None:
     assert await snapshot(migrated_db) == before
 
 
+@pytest.mark.migration_roundtrip
 async def test_downgrade_one_step_roundtrip(migrated_db: Db) -> None:
     before = await snapshot(migrated_db)
     down = migrated_db.alembic("downgrade", "-1")

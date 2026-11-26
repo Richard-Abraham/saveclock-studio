@@ -73,14 +73,13 @@ test-deps-down:
 	$(COMPOSE_TEST) down
 
 test:
-	$(UV) run pytest -q -m "not golden and not live" --cov --cov-branch \
+	$(UV) run pytest -q -m "not golden and not live and not migration_roundtrip" --cov --cov-branch \
 	  --cov-report=json:coverage.json --cov-fail-under=85
 	python3 scripts/cov_floors.py
 
 # alembic check (models == migration) and a downgrade -1 / upgrade head round trip
 migrations:
-	$(UV) run pytest -q -m integration tests/integration/test_migrations.py \
-	  -k "alembic_check or one_step_roundtrip"
+	$(UV) run pytest -q -m migration_roundtrip
 
 contracts:
 	$(UV) run python ../../scripts/export_openapi.py
@@ -150,16 +149,17 @@ sandbox:
 	COMPOSE="$(COMPOSE)" CONTAINER=$(CONTAINER) scripts/verify_sandbox.sh
 
 # --- gates -------------------------------------------------------------------------------
+# run_stages <stage...>: one runner for both gates; stops at the first failure and names it.
+define run_stages
+@set -e; trap '$(MAKE) --no-print-directory test-deps-down >/dev/null 2>&1' EXIT; \
+for s in $(1); do \
+  echo "==> stage $$s"; \
+  $(MAKE) --no-print-directory $$s || { echo "FAILED stage: $$s"; exit 2; }; \
+done; echo $(2)
+endef
+
 check-fast:
-	@set -e; trap '$(MAKE) --no-print-directory test-deps-down >/dev/null 2>&1' EXIT; \
-	for s in $(FAST_STAGES); do \
-	  echo "==> stage $$s"; \
-	  $(MAKE) --no-print-directory $$s || { echo "FAILED stage: $$s"; exit 2; }; \
-	done; echo CHECK-FAST OK
+	$(call run_stages,$(FAST_STAGES),CHECK-FAST OK)
 
 check:
-	@set -e; trap '$(MAKE) --no-print-directory test-deps-down >/dev/null 2>&1' EXIT; \
-	for s in $(CHECK_STAGES); do \
-	  echo "==> stage $$s"; \
-	  $(MAKE) --no-print-directory $$s || { echo "FAILED stage: $$s"; exit 2; }; \
-	done; echo CHECK OK
+	$(call run_stages,$(CHECK_STAGES),CHECK OK)
