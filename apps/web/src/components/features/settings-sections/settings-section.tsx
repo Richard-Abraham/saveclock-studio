@@ -5,15 +5,8 @@ import { Card } from "@/components/ui";
 /** A titled card. The title is an h2 drawn at the DESIGN h3 step (heading order stays h1 to h2). */
 export function SettingsSection({ title, id, children }: { title: string; id: string; children: ReactNode }) {
   return (
-    <Card
-      as="section"
-      id={id}
-      aria-labelledby={`${id}-title`}
-      className="flex scroll-mt-20 flex-col gap-4 p-4 lg:p-5"
-    >
-      <h2 id={`${id}-title`} className="font-sans text-h3 font-semibold">
-        {title}
-      </h2>
+    <Card id={id} className="flex scroll-mt-20 flex-col gap-4 p-4 lg:p-5">
+      <h2 className="font-sans text-h3 font-semibold">{title}</h2>
       {children}
     </Card>
   );

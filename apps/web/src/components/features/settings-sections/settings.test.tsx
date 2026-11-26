@@ -139,7 +139,7 @@ describe("SettingsSections", () => {
     const { container } = render(<SettingsSections settings={settingsFixture()} />);
     const names = screen.getAllByRole("heading", { level: 2 }).map((h) => h.textContent);
     expect(names).toEqual(["API keys", "Stock sources", "Storage", "Performance"]);
-    expect(container.querySelector("#storage")).toHaveAccessibleName("Storage");
+    expect(container.querySelector("#storage h2")).toHaveTextContent("Storage");
     await expectNoSeriousViolations(container);
   });
 });
