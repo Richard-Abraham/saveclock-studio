@@ -31,6 +31,7 @@ async def test_the_first_draft_ends_in_a_valid_plan(draft: Draft) -> None:
 
 async def test_every_stage_is_timed_in_order_and_progress_never_goes_back(draft: Draft) -> None:
     _pid, djob = await draft.analysed()
+    draft.recorder.sent.clear()  # the validate and analyze steps are not this job's
     await run_draft(draft.ctx, djob, OWNER, mode="draft")
     row = (await draft.sql("SELECT timings FROM jobs WHERE id = $1", djob))[0]
     timings = json.loads(row[0])
@@ -163,7 +164,7 @@ async def test_cancel_in_planning_with_no_plan_then_retry_runs_the_whole_chain(
     await run_draft(draft.ctx, djob, OWNER, mode="draft")  # a late message: nothing to do
     assert await draft.sql("SELECT 1 FROM edit_plans") == []
     assert (await draft.client.post(f"/api/v1/projects/{pid}/retry")).status_code == 202
-    retry_job = next(a for n, a in draft.env.enqueuer.sent if n == "validate_audio")[0]
+    retry_job = [a for n, a in draft.env.enqueuer.sent if n == "validate_audio"][-1][0]
     from uuid import UUID
 
     from saveclock.domain.ids import derive_job_id

@@ -497,11 +497,7 @@ async def _local_edit(
     await session.commit()
     if moved:
         await project_state.announce_pending(session, publisher)
-    row = await PlanRepository(session).get_version(
-        user_id=user_id, project_id=project.id, version=built.plan.version
-    )
-    assert row is not None  # noqa: S101 - written a moment ago in this session
-    return PatchResult(view_of(row), None)
+    return PatchResult(PlanView(built.plan, frozen=False), None)  # not the identity-mapped row
 
 
 async def _fetch_edit(

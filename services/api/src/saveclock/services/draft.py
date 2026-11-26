@@ -146,8 +146,8 @@ async def run_draft(ctx: WorkerContext, job_id: UUID, user_id: UUID, *, mode: Mo
         await _run(run, mode)
     except JobCanceled:
         await end_unwanted(ctx, user_id, job_id)
-    except LockConflict as exc:
-        await _back_to_draft(run, "lock_conflict", exc.reason)
+    except LockConflict:
+        await _back_to_draft(run, "lock_conflict", "lock_conflict")
         if ctx.publisher is not None:
             await ctx.publisher.publish(project_id, FailedEvent("replan", "lock_conflict", False))
     except (StockUnavailable, NoUsableClips) as exc:
