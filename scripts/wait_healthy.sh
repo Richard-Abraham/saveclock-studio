@@ -15,7 +15,9 @@ while [ "$SECONDS" -lt "$end" ]; do
   ok=1
   [ -n "$names" ] || ok=0
   for n in $names; do
-    [ "$($CONTAINER inspect --format '{{if .State.Health}}{{.State.Health.Status}}{{else}}none{{end}}' "$n")" = "healthy" ] || ok=0
+    status="$($CONTAINER inspect --format '{{if .State.Health}}{{.State.Health.Status}}{{else}}none{{end}}' "$n")"
+    # containers without a healthcheck (one-shot jobs such as migrate) do not block the wait
+    [ "$status" = "healthy" ] || [ "$status" = "none" ] || ok=0
   done
   [ "$ok" = 1 ] && { echo "healthy: $(echo $names)"; exit 0; }
   sleep 2

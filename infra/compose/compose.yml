@@ -1,4 +1,6 @@
 # One stack for dev and the owner's machine (C17). Project name `saveclock` comes from the Makefile.
+# Images are built by `make images` (explicit podman/docker build): podman-compose 1.6.0 cannot
+# handle a build context path that contains spaces, so there are no `build:` keys here.
 # Compose-spec subset that podman-compose 1.6.0 supports; every hardening key is verified on
 # the RUNNING containers by `make sandbox`, never by reading this file.
 networks:
@@ -67,12 +69,6 @@ services:
         condition: service_healthy
 
   api:
-    build:
-      context: ../..
-      dockerfile: infra/docker/Dockerfile.api
-      target: api
-      args:
-        APP_VERSION: "${IMAGE_TAG:-local}"
     image: saveclock-api:${IMAGE_TAG:-local}
     ports:
       - "${BIND_ADDR:-127.0.0.1}:8000:8000"
@@ -112,12 +108,6 @@ services:
         condition: service_completed_successfully
 
   worker:
-    build:
-      context: ../..
-      dockerfile: infra/docker/Dockerfile.api
-      target: worker
-      args:
-        APP_VERSION: "${IMAGE_TAG:-local}"
     image: saveclock-worker:${IMAGE_TAG:-local}
     command:
       - sh
