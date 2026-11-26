@@ -31,7 +31,11 @@ export function UnreachableBanner() {
   return (
     <Callout
       variant="danger"
-      title="Can’t reach SaveClock."
+      title={
+        <>
+          Can’t reach <span translate="no">SaveClock</span>.
+        </>
+      }
       id="unreachable-message"
       className="mb-6"
       actions={

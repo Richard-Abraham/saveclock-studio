@@ -77,13 +77,14 @@ describe("UnreachableBanner", () => {
       </>,
     );
     await screen.findByText("Server ok");
-    expect(container).not.toHaveTextContent("Can’t reach SaveClock.");
+    expect(container).not.toHaveTextContent("Can’t reach");
   });
 
   it("shows the exact copy with no live role when the server cannot be reached", async () => {
     server.use(http.get(READY, () => HttpResponse.error()));
     const { container } = frame(<UnreachableBanner />);
-    expect(await screen.findByText("Can’t reach SaveClock.")).toBeInTheDocument();
+    expect(await screen.findByText(/Can’t reach/)).toHaveTextContent("Can’t reach SaveClock.");
+    expect(screen.getByText("SaveClock")).toHaveAttribute("translate", "no");
     expect(screen.getByText("Check that it’s running on this computer.")).toBeInTheDocument();
     expect(container.querySelector("[role='alert'], [role='status'], [aria-live]")).toBeNull();
     await expectNoSeriousViolations(container);
@@ -105,7 +106,7 @@ describe("UnreachableBanner", () => {
     up = true;
     await userEvent.click(retry);
     await waitFor(() => {
-      expect(screen.queryByText("Can’t reach SaveClock.")).not.toBeInTheDocument();
+      expect(screen.queryByText(/Can’t reach/)).not.toBeInTheDocument();
     });
     expect(refresh).toHaveBeenCalledTimes(1);
     expect(screen.getByRole("heading", { level: 1 })).toHaveFocus();

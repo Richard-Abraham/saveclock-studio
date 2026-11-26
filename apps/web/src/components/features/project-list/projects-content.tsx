@@ -15,7 +15,7 @@ export async function ProjectsContent() {
 
   if (!projects.ok || !settings.ok) {
     return (
-      <div className="mt-6">
+      <div className="mt-4">
         <LoadError message="We couldn’t load your projects." id="projects-error" />
       </div>
     );

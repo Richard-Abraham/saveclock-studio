@@ -11,7 +11,7 @@ const VARIANT = {
 
 type CalloutProps = {
   variant: CalloutVariant;
-  title?: string;
+  title?: ReactNode;
   /** The message; `id` lands on its paragraph so a Retry button can aria-describe it. */
   children: ReactNode;
   actions?: ReactNode;

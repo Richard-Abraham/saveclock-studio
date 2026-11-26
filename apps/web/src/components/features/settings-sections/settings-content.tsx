@@ -12,13 +12,13 @@ export async function SettingsContent() {
   const settings = await loadSettings();
   if (!settings.ok) {
     return (
-      <div className="mt-6">
+      <div className="mt-4">
         <LoadError message="We couldn’t load your settings." id="settings-error" />
       </div>
     );
   }
   return (
-    <div className="mt-6 flex flex-col gap-6">
+    <div className="mt-4 flex flex-col gap-6">
       <DiskWarning volume={settings.data.disk.volume} link={false} />
       <SettingsSections settings={settings.data} />
     </div>
