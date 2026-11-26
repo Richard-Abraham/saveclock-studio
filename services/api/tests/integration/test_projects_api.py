@@ -278,3 +278,29 @@ async def test_a_foreign_project_is_a_404_everywhere(migrated_db: Db, api: ApiEn
     ]:
         r = await api.client.request(method, path, json={} if method == "PATCH" else None)
         assert r.status_code == 404, (method, path)
+
+
+async def test_transition_is_scoped_to_the_owner(migrated_db: Db) -> None:
+    """The repository refuses a foreign user even when the id and the status match."""
+    other = UUID("00000000-0000-4000-8000-0000000000bb")
+    await insert_user(migrated_db, other, "b@example.test")
+    mine = await insert_project(migrated_db, OWNER_USER_ID, "mine", BASE)
+    engine = create_engine(migrated_db.url("app_rw"))
+    try:
+        async with create_sessionmaker(engine)() as session:
+            repo = ProjectRepository(session)
+            assert not await repo.transition(
+                user_id=other, project_id=mine, from_="created", to="uploading"
+            )
+            assert await repo.transition(
+                user_id=OWNER_USER_ID, project_id=mine, from_="created", to="uploading"
+            )
+            assert not await repo.transition(  # the status moved on: a lost race is 0 rows
+                user_id=OWNER_USER_ID, project_id=mine, from_="created", to="uploading"
+            )
+            with pytest.raises(ValueError, match="undrawn"):
+                await repo.transition(
+                    user_id=OWNER_USER_ID, project_id=mine, from_="uploading", to="ready"
+                )
+    finally:
+        await engine.dispose()

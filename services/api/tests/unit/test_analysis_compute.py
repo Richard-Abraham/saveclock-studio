@@ -197,3 +197,25 @@ def test_the_checkpoint_must_match_the_manifest(tmp_path: Path) -> None:
     (tmp_path / "models.manifest.json").unlink()
     with pytest.raises(ModelIntegrityError, match="manifest"):
         verified_path(tmp_path, "m")
+
+
+class OddDownbeats:
+    """A model that finds a double-time grid whose downbeats sit on the beats a fold drops."""
+
+    name, version = "odd", "1"
+
+    def infer(self, signal: object, sr: int) -> tuple[list[float], list[float]]:
+        beats = [i * 0.25 for i in range(1, 80)]  # 240 BPM
+        return beats, beats[1::4]
+
+
+def test_downbeats_that_the_fold_dropped_are_not_kept(tmp_path: Path) -> None:
+    wav = tmp_path / "c.wav"
+    click_track(wav, bpm=240.0, duration=20.0)
+    signal, sr = dsp.decode_mono(wav)
+    result = compute_analysis(signal, sr, OddDownbeats(), length_s=15, cancel=never)
+    bm = result.values["beat_map"]
+    assert result.values["tempo_octave_adjust"] == -1
+    assert bm["downbeats_derived"] is True
+    for d in bm["downbeats_s"]:
+        assert any(abs(d - b) <= 0.001 for b in bm["beats_s"]), d  # every downbeat is a kept beat
