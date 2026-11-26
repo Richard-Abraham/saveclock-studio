@@ -40,7 +40,8 @@ RUN python /fetch/fetch_ffmpeg.py /fetch/ffmpeg.pin /cache /out
 FROM base AS models-fetch
 COPY scripts/fetch_models.py infra/docker/models.manifest.json /fetch/
 COPY infra/docker/cache/models/ /cache/
-RUN python /fetch/fetch_models.py /fetch/models.manifest.json /cache /out
+RUN python /fetch/fetch_models.py /fetch/models.manifest.json /cache /out \
+    && chmod -R a=rX /out
 
 # the ML stack for the worker only (CPU torch from the pytorch-cpu index, pinned in uv.lock);
 # a separate stage so the api stage above never sees it
@@ -52,7 +53,7 @@ RUN UV_NO_CACHE=1 uv sync --locked --no-dev --no-install-project --extra ml
 FROM api AS worker
 COPY --from=deps-ml /app/.venv /app/.venv
 COPY --from=ffmpeg-fetch --chmod=0755 /out/ffmpeg /out/ffprobe /usr/local/bin/
-COPY --from=models-fetch --chmod=0444 /out/ /opt/models/
+COPY --from=models-fetch /out/ /opt/models/
 ENV HF_HUB_OFFLINE=1 \
     TRANSFORMERS_OFFLINE=1 \
     MODELS_DIR=/opt/models
