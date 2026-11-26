@@ -13,7 +13,7 @@ export async function SettingsContent() {
   if (!settings.ok) {
     return (
       <div className="mt-6">
-        <LoadError message="We couldn’t load your settings." id="settings-error" error={settings.error} />
+        <LoadError message="We couldn’t load your settings." id="settings-error" />
       </div>
     );
   }

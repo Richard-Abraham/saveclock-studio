@@ -17,7 +17,7 @@ export async function ProjectsContent() {
     const error = projects.ok ? (settings.ok ? null : settings.error) : projects.error;
     return error ? (
       <div className="mt-6">
-        <LoadError message="We couldn’t load your projects." id="projects-error" error={error} />
+        <LoadError message="We couldn’t load your projects." id="projects-error" />
       </div>
     ) : null;
   }

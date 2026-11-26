@@ -2,35 +2,32 @@ import type { ErrorCode } from "@saveclock/contracts";
 import { z } from "zod";
 
 /**
- * What to do about each API error code. `satisfies Record<ErrorCode, ...>` makes a code added to
- * the Python `ErrorCode` enum (and regenerated into the contracts) a compile error here until it
- * is given a deliberate entry. In Phase 1 every code lands on a read-only GET, so Retry is safe.
+ * Every code the API can send, so an unknown one is recognised at runtime. `satisfies` makes a code
+ * added to the Python `ErrorCode` enum (and regenerated into the contracts) a compile error here until
+ * it is listed deliberately.
  */
-export type ErrorAdvice = { retry: boolean };
-const RETRY: ErrorAdvice = { retry: true };
-
-export const ERROR_ADVICE = {
-  validation_error: RETRY,
-  bad_request: RETRY,
-  forbidden: RETRY,
-  not_found: RETRY,
-  conflict: RETRY,
-  plan_version_conflict: RETRY,
-  lock_conflict: RETRY,
-  payload_too_large: RETRY,
-  unsupported_media: RETRY,
-  file_rejected: RETRY,
-  insufficient_storage: RETRY,
-  pixabay_not_configured: RETRY,
-  stock_unavailable: RETRY,
-  clip_unavailable: RETRY,
-  verification_failed: RETRY,
-  upstream_unavailable: RETRY,
-  internal_error: RETRY,
-} satisfies Record<ErrorCode, ErrorAdvice>;
+const ERROR_CODES = {
+  validation_error: true,
+  bad_request: true,
+  forbidden: true,
+  not_found: true,
+  conflict: true,
+  plan_version_conflict: true,
+  lock_conflict: true,
+  payload_too_large: true,
+  unsupported_media: true,
+  file_rejected: true,
+  insufficient_storage: true,
+  pixabay_not_configured: true,
+  stock_unavailable: true,
+  clip_unavailable: true,
+  verification_failed: true,
+  upstream_unavailable: true,
+  internal_error: true,
+} satisfies Record<ErrorCode, true>;
 
 function isErrorCode(value: string): value is ErrorCode {
-  return Object.hasOwn(ERROR_ADVICE, value);
+  return Object.hasOwn(ERROR_CODES, value);
 }
 
 const envelopeSchema = z.object({
@@ -67,10 +64,6 @@ export class ApiError extends Error {
     this.requestId = init.requestId ?? null;
     this.details = init.details ?? null;
     this.enveloped = init.enveloped ?? false;
-  }
-
-  get advice(): ErrorAdvice {
-    return ERROR_ADVICE[this.code];
   }
 }
 

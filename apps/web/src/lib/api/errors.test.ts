@@ -41,7 +41,6 @@ describe("API error mapping", () => {
     expect(error.status).toBe(403);
     expect(error.details).toEqual({ reason: "origin_mismatch" });
     expect(error.enveloped).toBe(true);
-    expect(error.advice).toEqual({ retry: true });
   });
 
   it("maps a non-JSON 502 to upstream_unavailable, not enveloped", async () => {

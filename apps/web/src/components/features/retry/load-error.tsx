@@ -1,16 +1,11 @@
 import { Callout } from "@/components/ui";
-import type { ApiError } from "@/lib/api/errors";
 
 import { RetryButton } from "./retry-button";
 
 /** A failed read-only load: say what happened, offer Retry (safe: both screens only GET). */
-export function LoadError({ message, id, error }: { message: string; id: string; error: ApiError }) {
+export function LoadError({ message, id }: { message: string; id: string }) {
   return (
-    <Callout
-      variant="danger"
-      id={id}
-      actions={error.advice.retry ? <RetryButton describedBy={id} /> : undefined}
-    >
+    <Callout variant="danger" id={id} actions={<RetryButton describedBy={id} />}>
       {message}
     </Callout>
   );
