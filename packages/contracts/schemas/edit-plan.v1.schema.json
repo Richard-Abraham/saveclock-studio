@@ -1,0 +1,586 @@
+{
+  "$defs": {
+    "Attribution": {
+      "additionalProperties": false,
+      "properties": {
+        "author": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Author"
+        },
+        "author_url": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Author Url"
+        },
+        "page_url": {
+          "title": "Page Url",
+          "type": "string"
+        }
+      },
+      "required": [
+        "author",
+        "author_url",
+        "page_url"
+      ],
+      "title": "Attribution",
+      "type": "object"
+    },
+    "Audio": {
+      "additionalProperties": false,
+      "properties": {
+        "trim": {
+          "$ref": "#/$defs/AudioTrim"
+        }
+      },
+      "required": [
+        "trim"
+      ],
+      "title": "Audio",
+      "type": "object"
+    },
+    "AudioTrim": {
+      "additionalProperties": false,
+      "properties": {
+        "duration_frames": {
+          "title": "Duration Frames",
+          "type": "integer"
+        },
+        "start_s": {
+          "title": "Start S",
+          "type": "number"
+        }
+      },
+      "required": [
+        "start_s",
+        "duration_frames"
+      ],
+      "title": "AudioTrim",
+      "type": "object"
+    },
+    "BeatGrid": {
+      "additionalProperties": false,
+      "properties": {
+        "beats_s": {
+          "items": {
+            "type": "number"
+          },
+          "title": "Beats S",
+          "type": "array"
+        },
+        "confidence": {
+          "title": "Confidence",
+          "type": "number"
+        },
+        "downbeats_s": {
+          "items": {
+            "type": "number"
+          },
+          "title": "Downbeats S",
+          "type": "array"
+        },
+        "fallback": {
+          "anyOf": [
+            {
+              "enum": [
+                "energy_grid",
+                "even_grid",
+                "phrase_only"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Fallback"
+        },
+        "source": {
+          "title": "Source",
+          "type": "string"
+        },
+        "tempo_bpm": {
+          "title": "Tempo Bpm",
+          "type": "number"
+        },
+        "tempo_octave_adjust": {
+          "title": "Tempo Octave Adjust",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "source",
+        "tempo_bpm",
+        "tempo_octave_adjust",
+        "confidence",
+        "beats_s",
+        "downbeats_s",
+        "fallback"
+      ],
+      "title": "BeatGrid",
+      "type": "object"
+    },
+    "BeatRef": {
+      "additionalProperties": false,
+      "properties": {
+        "beat_index": {
+          "minimum": 0,
+          "title": "Beat Index",
+          "type": "integer"
+        },
+        "kind": {
+          "enum": [
+            "downbeat",
+            "beat"
+          ],
+          "title": "Kind",
+          "type": "string"
+        },
+        "t_s": {
+          "title": "T S",
+          "type": "number"
+        }
+      },
+      "required": [
+        "beat_index",
+        "kind",
+        "t_s"
+      ],
+      "title": "BeatRef",
+      "type": "object"
+    },
+    "Clip": {
+      "additionalProperties": false,
+      "properties": {
+        "attribution": {
+          "$ref": "#/$defs/Attribution"
+        },
+        "in_frame": {
+          "minimum": 0,
+          "title": "In Frame",
+          "type": "integer"
+        },
+        "keywords": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Keywords",
+          "type": "array"
+        },
+        "locked": {
+          "title": "Locked",
+          "type": "boolean"
+        },
+        "mezzanine_frames": {
+          "minimum": 1,
+          "title": "Mezzanine Frames",
+          "type": "integer"
+        },
+        "mezzanine_key": {
+          "title": "Mezzanine Key",
+          "type": "string"
+        },
+        "provider": {
+          "title": "Provider",
+          "type": "string"
+        },
+        "provider_id": {
+          "title": "Provider Id",
+          "type": "string"
+        },
+        "score": {
+          "title": "Score",
+          "type": "number"
+        }
+      },
+      "required": [
+        "provider",
+        "provider_id",
+        "mezzanine_key",
+        "mezzanine_frames",
+        "in_frame",
+        "keywords",
+        "score",
+        "locked",
+        "attribution"
+      ],
+      "title": "Clip",
+      "type": "object"
+    },
+    "Cut": {
+      "additionalProperties": false,
+      "properties": {
+        "beat_ref": {
+          "$ref": "#/$defs/BeatRef"
+        },
+        "clip": {
+          "$ref": "#/$defs/Clip"
+        },
+        "effects": {
+          "items": {
+            "type": "string"
+          },
+          "maxItems": 0,
+          "title": "Effects",
+          "type": "array"
+        },
+        "index": {
+          "minimum": 0,
+          "title": "Index",
+          "type": "integer"
+        },
+        "out_end_frame": {
+          "title": "Out End Frame",
+          "type": "integer"
+        },
+        "out_start_frame": {
+          "title": "Out Start Frame",
+          "type": "integer"
+        },
+        "section": {
+          "$ref": "#/$defs/SectionRef"
+        }
+      },
+      "required": [
+        "index",
+        "out_start_frame",
+        "out_end_frame",
+        "beat_ref",
+        "section",
+        "clip"
+      ],
+      "title": "Cut",
+      "type": "object"
+    },
+    "Output": {
+      "additionalProperties": false,
+      "properties": {
+        "crf": {
+          "title": "Crf",
+          "type": "integer"
+        },
+        "preset": {
+          "title": "Preset",
+          "type": "string"
+        }
+      },
+      "required": [
+        "crf",
+        "preset"
+      ],
+      "title": "Output",
+      "type": "object"
+    },
+    "Overlays": {
+      "additionalProperties": false,
+      "properties": {
+        "credits_text": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Credits Text"
+        }
+      },
+      "required": [
+        "credits_text"
+      ],
+      "title": "Overlays",
+      "type": "object"
+    },
+    "PlanOptions": {
+      "additionalProperties": false,
+      "properties": {
+        "density": {
+          "maximum": 1,
+          "minimum": -2,
+          "title": "Density",
+          "type": "integer"
+        },
+        "keywords_override": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Keywords Override"
+        },
+        "style": {
+          "title": "Style",
+          "type": "string"
+        }
+      },
+      "required": [
+        "density",
+        "style",
+        "keywords_override"
+      ],
+      "title": "PlanOptions",
+      "type": "object"
+    },
+    "Provenance": {
+      "additionalProperties": false,
+      "properties": {
+        "keyword_source": {
+          "enum": [
+            "explicit",
+            "llm",
+            "table"
+          ],
+          "title": "Keyword Source",
+          "type": "string"
+        },
+        "llm_model": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Llm Model"
+        },
+        "planner_version": {
+          "title": "Planner Version",
+          "type": "string"
+        },
+        "seed": {
+          "title": "Seed",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "llm_model",
+        "keyword_source",
+        "planner_version",
+        "seed"
+      ],
+      "title": "Provenance",
+      "type": "object"
+    },
+    "Resolution": {
+      "additionalProperties": false,
+      "properties": {
+        "height": {
+          "title": "Height",
+          "type": "integer"
+        },
+        "width": {
+          "title": "Width",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "width",
+        "height"
+      ],
+      "title": "Resolution",
+      "type": "object"
+    },
+    "SectionRef": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "label": {
+          "enum": [
+            "e1",
+            "e2",
+            "e3",
+            "e4"
+          ],
+          "title": "Label",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "label"
+      ],
+      "title": "SectionRef",
+      "type": "object"
+    },
+    "Segment": {
+      "additionalProperties": false,
+      "properties": {
+        "end_s": {
+          "title": "End S",
+          "type": "number"
+        },
+        "start_s": {
+          "title": "Start S",
+          "type": "number"
+        },
+        "start_snapped_to": {
+          "const": "downbeat",
+          "title": "Start Snapped To",
+          "type": "string"
+        }
+      },
+      "required": [
+        "start_s",
+        "end_s",
+        "start_snapped_to"
+      ],
+      "title": "Segment",
+      "type": "object"
+    },
+    "Song": {
+      "additionalProperties": false,
+      "properties": {
+        "duration_s": {
+          "title": "Duration S",
+          "type": "number"
+        },
+        "sample_rate": {
+          "title": "Sample Rate",
+          "type": "integer"
+        },
+        "sha256": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Sha256",
+          "type": "string"
+        }
+      },
+      "required": [
+        "sha256",
+        "duration_s",
+        "sample_rate"
+      ],
+      "title": "Song",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "audio": {
+      "$ref": "#/$defs/Audio"
+    },
+    "beat_grid": {
+      "$ref": "#/$defs/BeatGrid"
+    },
+    "content_hash": {
+      "pattern": "^[0-9a-f]{64}$",
+      "title": "Content Hash",
+      "type": "string"
+    },
+    "created_by": {
+      "enum": [
+        "planner",
+        "user"
+      ],
+      "title": "Created By",
+      "type": "string"
+    },
+    "cuts": {
+      "items": {
+        "$ref": "#/$defs/Cut"
+      },
+      "minItems": 1,
+      "title": "Cuts",
+      "type": "array"
+    },
+    "fps": {
+      "title": "Fps",
+      "type": "integer"
+    },
+    "lead_frames": {
+      "minimum": 0,
+      "title": "Lead Frames",
+      "type": "integer"
+    },
+    "options": {
+      "$ref": "#/$defs/PlanOptions"
+    },
+    "output": {
+      "$ref": "#/$defs/Output"
+    },
+    "overlays": {
+      "$ref": "#/$defs/Overlays"
+    },
+    "plan_id": {
+      "format": "uuid",
+      "title": "Plan Id",
+      "type": "string"
+    },
+    "project_id": {
+      "format": "uuid",
+      "title": "Project Id",
+      "type": "string"
+    },
+    "provenance": {
+      "$ref": "#/$defs/Provenance"
+    },
+    "resolution": {
+      "$ref": "#/$defs/Resolution"
+    },
+    "schema_version": {
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "segment": {
+      "$ref": "#/$defs/Segment"
+    },
+    "song": {
+      "$ref": "#/$defs/Song"
+    },
+    "total_frames": {
+      "minimum": 1,
+      "title": "Total Frames",
+      "type": "integer"
+    },
+    "version": {
+      "minimum": 1,
+      "title": "Version",
+      "type": "integer"
+    }
+  },
+  "required": [
+    "schema_version",
+    "plan_id",
+    "project_id",
+    "version",
+    "created_by",
+    "fps",
+    "lead_frames",
+    "resolution",
+    "song",
+    "segment",
+    "beat_grid",
+    "options",
+    "cuts",
+    "total_frames",
+    "audio",
+    "overlays",
+    "output",
+    "provenance",
+    "content_hash"
+  ],
+  "title": "EditPlan",
+  "type": "object"
+}

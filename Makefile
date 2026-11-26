@@ -102,6 +102,7 @@ migrations:
 # openapi.json from the Python models, then the TS types from openapi.json (T-1.4a)
 contracts:
 	$(UV) run python ../../scripts/export_openapi.py
+	$(UV) run python ../../scripts/export_edit_plan_schema.py
 	pnpm --filter @saveclock/contracts generate
 
 # Regenerates into a temp dir and compares with the checked-in files, so a hand edit of either
@@ -111,6 +112,8 @@ contracts-check: guard
 	$(UV) run python ../../scripts/export_openapi.py "$$tmp/openapi.json"; \
 	pnpm --filter @saveclock/contracts exec openapi-typescript "$$tmp/openapi.json" -o "$$tmp/schema.d.ts" >/dev/null; \
 	diff -u packages/contracts/openapi.json "$$tmp/openapi.json" || { echo "CONTRACT DRIFT: openapi.json differs from the Python models (run make contracts)"; exit 1; }; \
+	$(UV) run python ../../scripts/export_edit_plan_schema.py "$$tmp/edit-plan.v1.schema.json"; \
+	diff -u packages/contracts/schemas/edit-plan.v1.schema.json "$$tmp/edit-plan.v1.schema.json" || { echo "CONTRACT DRIFT: edit-plan.v1.schema.json differs from the Python model (run make contracts)"; exit 1; }; \
 	diff -u packages/contracts/src/schema.d.ts "$$tmp/schema.d.ts" || { echo "CONTRACT DRIFT: schema.d.ts differs from openapi.json (run make contracts)"; exit 1; }; \
 	echo "contracts in sync"
 
