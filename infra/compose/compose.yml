@@ -125,6 +125,7 @@ services:
       TORCH_THREADS: "${TORCH_THREADS:-}"
       OMP_NUM_THREADS: "${OMP_NUM_THREADS:-}"
       FETCH_CONCURRENCY: "${FETCH_CONCURRENCY:-}"
+      TUNING_PUBLISHER: "true"
     volumes:
       - "blobs:/data/blobs"
     networks: [back]

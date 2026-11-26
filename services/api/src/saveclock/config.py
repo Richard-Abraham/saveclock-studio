@@ -101,6 +101,8 @@ class Settings(BaseSettings):
     # Not in ARCH §18 (proposed additions, plan 001 Step 2):
     broker_heartbeat_timeout_s: int = _f(60, "A,K,M", doc="plan 001")
     app_version: str = _f("dev", "all", doc="plan 001")
+    # true only on the worker that serves the heavy queues, so one process owns settings:tuning
+    tuning_publisher: bool = _f(False, "K", doc="plan 001")
 
     @field_validator("allowed_hosts", "stock_host_allowlist", mode="before")
     @classmethod

@@ -99,5 +99,9 @@ def test_inventory_parity_with_arch_18() -> None:
         | {c.name for c in COMPOSE_ONLY}
     )
     compose_only = {c.name for c in COMPOSE_ONLY}
-    assert ours - ARCH_18 - compose_only == {"BROKER_HEARTBEAT_TIMEOUT_S", "APP_VERSION"}
+    assert ours - ARCH_18 - compose_only == {
+        "BROKER_HEARTBEAT_TIMEOUT_S",
+        "APP_VERSION",
+        "TUNING_PUBLISHER",
+    }
     assert ARCH_18 - ours == set()

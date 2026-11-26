@@ -16,6 +16,7 @@ configure_logging(
     level=settings.log_level, env=settings.app_env, version=settings.app_version, service="worker"
 )
 broker = build_broker(settings)
-broker.add_middleware(TuningHeartbeat(settings))
+if settings.tuning_publisher:
+    broker.add_middleware(TuningHeartbeat(settings))
 dramatiq.set_broker(broker)
 actors = register_stub_actors(broker, settings)
