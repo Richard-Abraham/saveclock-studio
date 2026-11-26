@@ -165,6 +165,7 @@ async def _run(run: _Run, mode: Mode) -> None:
     state = plans.initial_state(basis)
     redis: Redis = Redis.from_url(ctx.settings.redis_url.get_secret_value())
     watch: asyncio.Task[None] | None = None
+    deps: FootageDeps | None = None
     try:
         async with run.stage("keywords"):
             keywords = await asyncio.to_thread(_resolve_keywords, ctx, redis, basis)
@@ -193,6 +194,8 @@ async def _run(run: _Run, mode: Mode) -> None:
     finally:
         if watch is not None:
             watch.cancel()
+        if deps is not None:
+            deps.close()  # the providers' shared HTTP client
         await asyncio.to_thread(redis.close)
     async with run.stage("plan"):
         async with ctx.sessionmaker() as session:
