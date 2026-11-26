@@ -259,6 +259,29 @@ async def test_retry_flow_and_the_manual_cap(api: ApiEnv) -> None:
     assert len(api.enqueuer.sent) == 3
 
 
+async def test_cancel_ends_queued_jobs_and_flags_running_ones(api: ApiEnv) -> None:
+    pid = (await api.client.post("/api/v1/projects", json={})).json()["id"]
+    await _set(api, pid, status="planning")
+    queued, running = new_id(), new_id()
+    conn = await asyncpg.connect(api.db.raw("postgres"))
+    try:
+        for job, stage, state in ((queued, "draft", "queued"), (running, "analyze", "running")):
+            await conn.execute(
+                "INSERT INTO jobs (id, project_id, stage, queue, state)"
+                " VALUES ($1, $2, $3, 'fetch', $4)",
+                job,
+                UUID(pid),
+                stage,
+                state,
+            )
+        assert (await api.client.post(f"/api/v1/projects/{pid}/cancel")).status_code == 202
+        rows = {r["id"]: r for r in await conn.fetch("SELECT * FROM jobs")}
+    finally:
+        await conn.close()
+    assert (rows[queued]["state"], rows[queued]["error_code"]) == ("error", "canceled")
+    assert (rows[running]["state"], rows[running]["cancel_requested"]) == ("running", True)
+
+
 async def test_retry_from_canceled(api: ApiEnv) -> None:
     pid = (await api.client.post("/api/v1/projects", json={})).json()["id"]
     await _set(api, pid, status="canceled")

@@ -83,13 +83,19 @@ def register_failure_hook(broker: dramatiq.Broker, settings: Settings) -> None:
                     job = await jobs.get(user_id=user_id, job_id=job_id)
                     await jobs.mark_dead(user_id=user_id, job_id=job_id)
                     if job is not None and job.project_id is not None:
-                        await ProjectRepository(session).transition(
-                            user_id=user_id,
-                            project_id=job.project_id,
-                            from_=[ProjectStatus.VALIDATING.value, ProjectStatus.ANALYZING.value],
-                            to=ProjectStatus.FAILED_ANALYSIS.value,
-                            reason="retries_exhausted",
-                        )
+                        projects = ProjectRepository(session)
+                        for from_, to in (
+                            (ProjectStatus.VALIDATING, ProjectStatus.FAILED_ANALYSIS),
+                            (ProjectStatus.ANALYZING, ProjectStatus.FAILED_ANALYSIS),
+                            (ProjectStatus.PLANNING, ProjectStatus.FAILED_PLAN),  # the draft job
+                        ):
+                            await projects.transition(
+                                user_id=user_id,
+                                project_id=job.project_id,
+                                from_=from_.value,
+                                to=to.value,
+                                reason="retries_exhausted",
+                            )
                     await session.commit()
             finally:
                 await engine.dispose()

@@ -77,14 +77,6 @@ class JobRepository:
         )
         await self.session.execute(stmt)
 
-    async def finish(self, *, user_id: UUID, job_id: UUID, run_ms: int) -> None:
-        stmt = (
-            update(Job)
-            .where(Job.id == job_id, Job.state == JobState.RUNNING.value, self._owned(user_id))
-            .values(state=JobState.OK.value, finished_at=func.now(), timings={"run_ms": run_ms})
-        )
-        await self.session.execute(stmt)
-
     async def mark_dead(self, *, user_id: UUID, job_id: UUID) -> None:
         stmt = (
             update(Job)
@@ -123,7 +115,19 @@ class JobRepository:
         return bool((await self.session.scalars(stmt)).one_or_none())
 
     async def request_cancel(self, *, user_id: UUID, project_id: UUID) -> int:
-        """Flag every active job of the project; the workers check between sub-steps."""
+        """Queued jobs end now (error/canceled, so they free `uq_jobs_active`); running jobs are
+        flagged and the workers check between sub-steps."""
+        ended = (
+            update(Job)
+            .where(
+                Job.project_id == project_id,
+                Job.state == JobState.QUEUED.value,
+                self._owned(user_id),
+            )
+            .values(state=JobState.ERROR.value, error_code="canceled", finished_at=func.now())
+            .execution_options(synchronize_session=False)
+        )
+        await self.session.execute(ended)
         stmt = (
             update(Job)
             .where(

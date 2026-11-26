@@ -22,7 +22,7 @@ from saveclock.adapters.beat_this import BeatModel, BeatThisModel, FakeBeatModel
 from saveclock.adapters.blobstore.blob_keys import canonical_key
 from saveclock.adapters.heavy_lock import HeavyLock
 from saveclock.adapters.models import ModelIntegrityError, verified_path
-from saveclock.config import Settings
+from saveclock.config import ANALYZE_WAIT_S, Settings
 from saveclock.domain import confidence, energy
 from saveclock.domain.beat_grid import clamp_octave, fold_downbeats, median_bpm
 from saveclock.domain.segment import select_segment
@@ -37,8 +37,6 @@ from saveclock.services.context import WorkerContext, cancel_probe, end_unwanted
 log = structlog.get_logger()
 
 CONFIDENCE_VERSION = 1  # bump when the weights change (P4-10)
-HEAVY_TTL_S = 300  # longer than the analyze time limit; the lock is not renewed
-HEAVY_WAIT_S = 600
 LOW_CONFIDENCE = 0.5
 
 
@@ -164,8 +162,8 @@ def _compute_blocking(
     model = get_model(settings)
     redis: Redis = Redis.from_url(settings.redis_url.get_secret_value())
     try:
-        lock = HeavyLock(redis, effective(settings, host_facts()).heavy, HEAVY_TTL_S)
-        with lock.hold(HEAVY_WAIT_S):
+        lock = HeavyLock(redis, effective(settings, host_facts()).heavy, settings.heavy_ttl_s)
+        with lock.hold(ANALYZE_WAIT_S):  # HeavyLockTimeout is retryable, inside the actor limit
             t = time.monotonic()
             signal, sr = dsp.decode_mono(ctx.blobs.local_path(canonical_key(project_id)))
             decode_ms = int((time.monotonic() - t) * 1000)

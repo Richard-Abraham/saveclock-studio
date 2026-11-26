@@ -64,6 +64,7 @@
 | `BROKER_HEARTBEAT_TIMEOUT_S` | `int` | `60` | no | no | A,K,M | plan 001 |
 | `APP_VERSION` | `str` | `dev` | no | no | all | plan 001 |
 | `TUNING_PUBLISHER` | `bool` | `False` | no | no | K | plan 001 |
+| `HEAVY_TTL_S` | `int` | `900` | no | no | K | plan 004; heavy-slot TTL, must exceed the analyze limit |
 | `SCRATCH_ROOT` | `str` | `/scratch` | no | no | K | plan 004; per-job scratch directories |
 | `MODELS_DIR` | `str` | `/opt/models` | no | no | K | plan 004; model weights and their manifest |
 | `MIGRATOR_DATABASE_URL` | `pydantic.types.SecretStr` | `` | yes | yes | migrate | ARCH §18 |

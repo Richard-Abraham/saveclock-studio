@@ -255,30 +255,26 @@ async def test_a_message_for_another_user_touches_nothing(
     assert not (harness.blob_root / "work").exists()
 
 
-async def test_kill_9_during_analysis_completes_once(
+async def test_kill_9_while_the_worker_holds_the_heavy_slot(
     harness: Harness, api: httpx.AsyncClient, redis_client: Redis, tmp_path: Path
 ) -> None:
+    """The worker takes the slot itself and is killed inside the analysis. The replacement waits
+    for the slot's TTL to run out (HEAVY_TTL_S=3 here; the real default is 900 s) and completes the
+    job exactly once. Nothing deletes the key by hand."""
     wav = tmp_path / "click.wav"
-    click_track(wav, duration=20.0)
-    await redis_client.set(f"{PREFIX}:0", "held-by-the-test", ex=120)  # analysis waits for the slot
-    first = harness.start_worker(QUEUES)
+    click_track(wav, duration=300.0)  # about 6 s of analysis: time to kill it mid-way
+    ttl = {"HEAVY_TTL_S": "3", "BROKER_HEARTBEAT_TIMEOUT_S": "3"}
+    first = harness.start_worker(QUEUES, **ttl)
     pid = await upload(api, wav, "c.wav")
     deadline = time.monotonic() + 60
-    while time.monotonic() < deadline:  # until the analyze job runs, blocked on the heavy lock
-        running = await rows(
-            harness.db, "SELECT 1 FROM jobs WHERE stage = 'analyze' AND state = 'running'"
-        )
-        if running:
-            break
-        await asyncio.sleep(0.3)
-    else:
-        msg = "the analyze job never started"
-        raise AssertionError(msg)
+    while not await redis_client.exists(f"{PREFIX}:0"):  # the worker holds the slot
+        assert time.monotonic() < deadline, "the worker never took the heavy slot"
+        await asyncio.sleep(0.02)
     os.killpg(first.pid, signal.SIGKILL)
     first.wait(timeout=10)
-    await redis_client.delete(f"{PREFIX}:0")
-    harness.start_worker([*QUEUES, "maintenance"], BROKER_HEARTBEAT_TIMEOUT_S="3")
-    await reached_planning(harness.db, pid, 90)
+    assert await project_status(harness.db, pid) == "analyzing"  # killed before it finished
+    harness.start_worker([*QUEUES, "maintenance"], **ttl)
+    await reached_planning(harness.db, pid, 120)
     assert len(await rows(harness.db, "SELECT id FROM analyses")) == 1
     analyze = (await rows(harness.db, "SELECT attempt FROM jobs WHERE stage = 'analyze'"))[0]
     assert analyze[0] >= 2  # it ran again after the kill

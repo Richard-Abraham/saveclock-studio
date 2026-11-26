@@ -6,12 +6,12 @@ import dramatiq
 
 from saveclock.adapters.blobstore.filesystem import FilesystemBlobStore
 from saveclock.adapters.queue import ACTORS
-from saveclock.config import Settings
+from saveclock.config import ANALYZE_LIMIT_S, Settings
 from saveclock.services.analysis import analyze_project
 from saveclock.services.context import WorkerContext
 from saveclock.workers.pipeline import actor_options, run_with_context
 
-TIME_LIMIT_MS = 120_000
+TIME_LIMIT_MS = ANALYZE_LIMIT_S * 1000
 
 
 def register_analyze_actor(broker: dramatiq.Broker, settings: Settings) -> None:

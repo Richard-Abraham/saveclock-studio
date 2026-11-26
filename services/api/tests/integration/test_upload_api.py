@@ -244,6 +244,33 @@ async def test_other_states_refuse_an_upload(api: ApiEnv, status: str) -> None:
     assert await status_of(api, pid) == status
 
 
+async def test_a_stale_uploading_project_can_be_uploaded_again(api: ApiEnv) -> None:
+    """The API died mid-upload: `uploading` for longer than the stale limit is abandoned."""
+    pid = await make_project(api)
+    await sql(
+        api.db,
+        "UPDATE projects SET status = 'uploading', updated_at = now() - interval '11 minutes'"
+        " WHERE id = $1",
+        UUID(pid),
+    )
+    r = await api.client.post(song_url(pid), content=WAV, headers=headers())
+    assert r.status_code == 202, r.text
+    assert await status_of(api, pid) == "validating"
+
+
+async def test_a_fresh_uploading_project_still_refuses_a_second_upload(api: ApiEnv) -> None:
+    pid = await make_project(api)
+    await sql(
+        api.db,
+        "UPDATE projects SET status = 'uploading', updated_at = now() - interval '9 minutes'"
+        " WHERE id = $1",
+        UUID(pid),
+    )
+    r = await api.client.post(song_url(pid), content=WAV, headers=headers())
+    assert r.status_code == 409
+    assert await status_of(api, pid) == "uploading"
+
+
 async def test_a_replacing_upload_resets_the_song_row(api: ApiEnv) -> None:
     pid = await make_project(api)
     await sql(api.db, "UPDATE projects SET status = 'rejected' WHERE id = $1", UUID(pid))

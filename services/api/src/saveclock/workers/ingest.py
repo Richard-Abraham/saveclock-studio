@@ -5,13 +5,15 @@ from uuid import UUID
 import dramatiq
 
 from saveclock.adapters.blobstore.filesystem import FilesystemBlobStore
+from saveclock.adapters.ffmpeg import CANONICALIZE_TIMEOUT_S, PROBE_TIMEOUT_S
 from saveclock.adapters.queue import ACTORS
 from saveclock.config import Settings
 from saveclock.services.context import WorkerContext
 from saveclock.services.ingest import validate_song
 from saveclock.workers.pipeline import actor_options, run_with_context
 
-TIME_LIMIT_MS = 60_000
+# probe + the attached-picture probe + canonicalize, plus hashing and copying
+TIME_LIMIT_MS = (2 * PROBE_TIMEOUT_S + CANONICALIZE_TIMEOUT_S + 60) * 1000
 
 
 def register_validate_actor(broker: dramatiq.Broker, settings: Settings) -> None:

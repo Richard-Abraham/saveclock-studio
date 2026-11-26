@@ -1,5 +1,5 @@
 from collections.abc import Sequence
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Any
 from uuid import UUID
 
@@ -72,6 +72,24 @@ class ProjectRepository:
                 Project.id == project_id, Project.user_id == user_id, Project.status.in_(sources)
             )
             .values(status=to, status_reason=reason, updated_at=func.now())
+            .execution_options(synchronize_session=False)
+        )
+        return bool((await self.session.execute(stmt)).rowcount)  # type: ignore[attr-defined]
+
+    async def release_stale_upload(
+        self, *, user_id: UUID, project_id: UUID, older_than_s: int
+    ) -> bool:
+        """`uploading -> created` when no upload has touched the project for `older_than_s`
+        (the API died mid-upload): the drawn "abort or no completion" edge."""
+        stmt = (
+            update(Project)
+            .where(
+                Project.id == project_id,
+                Project.user_id == user_id,
+                Project.status == "uploading",
+                Project.updated_at < func.now() - timedelta(seconds=older_than_s),
+            )
+            .values(status="created", updated_at=func.now())
             .execution_options(synchronize_session=False)
         )
         return bool((await self.session.execute(stmt)).rowcount)  # type: ignore[attr-defined]

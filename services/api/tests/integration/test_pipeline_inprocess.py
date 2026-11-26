@@ -303,21 +303,42 @@ async def test_a_cancel_request_stops_the_analysis(pipe: Pipeline) -> None:
     assert len(await pipe.sql("SELECT 1 FROM analyses")) == 0
 
 
-async def test_a_replanned_upload_replaces_the_analysis(pipe: Pipeline) -> None:
-    """One `analyses` row per song, even when the pipeline runs twice (retry, re-upload)."""
+async def test_cancel_in_planning_then_retry_replaces_the_analysis(pipe: Pipeline) -> None:
+    """Cancel ends the still-queued draft job, so a retry can run the pipeline again."""
     pid = await pipe.upload(wav(pipe.tmp_path))
     vjob = await pipe.validate_job(pid)
     await validate_song(pipe.ctx, vjob, OWNER)
     await analyze_project(pipe.ctx, derive_job_id(vjob, "analyze"), OWNER)
-    await pipe.sql("UPDATE projects SET status = 'analyzing' WHERE id = $1", pid)
-    await pipe.sql("DELETE FROM jobs WHERE stage = 'draft'")  # uq_jobs_active: one active draft
-    await pipe.sql(
-        "INSERT INTO jobs (id, project_id, stage, queue) VALUES ($1, $2, 'analyze', 'analysis')",
-        UUID(int=7),
-        pid,
-    )
-    await analyze_project(pipe.ctx, UUID(int=7), OWNER)
+    assert await pipe.status(pid) == ("planning", None)  # the draft job is queued
+    client = pipe.env.client
+    assert (await client.post(f"/api/v1/projects/{pid}/cancel")).status_code == 202
+    assert (await client.post(f"/api/v1/projects/{pid}/retry")).status_code == 202
+    retry_job = UUID(pipe.env.enqueuer.sent[-1][1][0])
+    await validate_song(pipe.ctx, retry_job, OWNER)
+    await analyze_project(pipe.ctx, derive_job_id(retry_job, "analyze"), OWNER)
+    assert await pipe.status(pid) == ("planning", None)
     assert len(await pipe.sql("SELECT 1 FROM analyses")) == 1
+
+
+async def test_a_new_song_replaces_the_kept_original(pipe: Pipeline, ffmpeg_tools: Tools) -> None:
+    mp3 = media.encode(ffmpeg_tools, pipe.tmp_path, "a.mp3", "-c:a", "libmp3lame")
+    pid = await pipe.upload(mp3, "a.mp3", "audio/mpeg")
+    await validate_song(pipe.ctx, await pipe.validate_job(pid), OWNER)
+    songs = pipe.env.blob_root / "songs" / str(pid)
+    assert [p.name for p in songs.iterdir()] == ["source.mp3"]
+    await pipe.sql("UPDATE projects SET status = 'canceled' WHERE id = $1", pid)
+    data = await asyncio.to_thread(wav(pipe.tmp_path).read_bytes)
+    r = await pipe.env.client.post(
+        f"/api/v1/projects/{pid}/song",
+        content=data,
+        headers={"content-type": "audio/wav", "x-filename": "b.wav"},
+    )
+    assert r.status_code == 202
+    assert [p.name for p in songs.iterdir()] == ["incoming.bin"]  # the old source is gone
+    new_job = UUID(pipe.env.enqueuer.sent[-1][1][0])
+    await validate_song(pipe.ctx, new_job, OWNER)
+    assert [p.name for p in songs.iterdir()] == ["source.wav"]
+    assert ingest._find_original(pipe.ctx.blobs, pid) == f"songs/{pid}/source.wav"
 
 
 async def test_exhausted_retries_mark_the_job_dead_and_the_project_failed(
@@ -332,6 +353,11 @@ async def test_exhausted_retries_mark_the_job_dead_and_the_project_failed(
     await asyncio.to_thread(hook, {"args": [str(vjob), str(OWNER)]}, {})
     assert await pipe.job(vjob) == ("dead", "internal_error")
     assert await pipe.status(pid) == ("failed_analysis", "retries_exhausted")
+    # a draft-stage failure leaves the project in `planning`: that is failed_plan
+    await pipe.sql("UPDATE projects SET status = 'planning' WHERE id = $1", pid)
+    await pipe.sql("UPDATE jobs SET state = 'running' WHERE id = $1", vjob)
+    await asyncio.to_thread(hook, {"args": [str(vjob), str(OWNER)]}, {})
+    assert await pipe.status(pid) == ("failed_plan", "retries_exhausted")
 
 
 async def test_a_dead_job_for_a_foreign_project_changes_nothing(pipe: Pipeline) -> None:

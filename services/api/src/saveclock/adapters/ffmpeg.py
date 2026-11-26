@@ -32,6 +32,9 @@ PRLIMIT = Path("/usr/bin/prlimit")
 LIMIT_AS_BYTES = 4 * 1024**3
 LIMIT_CPU_S = 600
 POLL_S = 0.5
+CANCEL_POLL_S = 2.0  # the cancel check may open a database connection
+PROBE_TIMEOUT_S = 60
+CANONICALIZE_TIMEOUT_S = 120
 STDERR_TAIL = 4096
 _FORBIDDEN_OPTS = frozenset(
     {"-protocol_blacklist", "-safe", "-allowed_extensions", "-allowed_segment_extensions"}
@@ -133,7 +136,7 @@ def run(
     argv = cmd
     if PRLIMIT.exists():
         argv = [str(PRLIMIT), f"--as={LIMIT_AS_BYTES}", f"--cpu={LIMIT_CPU_S}", "--", *cmd]
-    started = time.monotonic()
+    started = last_cancel_check = time.monotonic()
     proc = subprocess.Popen(  # noqa: S603 - an audited argument list, never a shell
         argv,
         shell=False,
@@ -153,10 +156,13 @@ def run(
                     _kill_group(proc)
                     msg = f"timeout after {timeout}s: {Path(cmd[0]).name}"
                     raise FfTimeout(msg) from None
-                if cancel is not None and cancel():
-                    _kill_group(proc)
-                    msg = f"canceled: {Path(cmd[0]).name}"
-                    raise FfCanceled(msg) from None
+                now = time.monotonic()
+                if cancel is not None and now - last_cancel_check >= CANCEL_POLL_S:
+                    last_cancel_check = now
+                    if cancel():
+                        _kill_group(proc)
+                        msg = f"canceled: {Path(cmd[0]).name}"
+                        raise FfCanceled(msg) from None
     except BaseException:
         if proc.poll() is None:
             _kill_group(proc)
@@ -173,7 +179,7 @@ def run(
 def _probe_json(tools: Tools, path: Path, fmt: str, *extra: str) -> dict[str, Any]:
     cmd = [tools.ffprobe, *PROBE_COMMON, "-f", fmt, *PROBE_LIMITS, "-print_format", "json"]
     try:
-        data: dict[str, Any] = json.loads(run([*cmd, *extra, str(path)], 60).stdout)
+        data: dict[str, Any] = json.loads(run([*cmd, *extra, str(path)], PROBE_TIMEOUT_S).stdout)
     except (FfTimeout, FfCanceled):
         raise
     except (FfError, ValueError) as exc:
@@ -224,7 +230,7 @@ def canonicalize(
     out_flac: Path,
     *,
     cancel: Callable[[], bool] | None = None,
-    timeout: float = 120,
+    timeout: float = CANONICALIZE_TIMEOUT_S,
 ) -> None:
     """Decode once to FLAC 48 kHz stereo with no tags (ARCH §11 Canonicalize, SEC-018)."""
     cmd = ffmpeg_cmd(

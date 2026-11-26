@@ -12,6 +12,17 @@ from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
 
 LOOPBACK = ("127.0.0.1", "::1", "localhost")
 
+# The analyze time budget, in one place (a test asserts the inequalities):
+#   HEAVY_TTL_S > ANALYZE_LIMIT_S >= ANALYZE_WAIT_S + ANALYZE_COMPUTE_S
+# The lock wait ends (a retryable HeavyLockTimeout) well inside the actor limit; the compute
+# allowance is sized for the longest accepted song (MAX_SONG_S = 600 s) at the slowest measured
+# Beat This speed (22 s for a 30 s clip including the model load, 0.73 x real time, so 440 s,
+# rounded up to 480); the slot TTL outlives the actor limit so a live holder never loses its slot.
+ANALYZE_WAIT_S = 120
+ANALYZE_COMPUTE_S = 480
+ANALYZE_LIMIT_S = ANALYZE_WAIT_S + ANALYZE_COMPUTE_S + 60
+HEAVY_TTL_S = 900
+
 
 def _f(
     default: Any,  # noqa: ANN401
@@ -110,6 +121,9 @@ class Settings(BaseSettings):
     app_version: str = _f("dev", "all", doc="plan 001")
     # true only on the worker that serves the heavy queues, so one process owns settings:tuning
     tuning_publisher: bool = _f(False, "K", doc="plan 001")
+    heavy_ttl_s: int = _f(
+        HEAVY_TTL_S, "K", doc="plan 004; heavy-slot TTL, must exceed the analyze limit"
+    )
     scratch_root: str = _f("/scratch", "K", doc="plan 004; per-job scratch directories")
     models_dir: str = _f("/opt/models", "K", doc="plan 004; model weights and their manifest")
 

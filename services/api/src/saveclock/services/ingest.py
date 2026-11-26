@@ -77,6 +77,7 @@ UPLOAD_FROM = (
     ProjectStatus.CANCELED.value,
 )
 OCTET = "application/octet-stream"
+STALE_UPLOAD_S = 600  # an `uploading` project untouched this long was abandoned (API killed)
 
 
 # --- upload (API side) ------------------------------------------------------------------------
@@ -215,6 +216,9 @@ async def receive_upload(
         raise UnsupportedMedia(UnsupportedMediaReason.MIME_MISMATCH)
     filename = decode_filename(x_filename)
     blobs.ensure_free_space(declared)  # 507
+    await projects.release_stale_upload(
+        user_id=user_id, project_id=project_id, older_than_s=STALE_UPLOAD_S
+    )
     if not await projects.transition(
         user_id=user_id,
         project_id=project_id,
@@ -234,6 +238,9 @@ async def receive_upload(
             raise UnsupportedMedia(UnsupportedMediaReason.EXTENSION_MISMATCH)
         if mime != OCTET and MIME_TO_FMT.get(mime) != sniffed.fmt:
             raise UnsupportedMedia(UnsupportedMediaReason.MIME_MISMATCH)
+        for key in blobs.list(f"songs/{project_id}"):  # a new song replaces the kept original
+            if key.startswith(f"songs/{project_id}/source."):
+                blobs.delete(key)
         size = await _store(
             blobs, incoming, buffered, rest, cap=min(declared, max_bytes), declared=declared
         )
