@@ -20,6 +20,7 @@ confirms the change summary; nothing is ever pushed without an explicit instruct
 | 007  | Render the silent master, verify it, Mode A and Mode B export, downloads (`007-phase2-render-verify-export.md`) | P1 | L | 006 | none | TODO |
 | 008  | Operate: self-tuning wiring, retention and delete, rehydration, settings APIs, stub removal, security pass (`008-phase2-operate-retention-settings-security.md`) | P1 | L | 007 | none | TODO |
 | 009  | `saveclock` CLI, Claude Code skill, dev-only driver, eval script, G2 evidence (`009-phase2-cli-skill-driver-eval-g2.md`) | P1 | L | 008, 002 | owner review sheets, the multi-hour soak, optional Pexels key; ends with the owner's G2 decision | TODO |
+| 010  | Tooling and setup follow-ups: split `doctor`, FFMPEG_SRC/MODELS_SRC guard, self-documenting `make help` + lint, `make rollback`, port docs, audit the ml extra, doc corrections (`010-tooling-setup-followups.md`). DB change: none | P2 | M | 004 | none; item 6 (`ALLOWED_HOSTS` flag, source is `services/api/src/saveclock/config.py:66`) needs an owner decision, see the plan's Step 7 | TODO |
 
 Status values: TODO | IN PROGRESS | DONE | BLOCKED (with one-line reason) | REJECTED (with one-line rationale)
 
@@ -54,6 +55,7 @@ Critical path facts:
 ## Dependency notes
 
 - 002 requires 001 because the TS client is generated from `packages/contracts/openapi.json` and the web container joins the compose stack, lint, sandbox and `make check` that 001 creates.
+- 010 depends only on 004 but edits the shared `Makefile` (plans 005 to 009 add targets there). Once its `help-lint` stage exists, every later target needs a `## description`; run 010 after 009 if you can, otherwise tell the 005 to 009 executors. It never edits `services/api/src/**`, compose services or generated env docs.
 - 003 requires 002 because G1 asks for "web -> API -> 4 queues -> worker -> BlobStore -> download" and the restore proof checks that the web shell lists the restored project.
 - The DB CHANGE for `0001_baseline` (tables `users`, `projects`, `songs`, `jobs`, 7 indexes, owner row, roles `app_rw`/`migrator`) is only in plan 001. Plans 002 and 003 declare "DB change: none".
 
