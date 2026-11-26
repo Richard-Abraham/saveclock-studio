@@ -10,7 +10,7 @@ FROM base AS deps
 COPY services/api/pyproject.toml services/api/uv.lock services/api/.python-version ./
 RUN uv sync --locked --no-dev --no-install-project
 
-# api: no ffmpeg, no torch (SEC-027). 0.0.0.0 is correct inside the container; the HOST
+# api: no ffmpeg, no ML stack (SEC-027). 0.0.0.0 is correct inside the container; the HOST
 # binding is the loopback one (compose, SEC-165).
 FROM deps AS api
 ARG APP_VERSION=dev
@@ -35,7 +35,7 @@ COPY infra/docker/ffmpeg.pin infra/docker/fetch_ffmpeg.py /fetch/
 COPY infra/docker/cache/ /cache/
 RUN python /fetch/fetch_ffmpeg.py /fetch/ffmpeg.pin /cache /out
 
-# worker: the api image plus the sha256-verified FFmpeg (SEC-170). No torch in Phase 1.
+# worker: the api image plus the sha256-verified FFmpeg (SEC-170). No ML stack in Phase 1.
 FROM api AS worker
 COPY --from=ffmpeg-fetch --chmod=0755 /out/ffmpeg /out/ffprobe /usr/local/bin/
 CMD ["dramatiq", "saveclock.workers.main", "--processes", "1", "--threads", "4", "--queues", "analysis", "fetch", "render"]

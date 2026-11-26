@@ -219,6 +219,9 @@ async def test_kill_9_mid_job_is_redelivered(harness: Harness, api: httpx.AsyncC
     os.killpg(first.pid, signal.SIGKILL)  # the whole process group: master and worker child
     first.wait(timeout=10)
     harness.start_worker([*MAIN_QUEUES, "maintenance"], BROKER_HEARTBEAT_TIMEOUT_S="3")
+    # Recovery bound: the killed hop is redelivered and finishes within 60 s. The rest of the
+    # chain then takes 3 more hops of 8 s each, so it gets its own 60 s.
+    await poll(api, job_id, lambda h: h[0]["state"] == "ok", 60)
     hops = await poll(api, job_id, all_ok, 60)
     assert hops[0]["attempt"] >= 2
     assert await job_rows(harness.db) == 4
