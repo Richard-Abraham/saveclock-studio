@@ -16,9 +16,15 @@ from pathlib import Path
 
 from saveclock.adapters.ffmpeg import Tools, ffmpeg_cmd, run
 
-RED, GREEN, BLUE, YELLOW = "0xd02020", "0x20c020", "0x2020d0", "0xe0d020"
+# mid-bright (no channel under 0x30) and at least 80 apart, so no render of them is black and the
+# colour of each shot is unmistakable. A small white box moves across every solid clip so that
+# freezedetect never fires on it: temporal noise (`noise=alls=8:allf=t`) does not survive the
+# CRF 44 encode of these tiny files (measured: frame difference 0, a 6 s freeze), motion does.
+RED, GREEN, BLUE, YELLOW = "0xd03030", "0x30c030", "0x3030d0", "0xe0d030"
 GRADIENT_S = 4.0
 GRID = "drawgrid=w=48:h=48:t=2:c=white@0.6"
+BOX = "color=c=white:s=64x64:r={fps}:d={d}"
+MOVE = "overlay=x='mod(t*300,W-64)':y='mod(t*213,H-64)'"
 ENCODE = ("-c:v", "libx264", "-preset", "ultrafast", "-crf", "44", "-g", "600", "-an")
 
 
@@ -65,8 +71,9 @@ def make_clip(tools: Tools, spec: FakeClip, out: Path) -> Path:
         for colour, seconds in spec.segments:
             inputs += ["-f", "lavfi", "-i", f"color=c={colour}:s={size}:r={spec.fps}:d={seconds}"]
         n = len(spec.segments)
+        inputs += ["-f", "lavfi", "-i", BOX.format(fps=spec.fps, d=spec.seconds)]
         concat = "".join(f"[{i}:v]" for i in range(n)) + f"concat=n={n}:v=1:a=0[v]"
-        chain = f"{concat};[v]{GRID}"
+        chain = f"{concat};[v]{GRID}[g];[g][{n}:v]{MOVE}"
         if spec.blur:
             chain += ",gblur=sigma=25"
         chain += ",format=yuv420p"

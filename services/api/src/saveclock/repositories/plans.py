@@ -107,3 +107,18 @@ class PlanRepository:
             .execution_options(synchronize_session=False)
         )
         return bool((await self.session.execute(stmt)).rowcount)  # type: ignore[attr-defined]
+
+    async def freeze(self, *, user_id: UUID, project_id: UUID, version: int) -> None:
+        """Stamp the version a render uses (once: a later edit makes a new version). Idempotent."""
+        stmt = (
+            update(EditPlan)
+            .where(
+                EditPlan.project_id == project_id,
+                EditPlan.version == version,
+                EditPlan.frozen_at.is_(None),
+                self._owned(user_id),
+            )
+            .values(frozen_at=func.now())
+            .execution_options(synchronize_session=False)
+        )
+        await self.session.execute(stmt)

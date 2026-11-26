@@ -27,6 +27,7 @@ from tests.factories.stock import fake_stock
 if TYPE_CHECKING:
     from tests.integration.draft_harness import Draft
     from tests.integration.footage_harness import Footage
+    from tests.integration.render_harness import Renders
 
 API_DIR = Path(__file__).resolve().parents[2]
 PG_HOST, PG_PORT = "127.0.0.1", 55432
@@ -259,3 +260,11 @@ async def draft(
     yield d
     d.redis.close()
     await engine.dispose()
+
+
+@pytest.fixture
+async def renderer(draft: "Draft") -> "Renders":
+    """Rendering in-process (plan 007) on top of the draft harness."""
+    from tests.integration.render_harness import Renders
+
+    return Renders(draft)

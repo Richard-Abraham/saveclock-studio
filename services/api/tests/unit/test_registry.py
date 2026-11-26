@@ -15,6 +15,8 @@ from saveclock.workers.broker import build_broker
 from saveclock.workers.draft import register_draft_actors
 from saveclock.workers.ingest import register_validate_actor
 from saveclock.workers.pipeline import FAILED_ACTOR, register_failure_hook
+from saveclock.workers.remux import register_remux_actor
+from saveclock.workers.render import register_render_actors
 
 
 def settings_for(tmp_path: Path) -> Settings:
@@ -35,6 +37,8 @@ def registered(tmp_path: Path) -> dramatiq.Broker:
     register_validate_actor(broker, settings)
     register_analyze_actor(broker, settings)
     register_draft_actors(broker, settings)
+    register_render_actors(broker, settings)
+    register_remux_actor(broker, settings)
     return broker
 
 

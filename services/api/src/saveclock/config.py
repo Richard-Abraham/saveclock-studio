@@ -36,6 +36,19 @@ NORMALIZE_HOLD_S = 300  # one encode (120 s) + the checks that follow (3 x 60 s 
 # it, so a live worker never loses a slot it holds: HEAVY_TTL_S > DRAFT_LIMIT_S > FOOTAGE_WAIT_S.
 DRAFT_LIMIT_S = 180
 
+# The render (plan 007), one job on the render queue; a heavy slot is held per render, from the
+# preflight to the end of FFmpeg (verification runs after release). In one place, asserted by
+# tests/unit/test_time_budgets.py:
+#   HEAVY_TTL_S > RENDER_LIMIT_S > RENDER_FFMPEG_S
+#   RENDER_LIMIT_S >= RENDER_HEAVY_WAIT_S + RENDER_FFMPEG_S
+# The slot wait (a retryable HeavyLockTimeout) plus the FFmpeg child fit the actor limit, and the
+# slot TTL outlives it. A remux is far shorter; it shares the worker threads with the render.
+RENDER_LIMIT_S = 300
+RENDER_FFMPEG_S = 270
+RENDER_HEAVY_WAIT_S = 20  # hypothesis: below RENDER_LIMIT_S - RENDER_FFMPEG_S, so wait + encode fit
+REMUX_LIMIT_S = 30
+REMUX_FFMPEG_S = 20  # the remux child; the verification calls that follow share the same limit
+
 
 def _f(
     default: Any,  # noqa: ANN401

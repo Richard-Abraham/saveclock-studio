@@ -8,18 +8,22 @@
 """
 
 import contextlib
+import hashlib
 import json
 import os
 import re
 import signal
 import subprocess
+import threading
 import time
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from pathlib import Path
+from types import TracebackType
 from typing import Any
 
 from saveclock.domain.audio_rules import AudioProbe, StreamInfo
+from saveclock.domain.edit_plan import EditPlan
 from saveclock.domain.framemath import FPS
 from saveclock.domain.video_checks import moov_before_mdat
 from saveclock.domain.windows import Window
@@ -373,9 +377,11 @@ def build_mezz(
         raise
 
 
-def probe_video(tools: Tools, path: Path) -> dict[str, Any]:
+def probe_video(tools: Tools, path: Path, *, hashes: bool = False) -> dict[str, Any]:
     """Everything `domain.video_checks.video_checks` needs: streams, format, packet PTS values,
-    the decoded frame count and whether `moov` precedes `mdat`."""
+    the decoded frame count and whether `moov` precedes `mdat`. `hashes=True` (the master check
+    and Mode A) adds the sha256 of every video packet (`packet_hashes`, QM-087) and a hash of the
+    frame PTS and durations (`frame_pts_hash`); the mezzanine check does not pay for them."""
     info = _probe_json(
         tools,
         path,
@@ -392,17 +398,156 @@ def probe_video(tools: Tools, path: Path) -> dict[str, Any]:
         tools,
         path,
         MP4_FMT,
-        *(
-            "-select_streams",
-            "v:0",
-            "-show_packets",
-            "-show_entries",
-            "packet=pts,dts,duration,flags",
-        ),
-    )
-    return {
+        *("-select_streams", "v:0", "-show_packets"),
+        *(("-show_data_hash", "sha256") if hashes else ()),
+        *("-show_entries", "packet=pts,dts,duration,flags" + (",data_hash" if hashes else "")),
+    )["packets"]
+    out: dict[str, Any] = {
         "streams": info["streams"],
         "format": info["format"],
-        "pts": [int(p["pts"]) for p in packets["packets"]],
+        "pts": [int(p["pts"]) for p in packets],
         "moov_first": moov_before_mdat(path),
     }
+    if hashes:
+        frames = _probe_json(
+            tools,
+            path,
+            MP4_FMT,
+            *("-select_streams", "v:0", "-show_frames", "-show_entries", "frame=pts,duration"),
+        )["frames"]
+        lines = "\n".join(f"{f.get('pts')},{f.get('duration')}" for f in frames)
+        out["packet_hashes"] = [p["data_hash"] for p in packets]
+        out["frame_pts_hash"] = hashlib.sha256(lines.encode()).hexdigest()
+    return out
+
+
+# --- the final render and the Mode A remux (ARCH §11, plan 007) --------------------------------
+
+# shortcut: the encode is this template, `plan.output.crf/preset` are not read; upgrade when the
+# plan's output block becomes owner-editable
+RENDER_ENCODE = (
+    *("-c:v", "libx264", "-preset", "veryfast", "-crf", "20", "-profile:v", "high"),
+    *("-pix_fmt", "yuv420p"),
+)
+MAX_RENDER_INPUTS = 60  # the planner never makes more cuts than this (plan 006's validator)
+AAC_TRANSCODE = ("-c:a", "aac", "-b:a", "192k", "-ar", "48000", "-ac", "2")
+
+
+def filter_graph(plan: EditPlan) -> str:
+    """trim by FRAME index (never seconds), concat, null: ARCH §11 final-render template."""
+    parts: list[str] = []
+    for k, cut in enumerate(plan.cuts):
+        start = cut.clip.in_frame
+        end = start + (cut.out_end_frame - cut.out_start_frame)
+        parts.append(f"[{k}:v]trim=start_frame={start}:end_frame={end},setpts=PTS-STARTPTS[v{k}]")
+    labels = "".join(f"[v{k}]" for k in range(len(plan.cuts)))
+    parts.append(f"{labels}concat=n={len(plan.cuts)}:v=1:a=0[vc]")
+    parts.append("[vc]null[vout]")
+    return ";".join(parts)
+
+
+def render_cmd(
+    tools: Tools,
+    plan: EditPlan,
+    mezz_paths: Sequence[Path],
+    out: Path,
+    *,
+    progress: Path,
+    threads: int,
+) -> list[str]:
+    """One `-i` per cut (in plan order): the silent master in one pass, no audio."""
+    if not 1 <= len(plan.cuts) <= MAX_RENDER_INPUTS or len(mezz_paths) != len(plan.cuts):
+        msg = f"a render takes 1 to {MAX_RENDER_INPUTS} cuts, one mezzanine each"
+        raise FfError(msg)
+    inputs = [a for path in mezz_paths for a in ("-f", MP4_FMT, "-i", str(path))]
+    return ffmpeg_cmd(
+        tools,
+        *inputs,
+        *("-filter_complex", filter_graph(plan)),
+        *("-map", "[vout]", "-an"),
+        *RENDER_ENCODE,
+        *("-r", str(FPS), "-fps_mode", "cfr", "-g", "60", "-video_track_timescale", "30000"),
+        *("-threads", str(threads)),
+        *("-frames:v", str(plan.total_frames)),
+        *("-progress", str(progress), "-nostats"),
+        *("-movflags", "+faststart", "-f", "mp4", str(out)),
+    )
+
+
+def remux_cmd(
+    tools: Tools,
+    master: Path,
+    source: Path,
+    source_fmt: str,
+    *,
+    audio_start_s: float,
+    total_frames: int,
+    out: Path,
+    aac_copy: bool,
+) -> list[str]:
+    """Mode A (ARCH §11): the master's video copied, the song trimmed in. No gain, loudness, EQ or
+    filter: the audio is stream-copied when it is AAC-LC and encoded to AAC-LC once otherwise."""
+    dur = f"{total_frames / FPS:.6f}"
+    audio = ("-c:a", "copy") if aac_copy else AAC_TRANSCODE
+    return ffmpeg_cmd(
+        tools,
+        *("-f", MP4_FMT, "-i", str(master)),
+        *("-ss", f"{audio_start_s:.6f}", "-t", dur, "-f", source_fmt, "-i", str(source)),
+        *("-map", "0:v:0", "-map", "1:a:0", "-c:v", "copy", *audio),
+        *("-t", dur, "-movflags", "+faststart", "-f", "mp4", str(out)),
+    )
+
+
+def parse_progress(text: str) -> tuple[int, bool]:
+    """FFmpeg's `-progress` file: `key=value` blocks ending in `progress=continue|end`. The last
+    frame count and whether the run has ended."""
+    frame, ended = 0, False
+    for line in text.splitlines():
+        key, _, value = line.partition("=")
+        if key == "frame" and value.strip().isdigit():
+            frame = int(value)
+        elif key == "progress":
+            ended = value.strip() == "end"
+    return frame, ended
+
+
+class ProgressTail:
+    """Polls the `-progress` file in a thread and reports `frame / total` (callback throttles)."""
+
+    def __init__(
+        self,
+        path: Path,
+        total_frames: int,
+        callback: Callable[[float], None],
+        *,
+        poll_s: float = 0.5,
+    ) -> None:
+        self._path, self._total, self._callback, self._poll = path, total_frames, callback, poll_s
+        self._stop = threading.Event()
+        self._thread = threading.Thread(target=self._run, daemon=True, name="progress-tail")
+
+    def _read(self) -> bool:
+        try:
+            frame, ended = parse_progress(self._path.read_text())
+        except OSError:
+            return False
+        self._callback(min(1.0, frame / self._total))
+        return ended
+
+    def _run(self) -> None:
+        while not self._stop.wait(self._poll):
+            if self._read():
+                return
+
+    def __enter__(self) -> "ProgressTail":
+        self._thread.start()
+        return self
+
+    def __exit__(
+        self,
+        exc_type: type[BaseException] | None,
+        exc: BaseException | None,
+        tb: TracebackType | None,
+    ) -> None:
+        self._stop.set()
+        self._thread.join(timeout=2)

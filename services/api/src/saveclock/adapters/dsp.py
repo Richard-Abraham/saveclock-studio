@@ -131,3 +131,63 @@ def audio_condition(signal: FloatArray, sr: int) -> float:
     if peak < 0.05:  # noqa: PLR2004
         score -= 0.3
     return max(0.0, score)
+
+
+# --- render verification (plan 007): cut positions and the Mode A offset --------------------------
+
+XCORR_SR = 8000  # the audio is compared at 8 kHz mono: 0.125 ms per sample
+XCORR_MAX_LAG_S = 0.2
+Float64 = npt.NDArray[np.float64]
+
+
+def frame_diffs(frames: npt.NDArray[np.uint8]) -> list[float]:
+    """`d[f]` = mean absolute difference of gray frame f against f - 1 (`d[0]` is 0); `frames` is
+    `(n, h, w)` or `(n, h * w)`. QUALITY §7 cut positions."""
+    if len(frames) == 0:
+        return []
+    flat = frames.reshape(len(frames), -1).astype(np.int16)
+    d = np.abs(np.diff(flat, axis=0)).mean(axis=1)
+    return [0.0, *(float(v) for v in d)]
+
+
+def _click_envelope(x: Float64, sr: int) -> Float64:
+    """Rectify, 4 ms boxcar, half-wave rectified first difference (the spike's onset envelope)."""
+    k = max(1, int(0.004 * sr))
+    env = np.convolve(np.abs(x), np.ones(k) / k, mode="same")
+    return np.asarray(np.maximum(np.diff(env, prepend=env[0]), 0.0), dtype=np.float64)
+
+
+def _parabolic_peak(y: Float64, k: int) -> float:
+    if k <= 0 or k >= len(y) - 1:
+        return float(k)
+    y0, y1, y2 = y[k - 1], y[k], y[k + 1]
+    denom = y0 - 2 * y1 + y2
+    return float(k) if denom == 0 else float(k + 0.5 * (y0 - y2) / denom)
+
+
+def xcorr_offset(
+    ref: Float64, test: Float64, sr: int = XCORR_SR, max_lag_s: float = XCORR_MAX_LAG_S
+) -> float:
+    """Offset in seconds of `test` against `ref` (positive: `test` is late): FFT cross-correlation
+    of the onset envelopes with a parabolic refinement of the peak."""
+    n = min(len(ref), len(test))
+    a, b = _click_envelope(ref[:n], sr), _click_envelope(test[:n], sr)
+    nfft = 1 << int(np.ceil(np.log2(2 * n)))
+    c = np.fft.irfft(np.fft.rfft(b, nfft) * np.conj(np.fft.rfft(a, nfft)), nfft)
+    c = np.concatenate([c[-(n - 1) :], c[:n]])  # lags -(n-1) .. n-1
+    m = int(max_lag_s * sr)
+    seg = c[n - 1 - m : n + m]
+    k = int(np.argmax(seg))
+    return (_parabolic_peak(seg, k) - m) / sr
+
+
+def onset_offsets(
+    ref: Float64, test: Float64, duration_s: float, sr: int = XCORR_SR
+) -> tuple[float, float, float]:
+    """`(offset at t~1 s, offset at t~end-1 s, drift per 60 s)` of `test` against `ref`, from the
+    first and last 2 s (QM-067/068)."""
+    w = int(2.0 * sr)
+    n = min(len(ref), len(test))
+    start = xcorr_offset(ref[:w], test[:w], sr)
+    end = xcorr_offset(ref[n - w : n], test[n - w : n], sr)
+    return start, end, (end - start) * (60.0 / max(duration_s - 2.0, 1.0))

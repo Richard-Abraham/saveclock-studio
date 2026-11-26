@@ -3,18 +3,21 @@
 import re
 from uuid import UUID
 
+from saveclock.domain.render_job import RENDER_FILES
+
 MAX_KEY_LEN = 512
 MAX_SEGMENT_LEN = 128
 _SEGMENT = re.compile(r"[A-Za-z0-9._-]+")
 _UUID = r"[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}"
 _NAME = r"[A-Za-z0-9._-]{1,100}"
+_RENDER_FILES = frozenset(RENDER_FILES.values())  # the render's own files; `stub.txt` is the stub's
+_RENDER_ALT = "|".join(re.escape(n) for n in (*sorted(_RENDER_FILES), "stub.txt"))
 _SERVABLE = re.compile(
-    rf"renders/{_UUID}/(master\.mp4|cutlist\.json|cutlist\.csv|with_song\.mp4|stub\.txt)"
+    rf"renders/{_UUID}/({_RENDER_ALT})"
     rf"|work/{_UUID}/proxy/{_NAME}\.mp4"
     rf"|work/{_UUID}/audio_proxy\.m4a"
 )
 _EXT = re.compile(r"[a-z0-9]{1,8}")
-_RENDER_FILES = frozenset({"master.mp4", "cutlist.json", "cutlist.csv", "with_song.mp4"})
 
 
 class InvalidKey(ValueError):

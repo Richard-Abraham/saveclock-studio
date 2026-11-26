@@ -19,6 +19,8 @@ ACTORS: dict[str, JobQueue] = {
     "analyze_song": JobQueue.ANALYSIS,
     "build_draft": JobQueue.FETCH,
     "replan": JobQueue.FETCH,
+    "render_master": JobQueue.RENDER,
+    "remux_with_song": JobQueue.RENDER,
 }
 
 

@@ -1,7 +1,8 @@
 """The progress stepper (ARCH §12) as data: one list of steps spans the whole automatic pipeline.
 
 Percentages are monotonic across steps and clamped to the step's range. `message_key` is an i18n
-key the web maps to copy; the server never sends display text. Plan 007 adds the render steps.
+key the web maps to copy; the server never sends display text. A pipeline restarts at 0: the
+draft's four steps, then the render's two, then the remux.
 """
 
 from dataclasses import dataclass
@@ -21,6 +22,10 @@ STEPS: tuple[Step, ...] = (
     Step("finding_beat", "analyzing", "progress.finding_beat", 10, 40),
     Step("choosing_clips", "planning", "progress.choosing_clips", 40, 70),
     Step("building_draft", "planning", "progress.building_draft", 70, 100),
+    # a render restarts the bar: its own two steps, then the Mode A remux on its own
+    Step("rendering", "rendering", "progress.rendering", 0, 85),  # hypothesis: the split
+    Step("verifying", "rendering", "progress.verifying", 85, 100),
+    Step("remuxing", "ready", "progress.remuxing", 0, 100),
 )
 BY_KEY = {s.key: s for s in STEPS}
 TICK_CEILING = 0.95  # a time-based estimate never reaches the end of its step

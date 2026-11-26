@@ -9,12 +9,19 @@ from saveclock.config import (
     FOOTAGE_WAIT_S,
     HEAVY_TTL_S,
     NORMALIZE_HOLD_S,
+    REMUX_FFMPEG_S,
+    REMUX_LIMIT_S,
+    RENDER_FFMPEG_S,
+    RENDER_HEAVY_WAIT_S,
+    RENDER_LIMIT_S,
     VET_HOLD_S,
     Settings,
 )
 from saveclock.workers import analysis as analysis_worker
 from saveclock.workers import draft as draft_worker
 from saveclock.workers import ingest as ingest_worker
+from saveclock.workers import remux as remux_worker
+from saveclock.workers import render as render_worker
 
 MAX_SONG_S = 600
 SLOWEST_BEAT_THIS_PER_AUDIO_S = 22 / 30  # measured: 22 s for a 30 s clip, model load included
@@ -47,3 +54,21 @@ def test_the_draft_limit_sits_between_the_slot_wait_and_the_slot_ttl() -> None:
 def test_the_draft_actor_uses_the_limit_and_a_hold_never_outlives_the_slot() -> None:
     assert draft_worker.TIME_LIMIT_MS == DRAFT_LIMIT_S * 1000
     assert max(VET_HOLD_S, NORMALIZE_HOLD_S) < HEAVY_TTL_S
+
+
+def test_the_render_slot_outlives_the_limit_which_outlives_the_ffmpeg_child() -> None:
+    assert HEAVY_TTL_S > RENDER_LIMIT_S > RENDER_FFMPEG_S
+
+
+def test_the_slot_wait_plus_the_encode_fit_the_render_limit() -> None:
+    assert RENDER_LIMIT_S >= RENDER_HEAVY_WAIT_S + RENDER_FFMPEG_S
+
+
+def test_a_remux_is_shorter_than_a_render_and_its_child_fits_its_limit() -> None:
+    assert REMUX_LIMIT_S < RENDER_LIMIT_S
+    assert REMUX_LIMIT_S > REMUX_FFMPEG_S
+
+
+def test_the_render_actors_use_those_numbers() -> None:
+    assert render_worker.TIME_LIMIT_MS == RENDER_LIMIT_S * 1000
+    assert remux_worker.TIME_LIMIT_MS == REMUX_LIMIT_S * 1000

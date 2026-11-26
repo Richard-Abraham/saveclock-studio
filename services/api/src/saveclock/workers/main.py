@@ -14,6 +14,8 @@ from saveclock.workers.draft import register_draft_actors
 from saveclock.workers.heartbeat import TuningHeartbeat
 from saveclock.workers.ingest import register_validate_actor
 from saveclock.workers.pipeline import register_failure_hook
+from saveclock.workers.remux import register_remux_actor
+from saveclock.workers.render import register_render_actors
 from saveclock.workers.stub import register_stub_actors
 
 settings = Settings()
@@ -29,4 +31,6 @@ register_failure_hook(broker, settings)
 register_validate_actor(broker, settings)
 register_analyze_actor(broker, settings)
 register_draft_actors(broker, settings)
+register_render_actors(broker, settings)
+register_remux_actor(broker, settings)
 sweep_stale(settings.scratch_root)  # scratch left behind by a killed worker (SEC-023)

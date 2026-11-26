@@ -1,7 +1,7 @@
 from typing import Any
 from uuid import UUID
 
-from sqlalchemy import func, literal, select, update
+from sqlalchemy import Uuid, func, literal, select, update
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.sql.elements import ColumnElement
@@ -28,15 +28,23 @@ class JobRepository:
         return list((await self.session.scalars(stmt)).all())
 
     async def create(
-        self, *, user_id: UUID, project_id: UUID, job_id: UUID, stage: str, queue: str
+        self,
+        *,
+        user_id: UUID,
+        project_id: UUID,
+        job_id: UUID,
+        stage: str,
+        queue: str,
+        render_id: UUID | None = None,
     ) -> None:
-        """Idempotent (ON CONFLICT DO NOTHING); inserts nothing if the project is not the user's."""
-        owned_project = select(literal(job_id), Project.id, literal(stage), literal(queue)).where(
-            Project.id == project_id, Project.user_id == user_id
-        )
+        """Idempotent (ON CONFLICT DO NOTHING); inserts nothing if the project is not the user's.
+        A render or remux job carries its `render_id`."""
+        owned_project = select(
+            literal(job_id), Project.id, literal(render_id, Uuid), literal(stage), literal(queue)
+        ).where(Project.id == project_id, Project.user_id == user_id)
         stmt = (
             insert(Job)
-            .from_select(["id", "project_id", "stage", "queue"], owned_project)
+            .from_select(["id", "project_id", "render_id", "stage", "queue"], owned_project)
             .on_conflict_do_nothing(index_elements=["id"])
         )
         await self.session.execute(stmt)
@@ -97,7 +105,9 @@ class JobRepository:
         )
         await self.session.execute(stmt)
 
-    async def fail(self, *, user_id: UUID, job_id: UUID, error_code: str) -> None:
+    async def fail(
+        self, *, user_id: UUID, job_id: UUID, error_code: str, detail: str | None = None
+    ) -> None:
         """A permanent, expected failure (a rejected file): `error`, not `dead`."""
         stmt = (
             update(Job)
@@ -106,7 +116,12 @@ class JobRepository:
                 Job.state.in_([JobState.QUEUED.value, JobState.RUNNING.value]),
                 self._owned(user_id),
             )
-            .values(state=JobState.ERROR.value, error_code=error_code, finished_at=func.now())
+            .values(
+                state=JobState.ERROR.value,
+                error_code=error_code,
+                error_detail=detail,
+                finished_at=func.now(),
+            )
         )
         await self.session.execute(stmt)
 
