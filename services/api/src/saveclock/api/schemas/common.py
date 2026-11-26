@@ -2,7 +2,13 @@ from typing import Any
 
 from pydantic import BaseModel, ConfigDict
 
-from saveclock.errors import ErrorCode, ForbiddenReason
+from saveclock.errors import (
+    BadRequestReason,
+    ConflictReason,
+    ErrorCode,
+    ForbiddenReason,
+    UnsupportedMediaReason,
+)
 
 
 class ErrorBody(BaseModel):
@@ -30,4 +36,28 @@ ERROR_RESPONSES: dict[int | str, dict[str, Any]] = {
     404: {"model": ErrorResponse, "description": "not found"},
     422: {"model": ErrorResponse, "description": "validation_error (details.fields)"},
     500: {"model": ErrorResponse, "description": "internal_error"},
+}
+
+BAD_REQUEST_RESPONSE: dict[int | str, dict[str, Any]] = {
+    400: {
+        "model": ErrorResponse,
+        "description": "bad_request; details.reason is one of "
+        + ", ".join(r.value for r in BadRequestReason),
+    }
+}
+CONFLICT_RESPONSE: dict[int | str, dict[str, Any]] = {
+    409: {
+        "model": ErrorResponse,
+        "description": "conflict; details.reason is one of "
+        + ", ".join(r.value for r in ConflictReason),
+    }
+}
+UPLOAD_RESPONSES: dict[int | str, dict[str, Any]] = {
+    413: {"model": ErrorResponse, "description": "payload_too_large"},
+    415: {
+        "model": ErrorResponse,
+        "description": "unsupported_media; details.reason is one of "
+        + ", ".join(r.value for r in UnsupportedMediaReason),
+    },
+    507: {"model": ErrorResponse, "description": "insufficient_storage"},
 }

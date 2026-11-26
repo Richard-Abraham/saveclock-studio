@@ -12,7 +12,7 @@ from saveclock.api.middleware import (
     RequestIdMiddleware,
     SecurityHeadersMiddleware,
 )
-from saveclock.api.v1 import health, projects, stub
+from saveclock.api.v1 import analysis, health, projects, stub, upload
 from saveclock.api.v1 import settings as settings_router
 from saveclock.config import Settings
 from saveclock.container import STUB_ENVS, build_deps
@@ -46,6 +46,8 @@ def create_app(settings: Settings | None = None, deps: Deps | None = None) -> Fa
     register_error_handlers(app)
     app.include_router(health.router, prefix=API_PREFIX)
     app.include_router(projects.router, prefix=API_PREFIX)
+    app.include_router(upload.router, prefix=API_PREFIX)
+    app.include_router(analysis.router, prefix=API_PREFIX)
     app.include_router(settings_router.router, prefix=API_PREFIX)
     if settings.app_env in STUB_ENVS:
         app.include_router(stub.router, prefix=API_PREFIX)
