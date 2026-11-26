@@ -211,7 +211,7 @@ web-audit: guard
 	@chrome=$$(command -v google-chrome chromium chromium-browser | head -1); \
 	[ -n "$$chrome" ] || { echo "NOT MEASURED (no Chrome): run this on a machine with Chrome"; exit 1; }; \
 	rm -rf .data/lighthouse && mkdir -p .data/lighthouse; \
-	for i in 1 2 3; do curl -s -o /dev/null http://127.0.0.1:3000/ http://127.0.0.1:3000/settings; done; \
+	for i in 1 2 3; do curl -s -o /dev/null http://127.0.0.1:3000/ -o /dev/null http://127.0.0.1:3000/settings; done; \
 	for page in home:/ settings:/settings; do \
 	  CHROME_PATH="$$chrome" pnpm dlx $(LIGHTHOUSE) "http://127.0.0.1:3000$${page#*:}" --quiet \
 	    --output=json --output-path=".data/lighthouse/$${page%%:*}.json" \
