@@ -2,14 +2,13 @@
 
 usage: fetch_ffmpeg.py <ffmpeg.pin> <cache-dir> <out-dir>
 
-The sha256 in ffmpeg.pin is authoritative (SEC-170). The cached copy is used first; the URL is
-provenance and a last resort (BtbN prunes old autobuilds, so it is expected to be dead).
+The sha256 in ffmpeg.pin is authoritative (SEC-170). The URL is provenance only (BtbN prunes old
+autobuilds); the build never downloads, it needs the cached copy (`make ffmpeg-cache`).
 """
 
 import hashlib
 import sys
 import tarfile
-import urllib.request
 from pathlib import Path
 
 WANTED = ("ffmpeg", "ffprobe")
@@ -37,13 +36,8 @@ def main(pin_file: str, cache_dir: str, out_dir: str) -> int:
     name = pin["URL"].rsplit("/", 1)[-1]
     tarball = Path(cache_dir) / name
     if not tarball.is_file():
-        print(f"{name} is not in the cache; trying the pinned URL", file=sys.stderr)
-        try:
-            tarball = Path("/tmp") / name  # noqa: S108 - build stage scratch
-            urllib.request.urlretrieve(pin["URL"], tarball)  # noqa: S310 - pinned https URL
-        except OSError as exc:
-            print(f"cached copy required: {exc}", file=sys.stderr)
-            return 1
+        print(f"{name} is not in the cache: run make ffmpeg-cache", file=sys.stderr)
+        return 1
     actual = sha256(tarball)
     if actual != pin["SHA256"]:
         print(f"SHA256 MISMATCH for {name}: {actual} != {pin['SHA256']}", file=sys.stderr)
