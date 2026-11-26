@@ -1,6 +1,6 @@
 import type { ProjectItem } from "@saveclock/contracts";
 
-import { Card, EmptyState, StatusPill } from "@/components/ui";
+import { Card, StatusPill } from "@/components/ui";
 import { formatEdited } from "@/lib/format";
 
 import { STATUS_PILL } from "./status";
@@ -54,9 +54,10 @@ function ProjectRow({ project, now }: { project: ProjectItem; now: Date }) {
 export function ProjectList({ items, now = new Date() }: { items: ProjectItem[]; now?: Date }) {
   if (items.length === 0) {
     return (
-      <EmptyState illustration={<TickGlyph />}>
-        No videos yet. Choose a song to make your first one.
-      </EmptyState>
+      <Card className="flex flex-col items-center gap-4 px-4 py-12 text-center">
+        <TickGlyph />
+        <p className="max-w-[40ch]">No videos yet. Choose a song to make your first one.</p>
+      </Card>
     );
   }
   return (
