@@ -145,7 +145,9 @@ class MigrateSettings(BaseSettings):
 class ComposeVar(BaseModel):
     name: str
     doc: str
-    default: str | None = None  # None = a required secret (CHANGE_ME in .env.example); else an optional setting
+    default: str | None = (
+        None  # None = a required secret (CHANGE_ME in .env.example); else an optional setting
+    )
 
 
 # Compose-only variables (C10, SEC-133): read by compose, never by Settings.
@@ -154,7 +156,19 @@ COMPOSE_ONLY = (
     ComposeVar(name="POSTGRES_APP_PASSWORD", doc="password of role app_rw"),
     ComposeVar(name="POSTGRES_MIGRATOR_PASSWORD", doc="password of role migrator"),
     ComposeVar(name="REDIS_PASSWORD", doc="requirepass for redis"),
-    ComposeVar(name="API_PORT", doc="host port of the api (default 8000; the restore scratch stack uses 18000)", default="8000"),
-    ComposeVar(name="WEB_PORT", doc="host port of the web shell (default 3000; the scratch stack uses 13000)", default="3000"),
-    ComposeVar(name="IMAGE_TAG", doc="tag of the saveclock-* images compose runs (default local; rollback uses sha-<commit>)", default="local"),
+    ComposeVar(
+        name="API_PORT",
+        doc="host port of the api (default 8000; the restore scratch stack uses 18000)",
+        default="8000",
+    ),
+    ComposeVar(
+        name="WEB_PORT",
+        doc="host port of the web shell (default 3000; the scratch stack uses 13000)",
+        default="3000",
+    ),
+    ComposeVar(
+        name="IMAGE_TAG",
+        doc="tag of the saveclock-* images compose runs (default local; rollback uses sha-<commit>)",
+        default="local",
+    ),
 )
