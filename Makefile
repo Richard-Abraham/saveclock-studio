@@ -25,7 +25,7 @@ CHECK_STAGES := $(FAST_STAGES) images image-guards hadolint
   migrations audit env env-docs env-docs-check contracts contracts-check test-deps-up \
   test-deps-down ffmpeg-cache images image-guards hadolint scan-images up dev down \
   down-volumes sandbox check-fast check web-install web-env web-lint web-test web-build \
-  bundle-scan web-audit-prod web-headers measure-rewrite smoke-web web-audit
+  bundle-scan web-audit-prod measure-rewrite smoke-web web-audit
 
 help:
 	@echo "targets: check-fast check dev down sandbox images scan-images env env-docs contracts"
@@ -206,10 +206,8 @@ web-audit-prod: guard
 	  else echo "pnpm audit needs the network; set ALLOW_OFFLINE=1 to skip it on purpose"; exit 1; fi; \
 	else pnpm audit --prod; fi
 
-# stack-dependent (run after `make dev`); plan 003's bring-up runs them too
-web-headers:
-	python3 scripts/check_web_headers.py
-
+# stack-dependent (run after `make dev`); plan 003's bring-up runs them too. smoke-web covers the
+# response headers as well (it absorbed the old web-headers check).
 measure-rewrite:
 	PROJECT=$(PROJECT) python3 scripts/measure_rewrite.py --container $(CONTAINER)
 

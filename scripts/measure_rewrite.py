@@ -13,7 +13,6 @@ straight to the API origin, with CORS allowing only the app origin. This script 
   4. the 100 MB upload DIRECT to the API, sent as the browser would (Origin = app origin): status 200,
      exact byte count and sha256, the API saw data while the client was still sending, and the API
      container's memory grew by less than 40 MiB,
-  5. for the record only: the same upload through the rewrite (expected to fail; not counted).
 
 Prints a table and a final `OQ-26: PASS` or `OQ-26: FAIL (<reasons>)`; exit 0 / 1.
 """
@@ -29,7 +28,8 @@ import subprocess
 import threading
 import time
 from dataclasses import dataclass
-from urllib.parse import urlsplit
+
+from web_http import connect, preflight
 
 MIB = 1 << 20
 UPLOAD_BYTES = 100 * MIB
@@ -44,11 +44,6 @@ APP_ORIGIN = "http://localhost:3000"
 # 1 MiB every 20 ms: on loopback 100 MB would otherwise be sent in a blink, and a ratio measured
 # on a 0.1 s send says nothing. Paced, the whole send lasts at least ~2 s.
 PACE_S = 0.02
-
-
-def connect(base: str) -> http.client.HTTPConnection:
-    parts = urlsplit(base)
-    return http.client.HTTPConnection(parts.hostname, parts.port, timeout=120)
 
 
 @dataclass
@@ -179,19 +174,6 @@ def measure_upload(base: str, container: str, cid: str | None) -> Upload:
     return result
 
 
-def preflight(base: str, origin: str) -> tuple[int, str | None]:
-    conn = connect(base)
-    conn.request("OPTIONS", "/api/v1/_stub/upload-sink", headers={
-        "Origin": origin,
-        "Access-Control-Request-Method": "POST",
-        "Access-Control-Request-Headers": "content-type,x-filename",
-    })  # fmt: skip
-    response = conn.getresponse()
-    response.read()
-    conn.close()
-    return response.status, response.getheader("access-control-allow-origin")
-
-
 def mib(value: int | None) -> str:
     return "n/a" if value is None else f"{value / MIB:.1f} MiB"
 
@@ -250,7 +232,6 @@ def main() -> int:
         reasons.append(f"CORS: app origin got {ok_origin!r}, foreign origin got {bad_origin!r}")
 
     api_cid = container_id(args.container, "api")
-    web_cid = container_id(args.container, "web")
     if api_cid is None:
         print("note: api container not found; memory growth cannot be measured")
     up = measure_upload(args.api, args.container, api_cid)
@@ -263,9 +244,6 @@ def main() -> int:
         )
     if not memory_ok:
         reasons.append(f"upload direct: API memory growth {mib(up.growth)} (want < {MEMORY_GROWTH_MAX // MIB} MiB)")
-
-    info = measure_upload(args.web, args.container, web_cid)
-    print(describe_upload("through the rewrite (info)", info, "INFO"))
 
     if reasons:
         print("OQ-26: FAIL (" + "; ".join(reasons) + ")")
