@@ -4,6 +4,14 @@ Run on the owner's laptop, 2026-11-26, compose project `saveclock-w003` (the old
 
 **G1 decision (owner, in their own words): ______________________ (left empty on purpose)**
 
+**Provisional: GO**, recorded by the reviewer on 2026-11-26 under the owner's standing instruction ("finish all code and test locally then push, I'll test on the other PC"). Every machine-checkable row is PASS. Still owner-pending:
+- GitHub 2FA statement and disk-encryption statement;
+- point `BACKUP_REPO` at another drive on the target PC and remove `BACKUP_ALLOW_SAME_DISK`;
+- keep a copy of `~/.config/saveclock/backup-passphrase` in a password manager;
+- `make backup-install-timer`, then confirm the first unattended nightly run.
+
+The owner confirms or overrides this line in their own words.
+
 ## Accepted exception and owner actions
 
 - **Same-disk backup (B5, accepted exception).** `BACKUP_REPO=~/saveclock-backups` is on the same device as the blob volume (`stat -c %d` gives 52 for both). It runs with `BACKUP_ALLOW_SAME_DISK=yes`. **On the target PC the owner must point `BACKUP_REPO` at another drive and set `BACKUP_ALLOW_SAME_DISK=no`.**
