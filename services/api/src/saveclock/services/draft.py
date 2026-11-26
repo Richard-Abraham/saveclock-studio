@@ -9,6 +9,7 @@ written in one transaction.
 """
 
 import asyncio
+import threading
 import time
 from collections.abc import AsyncIterator, Sequence
 from contextlib import asynccontextmanager
@@ -37,7 +38,7 @@ from saveclock.repositories.plans import PlanRepository
 from saveclock.repositories.projects import ProjectRepository
 from saveclock.services import plans, project_state
 from saveclock.services.analysis import JobCanceled
-from saveclock.services.context import WorkerContext, cancel_probe, end_unwanted
+from saveclock.services.context import WorkerContext, end_unwanted
 from saveclock.services.events import ProgressEmitter, ProgressTicker
 from saveclock.services.footage import (
     FootageDeps,
@@ -62,6 +63,7 @@ STAGES: tuple[tuple[str, str, float], ...] = (
     ("plan", "building_draft", 0.7),
     ("persist", "building_draft", 0.9),
 )
+CANCEL_POLL_S = 1.0
 EXPECTED_S = {"search": 20.0, "vet": 40.0, "normalize": 40.0}  # the ticker's pace only
 
 
@@ -84,6 +86,7 @@ class _Run:
     timings: list[dict[str, int | str]] = field(default_factory=list)
     started: float = field(default_factory=time.monotonic)
     current: tuple[str, float] | None = None
+    canceled: threading.Event = field(default_factory=threading.Event)
 
     async def cancelled(self) -> bool:
         async with self.ctx.sessionmaker() as session:
@@ -161,17 +164,18 @@ async def _run(run: _Run, mode: Mode) -> None:
         basis = await plans.load_basis(session, user_id, project_id)
     state = plans.initial_state(basis)
     redis: Redis = Redis.from_url(ctx.settings.redis_url.get_secret_value())
+    watch: asyncio.Task[None] | None = None
     try:
         async with run.stage("keywords"):
             keywords = await asyncio.to_thread(_resolve_keywords, ctx, redis, basis)
         async with run.stage("estimate"):
             cuts = await asyncio.to_thread(plans.estimate_cuts, basis, state)
-        cancel = cancel_probe(ctx, user_id, run.job_id)
+        watch = asyncio.create_task(_watch_cancel(run))
         deps = build_footage_deps(
             ctx,
             redis,
             pixabay_on=await effective_pixabay(ctx, user_id),
-            cancel=cancel,
+            cancel=run.canceled.is_set,
             seed=plans.seed_of(project_id),
         )
         async with run.stage("search"):
@@ -187,6 +191,8 @@ async def _run(run: _Run, mode: Mode) -> None:
         async with run.stage("normalize"):
             await _normalize(run, deps, vetted.ranked, keywords.keywords, cuts)
     finally:
+        if watch is not None:
+            watch.cancel()
         await asyncio.to_thread(redis.close)
     async with run.stage("plan"):
         async with ctx.sessionmaker() as session:
@@ -199,6 +205,16 @@ async def _run(run: _Run, mode: Mode) -> None:
         return
     await run.emitter.draft_ready(version)
     log.info("draft.done", mode=mode, version=version, cuts=len(built.plan.cuts))
+
+
+async def _watch_cancel(run: _Run) -> None:
+    """Polls the job's cancel flag into a thread-safe event: the footage runner asks `cancel()`
+    from the event loop and from threads, and a database probe would deadlock on the loop."""
+    while not run.canceled.is_set():
+        if await run.cancelled():
+            run.canceled.set()
+            return
+        await asyncio.sleep(CANCEL_POLL_S)
 
 
 def _resolve_keywords(ctx: WorkerContext, redis: Redis, basis: plans.Basis) -> KeywordResult:
