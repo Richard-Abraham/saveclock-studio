@@ -34,6 +34,10 @@ pytestmark = [pytest.mark.security, pytest.mark.integration, pytest.mark.ffmpeg]
 ROOT = Path(__file__).resolve().parents[4]
 LEAK_TOKEN = "root:x:"  # noqa: S105 - a short /etc/passwd token; only a boolean is kept, never the content
 SETTLED_OK = {"rejected", "failed_analysis", "planning", "draft_ready", "failed_plan"}
+# files the magic-byte sniff must refuse before FFmpeg starts (raw ADTS AAC is not accepted)
+REFUSED_BY_SNIFF = {
+    "adts_aac", "hls_playlist", "concat", "text_protocol", "renamed_binary", "zero_byte",
+}  # fmt: skip
 IN_FLIGHT = {"created", "uploading", "validating", "analyzing"}
 HTTP_OUTCOMES = {202, 400, 413, 415, 422}
 REJECT_REASONS = {r.value for r in FileRejectReason}
@@ -179,6 +183,8 @@ async def test_layer_a_every_file_reaches_a_documented_outcome(  # noqa: PLR0917
         )
         bodies.append(response.text)
         assert response.status_code in HTTP_OUTCOMES, (entry["path"], response.status_code)
+        if entry["category"] in REFUSED_BY_SNIFF:  # never reaches FFmpeg: 415 unsupported_media
+            assert response.status_code == 415, (entry["path"], response.status_code)
         if response.status_code == 202:
             accepted.append((entry["path"], project))
     outcomes: dict[str, str] = {}
