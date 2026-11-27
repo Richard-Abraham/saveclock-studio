@@ -10,16 +10,36 @@ describe("readServerEnv", () => {
   it("uses the compose defaults when nothing is set", () => {
     vi.stubEnv("API_INTERNAL_URL", undefined);
     vi.stubEnv("ALLOWED_HOSTS", undefined);
-    expect(readServerEnv()).toEqual({ apiOrigin: "http://api:8000", allowedHosts: ["localhost"] });
+    vi.stubEnv("DEV_DRIVER", undefined);
+    expect(readServerEnv()).toEqual({
+      apiOrigin: "http://api:8000",
+      allowedHosts: ["localhost"],
+      devDriver: false,
+    });
   });
 
   it("derives the origin (no path) from API_INTERNAL_URL and splits the host list", () => {
     vi.stubEnv("API_INTERNAL_URL", "http://127.0.0.1:8000/api/v1");
     vi.stubEnv("ALLOWED_HOSTS", "localhost,api");
+    vi.stubEnv("DEV_DRIVER", undefined);
     expect(readServerEnv()).toEqual({
       apiOrigin: "http://127.0.0.1:8000",
       allowedHosts: ["localhost", "api"],
+      devDriver: false,
     });
+  });
+
+  it("turns the dev driver on only for 1 or true (empty and anything else is off)", () => {
+    for (const [value, on] of [
+      ["1", true],
+      ["true", true],
+      ["", false],
+      ["0", false],
+      ["yes", false],
+    ] as const) {
+      vi.stubEnv("DEV_DRIVER", value);
+      expect(readServerEnv().devDriver).toBe(on);
+    }
   });
 
   it("rejects a malformed URL at startup", () => {

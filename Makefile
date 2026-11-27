@@ -28,7 +28,7 @@ CHECK_STAGES := $(FAST_STAGES) golden images image-guards security-container had
 
 .PHONY: help help-lint tooling-test rollback toolchain doctor-dev guard secrets banned doctor fmt-check lint types arch pins compose-lint test golden \
   migrations audit env env-docs env-docs-check contracts contracts-check test-deps-up \
-  test-deps-down ffmpeg-cache ffmpeg-bin models-cache test-ml fake-stock images image-guards hadolint scan-images up dev dev-fakes down \
+  skill-check test-deps-down ffmpeg-cache ffmpeg-bin models-cache test-ml fake-stock images image-guards hadolint scan-images up dev dev-fakes dev-driver smoke-driver down \
   down-volumes sandbox check-fast check web-install web-env web-lint web-test web-build \
   bundle-scan web-audit-prod measure-rewrite smoke-web web-audit stack-up seed smoke-stack security-pytest security-container security-pass hostile-corpus \
   predeploy-scan backup backup-init backup-test restore-proof backup-install-timer backup-timer-uninstall rollback-demo fresh-clone-timing
@@ -129,6 +129,10 @@ fake-stock: ffmpeg-bin ## generate the 8 fake stock clips FAKE_STOCK serves into
 # alembic check (models == migration) and a downgrade -1 / upgrade head round trip
 migrations: ## check models match migrations and the downgrade round trip
 	$(UV) run pytest -q -m migration_roundtrip
+
+# plan 009: the skill's facts (commands, flags, keyword rule, error codes) against the code that owns them
+skill-check: ## fail if .claude/skills/saveclock/SKILL.md drifts from the CLI, the keyword rule or the error codes
+	$(UV) run python ../../scripts/check_skill.py
 
 # openapi.json from the Python models, then the TS types from openapi.json (T-1.4a)
 contracts: ## regenerate openapi.json and the TypeScript types
@@ -330,6 +334,13 @@ seed: ## add the analysed click-track project to the running stack (needs make i
 smoke-stack: ## smoke-test the running stack: create, list, guards, logs, delete
 	COMPOSE="$(COMPOSE)" python3 scripts/smoke_stack.py --web http://localhost:$(WEB_PORT) \
 	  --api http://127.0.0.1:$(API_PORT)
+
+# plan 009: the throwaway driver page (/dev). Off by default; this recreates only `web` with DEV_DRIVER=1.
+dev-driver: ## recreate the web container with the dev-only driver page on (/dev); `make up` or dev turns it off again
+	DEV_DRIVER=1 $(COMPOSE) up -d --no-deps --force-recreate web
+
+smoke-driver: ## check /dev is 404 with the flag off and 200 with it on (needs the stack and the rebuilt web image)
+	COMPOSE="$(COMPOSE)" python3 scripts/smoke_driver.py --web http://localhost:$(WEB_PORT)
 
 predeploy-scan: ## scan what is about to leave the machine
 	scripts/predeploy_scan.sh .

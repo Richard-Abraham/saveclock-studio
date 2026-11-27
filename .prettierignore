@@ -5,6 +5,7 @@ pnpm-lock.yaml
 packages/contracts/src/schema.d.ts
 packages/contracts/openapi.json
 packages/contracts/schemas/edit-plan.v1.schema.json
+packages/contracts/schemas/saveclock-*.v1.schema.json
 services
 docs
 plans
