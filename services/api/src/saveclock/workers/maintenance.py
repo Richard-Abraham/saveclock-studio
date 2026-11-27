@@ -8,6 +8,7 @@ the sweeper picks up whatever a purge left behind.
 """
 
 import asyncio
+import time
 from collections.abc import Awaitable, Callable
 from uuid import UUID
 
@@ -27,17 +28,26 @@ log = structlog.get_logger()
 TIME_LIMIT_MS = MAINT_LIMIT_S * 1000
 PURGE_TIME_LIMIT_MS = PURGE_LIMIT_S * 1000
 MAINT_RETRIES = 5
+LOCK_WAIT_S = 8  # shortcut: a fixed wait, upgrade to a queue of waiters if sweeps ever run long
+LOCK_POLL_S = 0.25
 WHAT = frozenset({"uploads", "stuck_jobs", "orphans", "all"})
 
 
 async def _locked(redis: Redis, name: str, work: Callable[[], Awaitable[None]]) -> None:
-    """Run `work()` under `housekeeping:lock`, or skip when it is held."""
-    got = await asyncio.to_thread(
-        redis.set, housekeeping.LOCK_KEY, name, nx=True, ex=housekeeping.LOCK_TTL_S
-    )
-    if not got:
-        log.info("housekeeping.locked", actor=name)
-        return
+    """Run `work()` under `housekeeping:lock`. Another sweep that is still running makes this one
+    return without work, but a lock that is only briefly held (the periodic sender fires several
+    actors at once) is waited for: LOCK_WAIT_S."""
+    deadline = time.monotonic() + LOCK_WAIT_S
+    while True:
+        got = await asyncio.to_thread(
+            redis.set, housekeeping.LOCK_KEY, name, nx=True, ex=housekeeping.LOCK_TTL_S
+        )
+        if got:
+            break
+        if time.monotonic() >= deadline:
+            log.info("housekeeping.locked", actor=name)
+            return
+        await asyncio.sleep(LOCK_POLL_S)
     try:
         await work()
     finally:
