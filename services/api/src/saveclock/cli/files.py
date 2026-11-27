@@ -63,9 +63,14 @@ def write_stream(chunks: Iterable[bytes], directory: Path, name: str, *, force: 
         with os.fdopen(fd, "wb") as fh:
             for chunk in chunks:
                 fh.write(chunk)
-        # shortcut: check-then-rename is not atomic against a racing writer; upgrade if the
-        # tool ever serves more than one local user
-        tmp.replace(dest)
+        if force:
+            tmp.replace(dest)
+        else:
+            try:
+                os.link(tmp, dest)  # fails if `dest` appeared after the check above
+            except FileExistsError:
+                raise FileExistsError(str(dest)) from None
+            tmp.unlink()
     except BaseException:
         tmp.unlink(missing_ok=True)
         raise

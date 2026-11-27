@@ -51,6 +51,12 @@ def main(argv: Sequence[str] | None = None) -> int:
         return int(args._handler(Ctx(client, as_json, settings.app_origin), args))
     except CliError as err:
         return fail(err, as_json=as_json)
+    except OSError as err:  # a local file the command could not read or write
+        msg = f"{type(err).__name__}: {err}"
+        return fail(CliError("io_error", msg, exit_code=1), as_json=as_json)
+    except (KeyError, TypeError) as err:  # an API answer of a shape this CLI does not know
+        msg = f"unexpected API answer ({type(err).__name__}: {err})"
+        return fail(CliError("internal_error", msg, exit_code=1), as_json=as_json)
     except KeyboardInterrupt:
         print("interrupted (a running job keeps running)", file=sys.stderr)
         return 3

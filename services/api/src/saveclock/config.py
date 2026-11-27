@@ -193,8 +193,10 @@ class Settings(BaseSettings):
 
     @model_validator(mode="after")
     def _no_fakes_in_prod(self) -> Self:
-        if self.app_env == "prod" and (self.fake_stock or self.fake_ml or self.fake_llm):
-            msg = "FAKE_* variables are not allowed when APP_ENV=prod"
+        if self.app_env == "prod" and (
+            self.fake_stock or self.fake_ml or self.fake_llm or self.dev_driver
+        ):
+            msg = "FAKE_* and DEV_DRIVER variables are not allowed when APP_ENV=prod"
             raise ValueError(msg)
         return self
 

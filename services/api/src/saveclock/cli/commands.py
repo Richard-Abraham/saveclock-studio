@@ -8,6 +8,7 @@ skill's command table is guarded against it (`make skill-check`).
 import urllib.parse
 import webbrowser
 from collections.abc import Callable, Iterator
+from contextlib import ExitStack
 from dataclasses import dataclass, field
 from http import HTTPStatus
 from pathlib import Path
@@ -323,15 +324,32 @@ def cmd_render(c: Ctx, a: Any) -> int:  # noqa: ANN401
 
 
 # --- export ------------------------------------------------------------------------------
-def _download(c: Ctx, rid: str, kind: str, directory: Path, *, force: bool) -> schema.ExportFile:
-    fallback = f"{rid}-{kind}.{files.KIND_EXT[kind]}"
-    with c.client.stream("download_render", params={"render_id": rid}, query={"kind": kind}) as r:
-        name = files.safe_name(r.headers.get("content-disposition"), fallback)
-        try:
-            path = files.write_stream(r.iter_bytes(CHUNK), directory, name, force=force)
-        except FileExistsError as exc:
-            raise Refused(f"{exc} exists; use --force to overwrite") from exc
-    return schema.ExportFile(kind=kind, path=str(path))
+def _download(
+    c: Ctx, rid: str, kinds: tuple[str, ...], directory: Path, *, force: bool
+) -> list[schema.ExportFile]:
+    """Open every download first (headers only): a name clash refuses before any file is written."""
+    with ExitStack() as stack:
+        opened = [
+            (k, stack.enter_context(
+                c.client.stream("download_render", params={"render_id": rid}, query={"kind": k})
+            ))
+            for k in kinds
+        ]  # fmt: skip
+        names = [
+            files.safe_name(r.headers.get("content-disposition"), f"{rid}-{k}.{files.KIND_EXT[k]}")
+            for k, r in opened
+        ]
+        clash = [directory / n for n in names if (directory / n).exists()]
+        if clash and not force:
+            raise Refused(f"{clash[0]} exists; use --force to overwrite")
+        out = []
+        for (kind, r), name in zip(opened, names, strict=True):
+            try:
+                path = files.write_stream(r.iter_bytes(CHUNK), directory, name, force=force)
+            except FileExistsError as exc:
+                raise Refused(f"{exc} exists; use --force to overwrite") from exc
+            out.append(schema.ExportFile(kind=kind, path=str(path)))
+        return out
 
 
 def cmd_export(c: Ctx, a: Any) -> int:  # noqa: ANN401
@@ -360,10 +378,10 @@ def cmd_export(c: Ctx, a: Any) -> int:  # noqa: ANN401
         )
         if r["mode_a_state"] != "ready":
             raise CliError("mode_a_failed", f"the Mode A remux failed for render {rid}")
-        got.append(_download(c, rid, "with_song", directory, force=a.force))
+        got += _download(c, rid, ("with_song",), directory, force=a.force)
     else:
-        for kind in ("silent_video", "cutlist_json", "cutlist_csv"):
-            got.append(_download(c, rid, kind, directory, force=a.force))
+        kinds = ("silent_video", "cutlist_json", "cutlist_csv")
+        got += _download(c, rid, kinds, directory, force=a.force)
         credits_text = _get(c, "get_credits", project_id=pid)["text"]
     out = schema.ExportOut(mode=a.mode, render_id=rid, files=got, credits_text=credits_text)
     text = "\n".join(f"{f.kind}: {f.path}" for f in got)

@@ -13,7 +13,8 @@ class Event:
 
 
 def parse(lines: Iterable[str]) -> Iterator[Event]:
-    """Yield one `Event` per blank-line-terminated block that carries data."""
+    """Yield one `Event` per blank-line-terminated block that carries data, and an `Event("ping")`
+    for each comment line (a keep-alive), so a caller can check its deadline on a quiet stream."""
     name = "message"
     data: list[str] = []
     for raw in lines:
@@ -23,7 +24,7 @@ def parse(lines: Iterable[str]) -> Iterator[Event]:
                 yield Event(name, _decode("\n".join(data)))
             name, data = "message", []
         elif line.startswith(":"):
-            continue  # a comment, e.g. the `: ping` keep-alive
+            yield Event("ping", None)  # a comment, e.g. the `: ping` keep-alive
         else:
             field, _, value = line.partition(":")
             value = value.removeprefix(" ")

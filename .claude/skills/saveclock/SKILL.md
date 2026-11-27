@@ -118,7 +118,9 @@ An error prints `error: <code>: <message> (<details>)`; with `--json` it is `{"e
 
 CLI-only codes: `keywords_not_applied` (the replan failed; the previous plan is kept),
 `timeout` (still running, exit 3), `redirect` (the API answered with a redirect; refused),
-`network_error` (nothing answered), `refused` (not a loopback URL, a bad id or an existing file).
+`network_error` (nothing answered), `refused` (not a loopback URL, a bad id or an existing file),
+`mode_a_failed` (the Mode A remux failed on the server), `io_error` (a local file could not be read
+or written).
 
 ## Troubleshooting
 
@@ -132,8 +134,8 @@ CLI-only codes: `keywords_not_applied` (the replan failed; the previous plan is 
   - `no_usable_clips`: the first draft found no usable stock footage. Start again with
     `saveclock new` and `--keywords` of your own (5 to 8 short phrases).
   - `stock_unavailable`: stock search failed; retry later with a new `saveclock new`.
-  - `plan_failed`: the planner could not lay out the video. The usual cause is a song that is
-    about as long as the requested length, so no bar start leaves room for the whole video. Start
-    again with a shorter `--duration` (15 or 30) or a longer song. The server log line
-    `draft.plan_failed` has the exact reason. The CLI has no `retry` command: the API's retry
+  - `plan_failed`: the planner could not lay out the video. The usual cause is a song shorter than
+    15 s plus its first downbeat, so no bar start leaves room for a video. Start again with a
+    longer song. The server log line `draft.plan_failed` has the exact reason.
+    The CLI has no `retry` command: the API's retry
     operation is not part of this tool, and a new `saveclock new` is the recovery.

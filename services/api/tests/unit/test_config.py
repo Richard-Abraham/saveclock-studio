@@ -44,6 +44,13 @@ def test_prod_refuses_fakes() -> None:
 
 
 @pytest.mark.unit
+def test_prod_refuses_the_dev_driver() -> None:
+    with pytest.raises(ValidationError):
+        make_settings(APP_ENV="prod", DEV_DRIVER="true")
+    assert make_settings(APP_ENV="local", DEV_DRIVER="true").dev_driver is True
+
+
+@pytest.mark.unit
 def test_bind_addr_must_be_loopback() -> None:
     with pytest.raises(ValidationError):
         make_settings(BIND_ADDR="0.0.0.0")  # noqa: S104

@@ -35,6 +35,11 @@ ENDPOINTS: dict[str, tuple[str, str]] = {
 LOOPBACK_HOSTS = frozenset({"localhost", "127.0.0.1", "::1"})
 
 EXIT_API, EXIT_USAGE, EXIT_NETWORK = 1, 2, 3
+# error codes only the CLI raises (never an API `ErrorCode`); check_skill.py wants each in SKILL.md
+CLI_ONLY_CODES = (
+    "keywords_not_applied", "timeout", "redirect", "network_error", "refused",
+    "mode_a_failed", "io_error",
+)  # fmt: skip
 
 
 class CliError(Exception):

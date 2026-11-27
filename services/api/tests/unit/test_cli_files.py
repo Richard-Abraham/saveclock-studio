@@ -90,3 +90,15 @@ def test_the_output_directory_must_exist(tmp_path: Path) -> None:
 @pytest.mark.unit
 def test_every_download_kind_has_an_extension() -> None:
     assert set(files.KIND_EXT) == {k.value for k in DownloadKind}
+
+
+@pytest.mark.unit
+def test_a_file_created_after_the_check_is_not_overwritten(tmp_path: Path) -> None:
+    def chunks() -> Iterator[bytes]:
+        yield b"new"
+        (tmp_path / "a.mp4").write_bytes(b"racer")  # appears between the check and the rename
+
+    with pytest.raises(FileExistsError):
+        files.write_stream(chunks(), tmp_path, "a.mp4", force=False)
+    assert (tmp_path / "a.mp4").read_bytes() == b"racer"
+    assert [p.name for p in tmp_path.iterdir()] == ["a.mp4"]  # no temp file left behind

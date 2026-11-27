@@ -6,6 +6,7 @@ Checked against their owners, never against retyped lists:
   (c) the keyword pattern is `domain.keywords.KEYWORD_RE.pattern` character for character, and the
       count 8 is `MAX_KEYWORDS`;
   (d) every `ErrorCode` and every `ConflictReason` value appears in the error tables;
+  (d2) every code in `CLI_ONLY_CODES` appears in the skill's "CLI-only codes" paragraph;
   (e) the words "never audio" and "never calls `claude`" appear;
   (f) the front matter parses and names the skill.
 
@@ -16,6 +17,7 @@ import re
 import sys
 from pathlib import Path
 
+from saveclock.cli.client import CLI_ONLY_CODES
 from saveclock.cli.commands import COMMANDS
 from saveclock.domain.keywords import KEYWORD_RE, MAX_KEYWORDS
 from saveclock.errors import ConflictReason, ErrorCode
@@ -66,6 +68,11 @@ def problems(text: str) -> list[str]:
     for reason in ConflictReason:
         if f"| `{reason.value}` |" not in text:
             out.append(f"conflict reason `{reason.value}` has no row in the reason table")
+
+    para = re.search(r"^CLI-only codes:.*?(?:\n\n|\Z)", text, re.DOTALL | re.MULTILINE)
+    for code in CLI_ONLY_CODES:
+        if f"`{code}`" not in (para.group(0) if para else ""):
+            out.append(f"CLI-only code `{code}` is not in the skill's CLI-only codes paragraph")
 
     for phrase in ("never audio", "never calls `claude`"):
         if not re.search(re.escape(phrase), text, re.IGNORECASE):

@@ -3,6 +3,7 @@
 
 import json
 import tracemalloc
+from collections.abc import Iterator
 from pathlib import Path
 from typing import Any
 
@@ -10,6 +11,7 @@ import httpx
 import pytest
 
 from saveclock.cli import main as cli_main
+from saveclock.cli import waits
 from saveclock.cli.client import Client
 from tests.unit.cli_fakes import (
     PID,
@@ -351,6 +353,30 @@ def test_export_b_downloads_three_files_then_prints_the_credits(
 
 
 @pytest.mark.unit
+def test_export_b_refuses_on_any_name_clash_before_writing_a_file(
+    cli_run: CliRun, tmp_path: Path
+) -> None:
+    (tmp_path / "clip-cutlist_csv.mp4").write_bytes(b"mine")
+    code, out, errout = cli_run(
+        _export_fake(tmp_path), "export", PID, "--mode", "b", "--out", str(tmp_path)
+    )
+    assert code == 2
+    assert "clip-cutlist_csv.mp4" in out + errout
+    assert sorted(p.name for p in tmp_path.iterdir()) == ["clip-cutlist_csv.mp4"]
+    assert (tmp_path / "clip-cutlist_csv.mp4").read_bytes() == b"mine"
+
+
+@pytest.mark.unit
+def test_export_b_force_overwrites_every_clash(cli_run: CliRun, tmp_path: Path) -> None:
+    (tmp_path / "clip-cutlist_csv.mp4").write_bytes(b"mine")
+    code, _o, _e = cli_run(
+        _export_fake(tmp_path), "export", PID, "--mode", "b", "--out", str(tmp_path), "--force"
+    )
+    assert code == 0
+    assert (tmp_path / "clip-cutlist_csv.mp4").read_bytes() == b"data-cutlist_csv"
+
+
+@pytest.mark.unit
 def test_export_refuses_a_render_that_is_not_ready_and_calls_nothing_else(
     cli_run: CliRun, tmp_path: Path
 ) -> None:
@@ -398,6 +424,55 @@ def test_status_watch_stops_on_draft_ready(cli_run: CliRun, cli_clock: list[floa
     assert "analyse: 40%" in errout
     assert fake.ops == [f"GET {P}/events", f"GET {P}"]
     assert "draft" in out
+
+
+@pytest.mark.unit
+def test_status_watch_times_out_on_a_stream_that_only_pings(
+    cli_run: CliRun, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    t = [0.0]
+    monkeypatch.setattr(waits, "now", lambda: t[0])
+    monkeypatch.setattr(waits, "sleep", lambda s: t.__setitem__(0, t[0] + s))
+
+    def pings() -> Iterator[bytes]:
+        for _ in range(100):  # a fake second per ping; the deadline is 5
+            t[0] += 1.0
+            yield b": ping\n\n"
+        msg = "the deadline was never checked"
+        raise AssertionError(msg)
+
+    fake = Fake().on(
+        "GET",
+        f"{P}/events",
+        httpx.Response(200, content=pings(), headers={"content-type": "text/event-stream"}),
+    )
+    code, out, errout = cli_run(fake, "status", PID, "--watch", "--timeout", "5")
+    assert code == 3
+    assert "timeout" in out + errout
+    assert t[0] < 20
+
+
+@pytest.mark.unit
+def test_an_unwritable_output_directory_is_an_io_error_in_json(
+    cli_run: CliRun, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    def boom(*_a: Any, **_k: Any) -> Path:
+        raise PermissionError(13, "Permission denied")
+
+    monkeypatch.setattr("saveclock.cli.files.write_stream", boom)
+    code, out, _ = cli_run(
+        _export_fake(tmp_path), "export", PID, "--mode", "b", "--out", str(tmp_path), "--json"
+    )
+    assert code == 1
+    assert parsed(out)["error"]["code"] == "io_error"
+
+
+@pytest.mark.unit
+def test_an_unexpected_answer_shape_is_an_internal_error_in_json(cli_run: CliRun) -> None:
+    fake = Fake().on("GET", P, j(200, {"id": PID}))  # no ui_status, title, ...
+    code, out, _ = cli_run(fake, "status", PID, "--json")
+    assert code == 1
+    assert parsed(out)["error"]["code"] == "internal_error"
 
 
 @pytest.mark.unit
