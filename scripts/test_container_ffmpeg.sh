@@ -26,6 +26,10 @@ RUN=("$CONTAINER" run --rm --network none --memory=1g --memory-swap=1g --read-on
 
 in_image() { "${RUN[@]}" --entrypoint "$1" "$IMAGE" "${@:2}" 2>&1; }
 
+cfg_user="$("$CONTAINER" image inspect --format '{{.Config.User}}' "$IMAGE" 2>/dev/null | tr -d '[:space:]')"
+[ "$cfg_user" = 10001 ] && ok "the image's own USER is 10001 (not only the --user override below)" \
+  || bad "the image's USER is '$cfg_user', want 10001"
+
 uid="$(in_image id -u | tr -d '[:space:]')"
 [ "$uid" = 10001 ] && ok "the worker runs as uid 10001" || bad "uid is '$uid', want 10001"
 
