@@ -79,6 +79,22 @@ def evaluate_track(
     return out
 
 
+def downbeat_debug(ref: FloatArray, ref_down: FloatArray, est_down: FloatArray) -> dict[str, int]:
+    """Why a downbeat F1 is low: the counts and the shift (in beats) of the reference bar starts
+    that fits the estimate best. 0 means the bar starts agree; k means the estimate is k beats late."""
+    per_bar = 4
+    if len(ref_down) > 1 and len(ref) > 1:
+        per_bar = max(1, round(float(np.median(np.diff(ref_down)) / np.median(np.diff(ref)))))
+    start = np.abs(ref[:, None] - ref_down[None, :]).argmin(axis=0)
+    best, best_f = 0, -1.0
+    for k in range(per_bar):
+        shifted = ref[np.minimum(start + k, len(ref) - 1)]
+        f = float(mir_eval.beat.f_measure(shifted, est_down, f_measure_threshold=F_WINDOW_S)) if len(est_down) else 0.0
+        if f > best_f:
+            best, best_f = k, f
+    return {"n_est": len(est_down), "n_ref": len(ref_down), "best_phase_beats": best}
+
+
 def alignment_share(cut_times_s: list[float], beats_s: FloatArray, window_s: float = F_WINDOW_S) -> float:
     """QM-026: the share of planned cut times within `window_s` of an annotated beat."""
     if not cut_times_s or len(beats_s) == 0:

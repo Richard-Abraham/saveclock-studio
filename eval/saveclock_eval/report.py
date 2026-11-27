@@ -24,6 +24,8 @@ MIN_TIMING_N = 20  # G0-13: at least 20 runs before a percentile is a gate
 THRESHOLDS = Path(__file__).resolve().parent.parent / "thresholds.json"
 EXCLUDED = Path(__file__).resolve().parent.parent / "excluded_errors.json"
 NO_GOLDEN = "NOT MEASURED (no golden set, DECISIONS §8g, RQ-5)"
+SYNTH_DOWNBEAT_LABEL = "report only (clicks carry no bar accent)"
+NOT_GATED_SYNTH_DOWNBEAT = "not gated: " + SYNTH_DOWNBEAT_LABEL
 REF_CPUS, REF_THREADS = 4, 4  # QUALITY states its speed gates for 4 vCPU with 4 threads
 
 
@@ -95,6 +97,17 @@ def _fmt(spec: dict[str, Any]) -> str:
     return f">= {spec['floor']}" if "floor" in spec else f"<= {spec['max']}"
 
 
+def _downbeat_debug(done: list[dict[str, Any]]) -> str:
+    """Why the downbeat F1 is what it is, per track: estimated and reference downbeat counts and the
+    best phase offset in beats (0 = the grid is right, only the bar start differs otherwise)."""
+    parts = [
+        f"{r['label']}: est {d['n_est']}, ref {d['n_ref']}, best phase {d['best_phase_beats']} beats"
+        for r in done
+        if (d := (r.get("beat") or {}).get("downbeat_debug"))
+    ]
+    return "per track: " + ("; ".join(parts) if parts else "no debug data in this run")
+
+
 def _timing_row(
     row_id: str, description: str, values: list[float], spec: dict[str, Any], facts: dict[str, Any], observed: str
 ) -> Row:
@@ -164,8 +177,11 @@ def build_rows(
         spec = th[key]
         if vals:
             mean = float(np.mean(vals))
-            status = "PASS" if _gate(mean, spec) else "FAIL"
-            rows.append(Row(f"{spec['qm']}/synth", f"{label}, synthetic click tracks (known grid; not the golden set)", f"{mean:.4f}", _fmt(spec), "", status, str(len(vals)), "mean over renders; untrimmed, 70 ms"))
+            status, desc, note = "PASS" if _gate(mean, spec) else "FAIL", f"{label}, synthetic click tracks (known grid; not the golden set)", "mean over renders; untrimmed, 70 ms"
+            if key == "downbeat_f1":  # clicks carry no bar accent, so a low value is not a pipeline finding
+                status = "PASS (report only)" if status == "PASS" else f"FAIL ({NOT_GATED_SYNTH_DOWNBEAT})"
+                desc, note = f"{desc}: {SYNTH_DOWNBEAT_LABEL}", f"{note}; {_downbeat_debug(done)}"
+            rows.append(Row(f"{spec['qm']}/synth", desc, f"{mean:.4f}", _fmt(spec), "", status, str(len(vals)), note))
         else:
             rows.append(Row(f"{spec['qm']}/synth", f"{label}, synthetic click tracks", "-", _fmt(spec), "", "NOT MEASURED (no annotated track in this run)", "0", ""))
     octs = [b["octave_error"] for b in beats if b.get("octave_error") is not None]

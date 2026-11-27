@@ -118,3 +118,16 @@ def test_alignment_share_counts_cuts_within_70_ms(synth_dir: Path) -> None:
     assert alignment_share(off, ref) == 0.0
     assert alignment_share(on + off, ref) == 0.5
     assert alignment_share([], ref) == 0.0
+
+
+def test_downbeat_debug_names_the_phase_that_fits() -> None:
+    import numpy as np
+
+    from saveclock_eval.metrics import downbeat_debug
+
+    ref = np.arange(0.0, 16.0, 0.5)
+    ref_down = ref[::4]
+    shifted = ref[2::4]  # the estimate puts every bar start two beats late
+    assert downbeat_debug(ref, ref_down, shifted) == {"n_est": 8, "n_ref": 8, "best_phase_beats": 2}
+    assert downbeat_debug(ref, ref_down, ref_down)["best_phase_beats"] == 0
+    assert downbeat_debug(ref, ref_down, np.asarray([]))["n_est"] == 0

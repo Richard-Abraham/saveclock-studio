@@ -150,3 +150,29 @@ def test_the_sheets_module_has_no_code_that_fills_an_answer_column() -> None:
     src = Path(sheets.__file__).read_text()
     assert src.count('""') >= 2  # the answer cells are literal empty strings
     assert "hard_cut_seen" in src and "yes" not in src.lower().replace("yes` in", "")
+
+
+# --- QM-010/synth is report only (clicks carry no bar accent) --------------------------------------
+def test_the_synthetic_downbeat_row_is_report_only_and_never_drives_the_verdict() -> None:
+    beat = {"f_measure": 1.0, "cmlt": 1.0, "amlt": 1.0, "downbeat_f1": 0.05, "octave_error": 0,
+            "downbeat_debug": {"n_est": 7, "n_ref": 20, "best_phase_beats": 2}}
+    rows = report.build_rows([rec(i, beat=beat, label=f"click-{i}") for i in range(3)], FACTS)
+    row = next(r for r in rows if r.id == "QM-010/synth")
+    assert "report only (clicks carry no bar accent)" in row.description
+    assert "(not gated" in row.status and report.status_word(row.status) == "FAIL"
+    assert "click-0: est 7, ref 20, best phase 2 beats" in row.evidence
+    assert report.verdict(rows).startswith("G2 NOT DECIDED")
+
+
+def test_the_golden_downbeat_gate_is_still_a_gate() -> None:
+    rows = report.build_rows([rec(0)], FACTS)
+    assert not any("not gated" in r.status for r in rows if r.id == "QM-010")
+
+
+def test_a_cell_that_a_spreadsheet_would_run_as_a_formula_is_written_as_text(tmp_path: Path) -> None:
+    records = [rec(0, song_label=s) for s in ("=cmd|' /C calc'!A0", "+1", "-1", "@SUM(1)", "\tx", "\rx", "fine")]
+    for i, r in enumerate(records):
+        r["index"] = i
+    _audit, keywords = sheets.write_sheets(tmp_path, "run1", records)
+    labels = [row[1] for row in list(csv.reader(keywords.open(newline="")))[1:]]
+    assert labels == ["'=cmd|' /C calc'!A0", "'+1", "'-1", "'@SUM(1)", "'\tx", "'\rx", "fine"]

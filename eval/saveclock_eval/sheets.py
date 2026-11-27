@@ -18,6 +18,11 @@ AUDIT_SIZE = 100
 NOT_KEPT = "NOT KEPT"
 
 
+def _safe(cell: str) -> str:
+    """A spreadsheet runs a cell that starts with one of these as a formula: a leading quote makes it text."""
+    return "'" + cell if cell[:1] in ("=", "+", "-", "@", "\t", "\r") else cell
+
+
 def sample_segments(records: list[dict[str, Any]], size: int = AUDIT_SIZE) -> list[tuple[dict[str, Any], dict[str, Any]]]:
     """`size` (render, cut) pairs: one per render when at least `size` renders exist, otherwise
     spread evenly over every cut of every completed render (all of them when fewer than `size`)."""
@@ -60,5 +65,5 @@ def write_sheets(out_dir: Path, run_id: str, records: list[dict[str, Any]]) -> t
         with path.open("w", newline="", encoding="utf-8") as fh:
             w = csv.writer(fh)
             w.writerow(columns)
-            w.writerows(rows)
+            w.writerows([_safe(c) for c in row] for row in rows)
     return paths

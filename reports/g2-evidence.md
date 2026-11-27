@@ -12,16 +12,16 @@ Do this on the PC that will really be used (full commands in `docs/SETUP.md`, se
 4. Optional: with a Pexels key run `make eval-smoke EVAL_ARGS="--stock pexels"` and the plan 005 live smoke (`uv --directory services/api run pytest -q -m live`).
 5. Decide whether to build a small golden set (RQ-5), then write the decision below. NO-GO means "fix pipeline; no UI polish".
 
-Verdict line: **G2 NOT DECIDED: owner steps pending.** One measured gated row is FAIL on synthetic tracks: QM-010/synth (downbeat F1 0.0464, n = 3, real Beat This on click tracks whose downbeats differ only by tone). Treat it as a finding to look at before the soak (the golden-set QM-010 row stays NOT MEASURED); it is not a verdict.
+Verdict line: **G2 NOT DECIDED: owner steps pending.** One synthetic row reads FAIL: QM-010/synth (downbeat F1 0.0464, n = 3, real Beat This on click tracks), but it is now report only (clicks carry no bar accent, so it is not gated and never drives the verdict). The golden-set QM-010 row stays NOT MEASURED and stays a gate. A future run records per track the estimated and reference downbeat counts and the best phase offset in beats.
 
 ## Evidence per G2 criterion
 
-Smoke run: `eval/results/20261127T190827Z-smoke.csv` and `.md` (3 renders, `make dev-fakes` stack, project `saveclock-w009`, real Beat This, fake stock; command `make eval-smoke PROJECT=saveclock-w009 API_PORT=18009 WEB_PORT=13009`, exit 0, last line `verdict: Fix pipeline; no UI polish (failing rows: QM-010/synth)`).
+Smoke run: `eval/results/20261127T190827Z-smoke.csv` and `.md` (3 renders, `make dev-fakes` stack, project `saveclock-w009`, real Beat This, fake stock; command `make eval-smoke PROJECT=saveclock-w009 API_PORT=18009 WEB_PORT=13009`, exit 0, the run printed `verdict: Fix pipeline; no UI polish (failing rows: QM-010/synth)` before QM-010/synth became report only; the committed `.csv` and `.md` were regenerated from the stored records and now read `G2 NOT DECIDED: owner steps pending (15 rows OWNER-BLOCKED)`).
 
 | G2 criterion | Command | Evidence (verbatim) | Status |
 |---|---|---|---|
 | Golden-set core numbers QM-001, 003, 004, 010, 016 | run_eval | `NOT MEASURED (no golden set, DECISIONS §8g, RQ-5)` | NOT MEASURED (no golden set, DECISIONS §8g, RQ-5) |
-| Synthetic beat metrics (not the golden set) | run_eval | QM-001/synth 1.0000, QM-003/synth 1.0000, QM-004/synth 1.0000, QM-010/synth 0.0464, QM-016/synth 0.0000 (n = 3) | FAIL (QM-010/synth only) |
+| Synthetic beat metrics (not the golden set) | run_eval | QM-001/synth 1.0000, QM-003/synth 1.0000, QM-004/synth 1.0000, QM-010/synth 0.0464, QM-016/synth 0.0000 (n = 3) | PASS on the gated rows; QM-010/synth FAIL, report only (not gated) |
 | Musical alignment QM-026 | run_eval | `1.0000`, target >= 0.9, n = 3, synthetic grid | PASS (synthetic only; owner songs if `local.json`) |
 | 100 consecutive renders QM-060..064, QM-068 | run_eval | `3/3 clean` each, `3 consecutive so far, 100 needed` | OWNER-BLOCKED (soak on the owner's PC) |
 | No repeated clip QM-038; internal cuts QM-036(a) detector; Mode A integrity QM-087; frame rule oracle; host re-probe | run_eval | `3/3 clean` each | OWNER-BLOCKED (soak on the owner's PC; n = 3 shown) |

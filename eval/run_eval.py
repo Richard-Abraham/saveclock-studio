@@ -41,7 +41,7 @@ from saveclock_eval.client import (
     WaitTimeout,
     wait_until,
 )
-from saveclock_eval.metrics import alignment_share, evaluate_track
+from saveclock_eval.metrics import alignment_share, downbeat_debug, evaluate_track
 
 EVAL_DIR = Path(__file__).resolve().parent
 REPO = EVAL_DIR.parent
@@ -161,8 +161,11 @@ def run_one(client: EvalClient, entry: dict[str, Any], index: int, args: argpars
         ]
         if ref is not None:
             est, est_down = np.asarray(analysis["beats_s"]), np.asarray(analysis["downbeats_s"])
-            m = evaluate_track(ref, est, ref_down if ref_down is not None and len(ref_down) else None, est_down if len(est_down) else None)
+            ref_d = ref_down if ref_down is not None and len(ref_down) else None
+            m = evaluate_track(ref, est, ref_d, est_down)  # no estimated downbeat: an empty array scores 0, not "unmeasured"
             rec["beat"] = {k: m[k] for k in ("f_measure", "cmlt", "amlt", "downbeat_f1", "octave_error")}
+            if ref_d is not None:
+                rec["beat"]["downbeat_debug"] = downbeat_debug(ref, ref_d, est_down)
             if entry.get("bpm"):
                 rec["beat"]["tempo_abs_err"] = abs(analysis["tempo_bpm"] - entry["bpm"])
             rec["alignment"] = alignment_share([c["out_start_frame"] / FPS + t0 for c in plan["cuts"]], ref)
@@ -221,7 +224,7 @@ def run_one(client: EvalClient, entry: dict[str, Any], index: int, args: argpars
     except WaitTimeout:
         rec.update(outcome="failed", stage=stage, error_code="timeout")
     finally:
-        if pid and not args.keep and rec["outcome"] == "completed" and not rec["hard_failures"]:
+        if pid and not args.keep and not rec["hard_failures"]:  # a hard failure stays as evidence; failed and excluded runs are cleaned too
             try:
                 client.delete_project(pid)
             except ApiFailure:
@@ -250,10 +253,16 @@ def parse(argv: list[str] | None) -> argparse.Namespace:
     return args
 
 
-def save_partial(path: Path, run_id: str, facts: dict[str, Any], records: list[dict[str, Any]]) -> None:
+def save_partial(path: Path, run_id: str, facts: dict[str, Any], records: list[dict[str, Any]], n_target: int, mode: str) -> None:
     tmp = path.with_suffix(".tmp")
-    tmp.write_text(json.dumps({"run_id": run_id, "facts": facts, "records": records}, indent=1))
+    tmp.write_text(json.dumps({"run_id": run_id, "facts": facts, "records": records, "n_target": n_target, "mode": mode}, indent=1))
     tmp.replace(path)
+
+
+def load_partial(path: Path) -> tuple[list[dict[str, Any]], int | None, str | None]:
+    """The saved records and the run's own target and mode (None for a file written before they were stored)."""
+    saved = json.loads(path.read_text())
+    return saved["records"], saved.get("n_target"), saved.get("mode")
 
 
 def main(argv: list[str] | None = None) -> int:  # noqa: PLR0911, PLR0912, PLR0915
@@ -281,12 +290,16 @@ def main(argv: list[str] | None = None) -> int:  # noqa: PLR0911, PLR0912, PLR09
     if local.is_file() and not args.live:
         print(f"{local.name} exists: pass --live to use the owner's own songs (it is ignored otherwise)")
     entries = load_entries(args.manifest, local if args.live else None)
-    n_target = 3 if args.smoke else (args.soak or len(entries))
     run_id = args.resume or f"{datetime.now(UTC):%Y%m%dT%H%M%SZ}-{'smoke' if args.smoke else 'soak'}"
     partial = out / f"{run_id}.partial.json"
     records: list[dict[str, Any]] = []
-    if args.resume:
-        records = json.loads(partial.read_text())["records"]
+    n_target = 3 if args.smoke else (args.soak or len(entries))
+    if args.resume:  # the run's own target and mode win over this command line (which names neither)
+        records, saved_target, saved_mode = load_partial(partial)
+        if saved_mode:
+            args.smoke, args.soak = saved_mode == "smoke", (None if saved_mode == "smoke" else saved_target)
+        n_target = saved_target if saved_target is not None else n_target
+    mode = "smoke" if args.smoke else "soak"
     if settings["disk"]["low"]:
         print("refusing to start: the stack reports low disk space (disk.low)", file=sys.stderr)
         return 3
@@ -310,7 +323,7 @@ def main(argv: list[str] | None = None) -> int:  # noqa: PLR0911, PLR0912, PLR09
             entry = plan_entries[len(records) % len(plan_entries)]
             rec = run_one(client, entry, len(records), args, work, run_id)
             records.append(rec)
-            save_partial(partial, run_id, facts, records)
+            save_partial(partial, run_id, facts, records, n_target, mode)
             print(f"[{len(records)}] {entry['label']}: {rec['outcome']}"
                   + (f" ({rec['stage']}: {rec['error_code']})" if rec["outcome"] != "completed" else "")
                   + (f" HARD FAILURE {rec['hard_failures']}" if rec["hard_failures"] else "")
