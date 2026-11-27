@@ -2,6 +2,7 @@
 
 from pathlib import Path
 
+import numpy as np
 import pytest
 
 from saveclock.adapters import dsp
@@ -56,9 +57,14 @@ def test_a_good_master_decodes_cleanly_and_a_damaged_one_does_not(
     assert vm.decode_null(ffmpeg_tools, rendered.master) == ""
     damaged = tmp_path / "damaged.mp4"
     data = bytearray(rendered.master.read_bytes())
-    for i in range(len(data) // 2, len(data) // 2 + 4000):
-        data[i] = 0xFF
+    rng = np.random.default_rng(1)  # a fixed seed: the same bytes flip every run
+    for i in np.flatnonzero(rng.random(len(data)) < 0.002):
+        if i >= 3000:  # past the moov box at the front
+            data[int(i)] ^= 0xFF
     damaged.write_bytes(bytes(data))
+    truncated = tmp_path / "truncated.mp4"
+    truncated.write_bytes(rendered.master.read_bytes()[: len(data) // 2])
+    assert v.playable_check(vm.decode_null(ffmpeg_tools, truncated)).ok is False
     assert v.playable_check(vm.decode_null(ffmpeg_tools, damaged)).ok is False
 
 
@@ -126,3 +132,21 @@ def test_the_mono_decode_is_8_khz_and_the_click_offset_is_found(
     part = vm.decode_mono8k(ffmpeg_tools, wav, "wav", start_s=1.0, dur_s=3.0)
     assert len(part) == 3 * dsp.XCORR_SR
     assert abs(dsp.xcorr_offset(whole[8000:32000], part)) < 0.001
+
+
+def test_a_render_of_forty_five_inputs_opens_its_encoder(
+    ffmpeg_tools: Tools, tmp_path: Path
+) -> None:
+    """A 30-input render once failed to open x264 under the 4 GB address-space limit of the
+    runner: the render has its own, larger limit."""
+    big = render_plan(
+        ffmpeg_tools,
+        tmp_path,
+        solid_stock(ffmpeg_tools, tmp_path / "clips"),
+        bpm=133.3,
+        seconds=60,
+        threads=4,
+    )
+    assert len(big.plan.cuts) >= 40
+    probe = vm.probe_master(ffmpeg_tools, big.master)
+    assert not [r for r in v.master_checks(probe, big.plan.total_frames) if not r.ok]

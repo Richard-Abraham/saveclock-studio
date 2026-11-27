@@ -5,7 +5,7 @@ from sqlalchemy import func, or_, select, text, update
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from saveclock.models import EditPlan, Job, ModeAState, Render, RenderState
+from saveclock.models import EditPlan, Job, ModeAState, Project, Render, RenderState
 
 ACTIVE = (RenderState.QUEUED.value, RenderState.RUNNING.value, RenderState.VERIFYING.value)
 # the partial unique index of `uq_renders_job_hash`
@@ -38,6 +38,13 @@ class RenderRepository:
         )
         if render.user_id != user_id:
             return None
+        return (await self.session.scalars(stmt)).one_or_none()
+
+    async def project_title(self, *, user_id: UUID, render: Render) -> str | None:
+        """The title of the render's project (None: no title); only the owner reads it."""
+        stmt = select(Project.title).where(
+            Project.id == render.project_id, Project.user_id == user_id
+        )
         return (await self.session.scalars(stmt)).one_or_none()
 
     async def latest_for_project(self, *, user_id: UUID, project_id: UUID) -> Render | None:

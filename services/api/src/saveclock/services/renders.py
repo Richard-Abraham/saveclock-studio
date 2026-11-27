@@ -181,6 +181,7 @@ async def cancel_render(
         )
     await session.commit()
     await project_state.announce_pending(session, publisher)
+    session.expire_all()  # the UPDATEs bypassed the identity map
     return await get_render(session, user_id, render_id)
 
 
@@ -200,7 +201,7 @@ async def delete_render(
         raise Conflict(ConflictReason.WRONG_STATE)
     renders = RenderRepository(session)
     project_id = render.project_id
-    await asyncio.to_thread(blobs.delete_prefix, f"renders/{render_id}/")
+    await asyncio.to_thread(blobs.delete_prefix, f"renders/{render_id}")
     await renders.delete(user_id=user_id, render_id=render_id)
     project = await ProjectRepository(session).get(user_id=user_id, project_id=project_id)
     if (

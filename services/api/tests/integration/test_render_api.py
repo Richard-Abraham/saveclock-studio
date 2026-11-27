@@ -86,6 +86,7 @@ async def test_a_failed_render_allows_the_same_plan_again(renderer: Renders) -> 
         "UPDATE renders SET state = 'failed', error_code = 'internal_error' WHERE id = $1", rid
     )
     await d.sql("UPDATE projects SET status = 'failed_render' WHERE id = $1", pid)
+    await d.sql("UPDATE jobs SET state = 'dead' WHERE render_id = $1", rid)
     again = await renderer.post(pid)
     assert again.status_code == 202
     assert again.json()["render_id"] != str(rid)
@@ -253,4 +254,5 @@ async def test_the_cut_lists_are_published_with_the_master(renderer: Renders) ->
     doc = json.loads(await asyncio.to_thread(renderer.path(rid, "cutlist.json").read_text))
     assert [c["start_frame"] for c in doc["cuts"]] == [c.out_start_frame for c in plan.cuts]
     assert doc["total_frames"] == plan.total_frames
-    assert renderer.path(rid, "cutlist.csv").read_text().count("\r\n") == len(plan.cuts) + 1
+    csv_bytes = await asyncio.to_thread(renderer.path(rid, "cutlist.csv").read_bytes)
+    assert csv_bytes.count(b"\r\n") == len(plan.cuts) + 1

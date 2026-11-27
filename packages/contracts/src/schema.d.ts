@@ -162,6 +162,27 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/projects/{project_id}/credits": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Credits
+         * @description The footage attributions of the working plan and a ready-to-copy credits string. 409
+         *     `conflict` (`no_plan_yet`) before the first draft exists.
+         */
+        get: operations["get_credits"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/projects/{project_id}/events": {
         parameters: {
             query?: never;
@@ -212,6 +233,28 @@ export interface paths {
         patch: operations["patch_plan"];
         trace?: never;
     };
+    "/api/v1/projects/{project_id}/renders": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Create
+         * @description Freeze the plan (`plan_version`, default the latest) and render it: the silent master plus
+         *     the cut lists. An identical active or ready render is returned instead. 409 `conflict`
+         *     (`wrong_state`, `job_active`, `intermediates_missing`, `no_plan_yet`), 507 low disk.
+         */
+        post: operations["create_render"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/projects/{project_id}/retry": {
         parameters: {
             query?: never;
@@ -243,6 +286,91 @@ export interface paths {
          * @description One streamed upload: raw body, `Content-Length` required, `X-Filename` percent-encoded.
          */
         post: operations["upload_song"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/renders/{render_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get
+         * @description State, a summary of the checks, the files available, Mode A state and queue position.
+         */
+        get: operations["get_render"];
+        put?: never;
+        post?: never;
+        /**
+         * Delete
+         * @description Remove the render and its files; refused (409) while it runs.
+         */
+        delete: operations["delete_render"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/renders/{render_id}/cancel": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Cancel
+         * @description A `queued`, `running` or `verifying` render; anything else is 409.
+         */
+        post: operations["cancel_render"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/renders/{render_id}/download": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Download
+         * @description Stream one file (`Range` works, repeatable). `with_song` needs Mode A to be `ready`.
+         */
+        get: operations["download_render"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/renders/{render_id}/mode-a": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Mode A
+         * @description Put the song on the master (video untouched). A repeat returns the existing state, except
+         *     after a failure, which queues one new attempt. 409 when the render is not ready.
+         */
+        post: operations["request_mode_a"];
         delete?: never;
         options?: never;
         head?: never;
@@ -413,6 +541,27 @@ export interface components {
             /** Configured */
             configured: boolean;
         };
+        /** CreditItemOut */
+        CreditItemOut: {
+            /** Author */
+            author: string | null;
+            /** Page Url */
+            page_url: string;
+            /** Provider */
+            provider: string;
+            /** Uses */
+            uses: number;
+        };
+        /**
+         * CreditsOut
+         * @description The footage attributions of the working plan and one ready-to-copy credits text.
+         */
+        CreditsOut: {
+            /** Items */
+            items: components["schemas"]["CreditItemOut"][];
+            /** Text */
+            text: string;
+        };
         /** Cut */
         Cut: {
             beat_ref: components["schemas"]["BeatRef"];
@@ -434,6 +583,11 @@ export interface components {
             projects: string[];
             volume: components["schemas"]["Volume"];
         };
+        /**
+         * DownloadKind
+         * @enum {string}
+         */
+        DownloadKind: "silent_video" | "cutlist_json" | "cutlist_csv" | "with_song";
         /** ErrorBody */
         ErrorBody: {
             code: components["schemas"]["ErrorCode"];
@@ -456,6 +610,15 @@ export interface components {
         /** ErrorResponse */
         ErrorResponse: {
             error: components["schemas"]["ErrorBody"];
+        };
+        /** FailedCheck */
+        FailedCheck: {
+            /** Detail */
+            detail: string;
+            /** Id */
+            id: string;
+            /** Level */
+            level: string;
         };
         /**
          * Fallback
@@ -500,6 +663,20 @@ export interface components {
              */
             op: "lock_clip";
         };
+        /** ModeAAccepted */
+        ModeAAccepted: {
+            mode_a_state: components["schemas"]["ModeAState"];
+            /**
+             * Render Id
+             * Format: uuid
+             */
+            render_id: string;
+        };
+        /**
+         * ModeAState
+         * @enum {string}
+         */
+        ModeAState: "queued" | "running" | "ready" | "failed";
         /** Output */
         Output: {
             /** Crf */
@@ -601,7 +778,7 @@ export interface components {
         };
         /**
          * ProjectDetail
-         * @description `render` stays empty until plan 007 adds it, additively.
+         * @description `render` is the latest render (none before the first one).
          */
         ProjectDetail: {
             analysis: components["schemas"]["AnalysisSummary"] | null;
@@ -629,8 +806,7 @@ export interface components {
                 [key: string]: unknown;
             };
             plan?: components["schemas"]["PlanSummaryOut"] | null;
-            /** Render */
-            render?: null;
+            render?: components["schemas"]["RenderSummary"] | null;
             song: components["schemas"]["SongMeta"] | null;
             /** Status Reason */
             status_reason: string | null;
@@ -713,6 +889,70 @@ export interface components {
             planner_version: string;
             /** Seed */
             seed: number;
+        };
+        /** RenderAccepted */
+        RenderAccepted: {
+            /**
+             * Render Id
+             * Format: uuid
+             */
+            render_id: string;
+        };
+        /** RenderCreate */
+        RenderCreate: {
+            /** Plan Version */
+            plan_version?: number | null;
+        };
+        /** RenderOut */
+        RenderOut: {
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Duration Frames */
+            duration_frames: number | null;
+            /** Error Code */
+            error_code: string | null;
+            /** Files */
+            files: components["schemas"]["DownloadKind"][];
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            mode_a_state: components["schemas"]["ModeAState"] | null;
+            /** Plan Version */
+            plan_version: number;
+            /**
+             * Project Id
+             * Format: uuid
+             */
+            project_id: string;
+            /** Queue Position */
+            queue_position: number | null;
+            /** Size Bytes */
+            size_bytes: number | null;
+            state: components["schemas"]["RenderState"];
+            verify: components["schemas"]["VerifySummary"] | null;
+        };
+        /**
+         * RenderState
+         * @enum {string}
+         */
+        RenderState: "queued" | "running" | "verifying" | "ready" | "failed" | "canceled";
+        /**
+         * RenderSummary
+         * @description The latest render, on the project (`GET /projects/{id}`).
+         */
+        RenderSummary: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            mode_a_state: components["schemas"]["ModeAState"] | null;
+            state: components["schemas"]["RenderState"];
         };
         /** ReplanAccepted */
         ReplanAccepted: {
@@ -975,6 +1215,32 @@ export interface components {
              * @enum {string}
              */
             op: "use_detected_beats";
+        };
+        /**
+         * VerifySummary
+         * @description What the render's checks found (QUALITY §7); the full results stay in `renders.verify`.
+         */
+        VerifySummary: {
+            /** Attribution Present */
+            attribution_present: boolean | null;
+            /** Blocks */
+            blocks: number;
+            /** Cut Presence Ratio */
+            cut_presence_ratio: number | null;
+            /** Duration Delta Frames */
+            duration_delta_frames: number | null;
+            /** Failed */
+            failed: components["schemas"]["FailedCheck"][];
+            /** Max Cut Error Frames */
+            max_cut_error_frames: number | null;
+            /** Passed */
+            passed: boolean;
+            /** Render Ms */
+            render_ms: number | null;
+            /** Verify Ms */
+            verify_ms: number | null;
+            /** Warns */
+            warns: number;
         };
         /** Volume */
         Volume: {
@@ -1510,7 +1776,7 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorResponse"];
                 };
             };
-            /** @description conflict; details.reason is one of not_ready, wrong_state, upload_in_progress, retry_limit, job_active, no_plan_yet, too_many_streams, render_active */
+            /** @description conflict; details.reason is one of not_ready, wrong_state, upload_in_progress, retry_limit, job_active, no_plan_yet, too_many_streams, render_active, intermediates_missing */
             409: {
                 headers: {
                     [name: string]: unknown;
@@ -1577,7 +1843,7 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorResponse"];
                 };
             };
-            /** @description conflict; details.reason is one of not_ready, wrong_state, upload_in_progress, retry_limit, job_active, no_plan_yet, too_many_streams, render_active */
+            /** @description conflict; details.reason is one of not_ready, wrong_state, upload_in_progress, retry_limit, job_active, no_plan_yet, too_many_streams, render_active, intermediates_missing */
             409: {
                 headers: {
                     [name: string]: unknown;
@@ -1644,7 +1910,74 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorResponse"];
                 };
             };
-            /** @description conflict; details.reason is one of not_ready, wrong_state, upload_in_progress, retry_limit, job_active, no_plan_yet, too_many_streams, render_active */
+            /** @description conflict; details.reason is one of not_ready, wrong_state, upload_in_progress, retry_limit, job_active, no_plan_yet, too_many_streams, render_active, intermediates_missing */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description validation_error (details.fields) */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description internal_error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    get_credits: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                project_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CreditsOut"];
+                };
+            };
+            /** @description forbidden; details.reason is one of host_not_allowed, origin_mismatch, cross_site */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description conflict; details.reason is one of not_ready, wrong_state, upload_in_progress, retry_limit, job_active, no_plan_yet, too_many_streams, render_active, intermediates_missing */
             409: {
                 headers: {
                     [name: string]: unknown;
@@ -1711,7 +2044,7 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorResponse"];
                 };
             };
-            /** @description conflict; details.reason is one of not_ready, wrong_state, upload_in_progress, retry_limit, job_active, no_plan_yet, too_many_streams, render_active */
+            /** @description conflict; details.reason is one of not_ready, wrong_state, upload_in_progress, retry_limit, job_active, no_plan_yet, too_many_streams, render_active, intermediates_missing */
             409: {
                 headers: {
                     [name: string]: unknown;
@@ -1780,7 +2113,7 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorResponse"];
                 };
             };
-            /** @description conflict; details.reason is one of not_ready, wrong_state, upload_in_progress, retry_limit, job_active, no_plan_yet, too_many_streams, render_active */
+            /** @description conflict; details.reason is one of not_ready, wrong_state, upload_in_progress, retry_limit, job_active, no_plan_yet, too_many_streams, render_active, intermediates_missing */
             409: {
                 headers: {
                     [name: string]: unknown;
@@ -1889,6 +2222,86 @@ export interface operations {
             };
         };
     };
+    create_render: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                project_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": components["schemas"]["RenderCreate"] | null;
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RenderAccepted"];
+                };
+            };
+            /** @description forbidden; details.reason is one of host_not_allowed, origin_mismatch, cross_site */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description conflict; details.reason is one of not_ready, wrong_state, upload_in_progress, retry_limit, job_active, no_plan_yet, too_many_streams, render_active, intermediates_missing */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description validation_error (details.fields) */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description internal_error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description insufficient_storage */
+            507: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
     retry_project: {
         parameters: {
             query?: never;
@@ -1927,7 +2340,7 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorResponse"];
                 };
             };
-            /** @description conflict; details.reason is one of not_ready, wrong_state, upload_in_progress, retry_limit, job_active, no_plan_yet, too_many_streams, render_active */
+            /** @description conflict; details.reason is one of not_ready, wrong_state, upload_in_progress, retry_limit, job_active, no_plan_yet, too_many_streams, render_active, intermediates_missing */
             409: {
                 headers: {
                     [name: string]: unknown;
@@ -2011,7 +2424,7 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorResponse"];
                 };
             };
-            /** @description conflict; details.reason is one of not_ready, wrong_state, upload_in_progress, retry_limit, job_active, no_plan_yet, too_many_streams, render_active */
+            /** @description conflict; details.reason is one of not_ready, wrong_state, upload_in_progress, retry_limit, job_active, no_plan_yet, too_many_streams, render_active, intermediates_missing */
             409: {
                 headers: {
                     [name: string]: unknown;
@@ -2058,6 +2471,332 @@ export interface operations {
             };
             /** @description insufficient_storage */
             507: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    get_render: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                render_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RenderOut"];
+                };
+            };
+            /** @description forbidden; details.reason is one of host_not_allowed, origin_mismatch, cross_site */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description validation_error (details.fields) */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description internal_error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    delete_render: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                render_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description forbidden; details.reason is one of host_not_allowed, origin_mismatch, cross_site */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description conflict; details.reason is one of not_ready, wrong_state, upload_in_progress, retry_limit, job_active, no_plan_yet, too_many_streams, render_active, intermediates_missing */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description validation_error (details.fields) */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description internal_error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    cancel_render: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                render_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RenderOut"];
+                };
+            };
+            /** @description forbidden; details.reason is one of host_not_allowed, origin_mismatch, cross_site */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description conflict; details.reason is one of not_ready, wrong_state, upload_in_progress, retry_limit, job_active, no_plan_yet, too_many_streams, render_active, intermediates_missing */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description validation_error (details.fields) */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description internal_error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    download_render: {
+        parameters: {
+            query: {
+                kind: components["schemas"]["DownloadKind"];
+            };
+            header?: {
+                range?: string | null;
+            };
+            path: {
+                render_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description forbidden; details.reason is one of host_not_allowed, origin_mismatch, cross_site */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description conflict; details.reason is one of not_ready, wrong_state, upload_in_progress, retry_limit, job_active, no_plan_yet, too_many_streams, render_active, intermediates_missing */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description validation_error (details.fields) */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description internal_error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    request_mode_a: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                render_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ModeAAccepted"];
+                };
+            };
+            /** @description forbidden; details.reason is one of host_not_allowed, origin_mismatch, cross_site */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description conflict; details.reason is one of not_ready, wrong_state, upload_in_progress, retry_limit, job_active, no_plan_yet, too_many_streams, render_active, intermediates_missing */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description validation_error (details.fields) */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description internal_error */
+            500: {
                 headers: {
                     [name: string]: unknown;
                 };

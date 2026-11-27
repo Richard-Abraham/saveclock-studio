@@ -452,6 +452,65 @@
         "title": "Configured",
         "type": "object"
       },
+      "CreditItemOut": {
+        "additionalProperties": false,
+        "properties": {
+          "author": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Author"
+          },
+          "page_url": {
+            "title": "Page Url",
+            "type": "string"
+          },
+          "provider": {
+            "title": "Provider",
+            "type": "string"
+          },
+          "uses": {
+            "title": "Uses",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "provider",
+          "author",
+          "page_url",
+          "uses"
+        ],
+        "title": "CreditItemOut",
+        "type": "object"
+      },
+      "CreditsOut": {
+        "additionalProperties": false,
+        "description": "The footage attributions of the working plan and one ready-to-copy credits text.",
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/CreditItemOut"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "text": {
+            "title": "Text",
+            "type": "string"
+          }
+        },
+        "required": [
+          "items",
+          "text"
+        ],
+        "title": "CreditsOut",
+        "type": "object"
+      },
       "Cut": {
         "additionalProperties": false,
         "properties": {
@@ -521,6 +580,16 @@
         ],
         "title": "Disk",
         "type": "object"
+      },
+      "DownloadKind": {
+        "enum": [
+          "silent_video",
+          "cutlist_json",
+          "cutlist_csv",
+          "with_song"
+        ],
+        "title": "DownloadKind",
+        "type": "string"
       },
       "ErrorBody": {
         "additionalProperties": false,
@@ -602,6 +671,30 @@
           "error"
         ],
         "title": "ErrorResponse",
+        "type": "object"
+      },
+      "FailedCheck": {
+        "additionalProperties": false,
+        "properties": {
+          "detail": {
+            "title": "Detail",
+            "type": "string"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "level": {
+            "title": "Level",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "level",
+          "detail"
+        ],
+        "title": "FailedCheck",
         "type": "object"
       },
       "Fallback": {
@@ -697,6 +790,35 @@
         ],
         "title": "LockClip",
         "type": "object"
+      },
+      "ModeAAccepted": {
+        "additionalProperties": false,
+        "properties": {
+          "mode_a_state": {
+            "$ref": "#/components/schemas/ModeAState"
+          },
+          "render_id": {
+            "format": "uuid",
+            "title": "Render Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "render_id",
+          "mode_a_state"
+        ],
+        "title": "ModeAAccepted",
+        "type": "object"
+      },
+      "ModeAState": {
+        "enum": [
+          "queued",
+          "running",
+          "ready",
+          "failed"
+        ],
+        "title": "ModeAState",
+        "type": "string"
       },
       "Output": {
         "additionalProperties": false,
@@ -1019,7 +1141,7 @@
       },
       "ProjectDetail": {
         "additionalProperties": false,
-        "description": "`render` stays empty until plan 007 adds it, additively.",
+        "description": "`render` is the latest render (none before the first one).",
         "properties": {
           "analysis": {
             "anyOf": [
@@ -1067,8 +1189,14 @@
             ]
           },
           "render": {
-            "title": "Render",
-            "type": "null"
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/RenderSummary"
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "song": {
             "anyOf": [
@@ -1325,6 +1453,197 @@
           "seed"
         ],
         "title": "Provenance",
+        "type": "object"
+      },
+      "RenderAccepted": {
+        "additionalProperties": false,
+        "properties": {
+          "render_id": {
+            "format": "uuid",
+            "title": "Render Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "render_id"
+        ],
+        "title": "RenderAccepted",
+        "type": "object"
+      },
+      "RenderCreate": {
+        "additionalProperties": false,
+        "properties": {
+          "plan_version": {
+            "anyOf": [
+              {
+                "minimum": 1.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Plan Version"
+          }
+        },
+        "title": "RenderCreate",
+        "type": "object"
+      },
+      "RenderOut": {
+        "additionalProperties": false,
+        "properties": {
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "duration_frames": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Duration Frames"
+          },
+          "error_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error Code"
+          },
+          "files": {
+            "items": {
+              "$ref": "#/components/schemas/DownloadKind"
+            },
+            "title": "Files",
+            "type": "array"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "mode_a_state": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ModeAState"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "plan_version": {
+            "title": "Plan Version",
+            "type": "integer"
+          },
+          "project_id": {
+            "format": "uuid",
+            "title": "Project Id",
+            "type": "string"
+          },
+          "queue_position": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Queue Position"
+          },
+          "size_bytes": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Size Bytes"
+          },
+          "state": {
+            "$ref": "#/components/schemas/RenderState"
+          },
+          "verify": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/VerifySummary"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "project_id",
+          "plan_version",
+          "state",
+          "error_code",
+          "verify",
+          "files",
+          "mode_a_state",
+          "queue_position",
+          "size_bytes",
+          "duration_frames",
+          "created_at"
+        ],
+        "title": "RenderOut",
+        "type": "object"
+      },
+      "RenderState": {
+        "enum": [
+          "queued",
+          "running",
+          "verifying",
+          "ready",
+          "failed",
+          "canceled"
+        ],
+        "title": "RenderState",
+        "type": "string"
+      },
+      "RenderSummary": {
+        "additionalProperties": false,
+        "description": "The latest render, on the project (`GET /projects/{id}`).",
+        "properties": {
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "mode_a_state": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ModeAState"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "state": {
+            "$ref": "#/components/schemas/RenderState"
+          }
+        },
+        "required": [
+          "id",
+          "state",
+          "mode_a_state"
+        ],
+        "title": "RenderSummary",
         "type": "object"
       },
       "ReplanAccepted": {
@@ -2006,6 +2325,111 @@
           "on"
         ],
         "title": "UseDetectedBeats",
+        "type": "object"
+      },
+      "VerifySummary": {
+        "additionalProperties": false,
+        "description": "What the render's checks found (QUALITY \u00a77); the full results stay in `renders.verify`.",
+        "properties": {
+          "attribution_present": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Attribution Present"
+          },
+          "blocks": {
+            "title": "Blocks",
+            "type": "integer"
+          },
+          "cut_presence_ratio": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cut Presence Ratio"
+          },
+          "duration_delta_frames": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Duration Delta Frames"
+          },
+          "failed": {
+            "items": {
+              "$ref": "#/components/schemas/FailedCheck"
+            },
+            "title": "Failed",
+            "type": "array"
+          },
+          "max_cut_error_frames": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Cut Error Frames"
+          },
+          "passed": {
+            "title": "Passed",
+            "type": "boolean"
+          },
+          "render_ms": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Render Ms"
+          },
+          "verify_ms": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Verify Ms"
+          },
+          "warns": {
+            "title": "Warns",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "passed",
+          "blocks",
+          "warns",
+          "failed",
+          "max_cut_error_frames",
+          "duration_delta_frames",
+          "cut_presence_ratio",
+          "attribution_present",
+          "render_ms",
+          "verify_ms"
+        ],
+        "title": "VerifySummary",
         "type": "object"
       },
       "Volume": {
@@ -2693,7 +3117,7 @@
                 }
               }
             },
-            "description": "conflict; details.reason is one of not_ready, wrong_state, upload_in_progress, retry_limit, job_active, no_plan_yet, too_many_streams, render_active"
+            "description": "conflict; details.reason is one of not_ready, wrong_state, upload_in_progress, retry_limit, job_active, no_plan_yet, too_many_streams, render_active, intermediates_missing"
           },
           "422": {
             "content": {
@@ -2777,7 +3201,7 @@
                 }
               }
             },
-            "description": "conflict; details.reason is one of not_ready, wrong_state, upload_in_progress, retry_limit, job_active, no_plan_yet, too_many_streams, render_active"
+            "description": "conflict; details.reason is one of not_ready, wrong_state, upload_in_progress, retry_limit, job_active, no_plan_yet, too_many_streams, render_active, intermediates_missing"
           },
           "422": {
             "content": {
@@ -2860,7 +3284,7 @@
                 }
               }
             },
-            "description": "conflict; details.reason is one of not_ready, wrong_state, upload_in_progress, retry_limit, job_active, no_plan_yet, too_many_streams, render_active"
+            "description": "conflict; details.reason is one of not_ready, wrong_state, upload_in_progress, retry_limit, job_active, no_plan_yet, too_many_streams, render_active, intermediates_missing"
           },
           "422": {
             "content": {
@@ -2886,6 +3310,90 @@
         "summary": "Cancel",
         "tags": [
           "projects"
+        ]
+      }
+    },
+    "/api/v1/projects/{project_id}/credits": {
+      "get": {
+        "description": "The footage attributions of the working plan and a ready-to-copy credits string. 409\n`conflict` (`no_plan_yet`) before the first draft exists.",
+        "operationId": "get_credits",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Project Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CreditsOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "forbidden; details.reason is one of host_not_allowed, origin_mismatch, cross_site"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "not found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "conflict; details.reason is one of not_ready, wrong_state, upload_in_progress, retry_limit, job_active, no_plan_yet, too_many_streams, render_active, intermediates_missing"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "validation_error (details.fields)"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "internal_error"
+          }
+        },
+        "summary": "Get Credits",
+        "tags": [
+          "credits"
         ]
       }
     },
@@ -2944,7 +3452,7 @@
                 }
               }
             },
-            "description": "conflict; details.reason is one of not_ready, wrong_state, upload_in_progress, retry_limit, job_active, no_plan_yet, too_many_streams, render_active"
+            "description": "conflict; details.reason is one of not_ready, wrong_state, upload_in_progress, retry_limit, job_active, no_plan_yet, too_many_streams, render_active, intermediates_missing"
           },
           "422": {
             "content": {
@@ -3045,7 +3553,7 @@
                 }
               }
             },
-            "description": "conflict; details.reason is one of not_ready, wrong_state, upload_in_progress, retry_limit, job_active, no_plan_yet, too_many_streams, render_active"
+            "description": "conflict; details.reason is one of not_ready, wrong_state, upload_in_progress, retry_limit, job_active, no_plan_yet, too_many_streams, render_active, intermediates_missing"
           },
           "422": {
             "content": {
@@ -3176,6 +3684,117 @@
         ]
       }
     },
+    "/api/v1/projects/{project_id}/renders": {
+      "post": {
+        "description": "Freeze the plan (`plan_version`, default the latest) and render it: the silent master plus\nthe cut lists. An identical active or ready render is returned instead. 409 `conflict`\n(`wrong_state`, `job_active`, `intermediates_missing`, `no_plan_yet`), 507 low disk.",
+        "operationId": "create_render",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Project Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "anyOf": [
+                  {
+                    "$ref": "#/components/schemas/RenderCreate"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Body"
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RenderAccepted"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "forbidden; details.reason is one of host_not_allowed, origin_mismatch, cross_site"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "not found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "conflict; details.reason is one of not_ready, wrong_state, upload_in_progress, retry_limit, job_active, no_plan_yet, too_many_streams, render_active, intermediates_missing"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "validation_error (details.fields)"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "internal_error"
+          },
+          "507": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "insufficient_storage"
+          }
+        },
+        "summary": "Create",
+        "tags": [
+          "renders"
+        ]
+      }
+    },
     "/api/v1/projects/{project_id}/retry": {
       "post": {
         "operationId": "retry_project",
@@ -3230,7 +3849,7 @@
                 }
               }
             },
-            "description": "conflict; details.reason is one of not_ready, wrong_state, upload_in_progress, retry_limit, job_active, no_plan_yet, too_many_streams, render_active"
+            "description": "conflict; details.reason is one of not_ready, wrong_state, upload_in_progress, retry_limit, job_active, no_plan_yet, too_many_streams, render_active, intermediates_missing"
           },
           "422": {
             "content": {
@@ -3383,7 +4002,7 @@
                 }
               }
             },
-            "description": "conflict; details.reason is one of not_ready, wrong_state, upload_in_progress, retry_limit, job_active, no_plan_yet, too_many_streams, render_active"
+            "description": "conflict; details.reason is one of not_ready, wrong_state, upload_in_progress, retry_limit, job_active, no_plan_yet, too_many_streams, render_active, intermediates_missing"
           },
           "413": {
             "content": {
@@ -3439,6 +4058,424 @@
         "summary": "Upload Song",
         "tags": [
           "upload"
+        ]
+      }
+    },
+    "/api/v1/renders/{render_id}": {
+      "delete": {
+        "description": "Remove the render and its files; refused (409) while it runs.",
+        "operationId": "delete_render",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "render_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Render Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "forbidden; details.reason is one of host_not_allowed, origin_mismatch, cross_site"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "not found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "conflict; details.reason is one of not_ready, wrong_state, upload_in_progress, retry_limit, job_active, no_plan_yet, too_many_streams, render_active, intermediates_missing"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "validation_error (details.fields)"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "internal_error"
+          }
+        },
+        "summary": "Delete",
+        "tags": [
+          "renders"
+        ]
+      },
+      "get": {
+        "description": "State, a summary of the checks, the files available, Mode A state and queue position.",
+        "operationId": "get_render",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "render_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Render Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RenderOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "forbidden; details.reason is one of host_not_allowed, origin_mismatch, cross_site"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "not found"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "validation_error (details.fields)"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "internal_error"
+          }
+        },
+        "summary": "Get",
+        "tags": [
+          "renders"
+        ]
+      }
+    },
+    "/api/v1/renders/{render_id}/cancel": {
+      "post": {
+        "description": "A `queued`, `running` or `verifying` render; anything else is 409.",
+        "operationId": "cancel_render",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "render_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Render Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RenderOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "forbidden; details.reason is one of host_not_allowed, origin_mismatch, cross_site"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "not found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "conflict; details.reason is one of not_ready, wrong_state, upload_in_progress, retry_limit, job_active, no_plan_yet, too_many_streams, render_active, intermediates_missing"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "validation_error (details.fields)"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "internal_error"
+          }
+        },
+        "summary": "Cancel",
+        "tags": [
+          "renders"
+        ]
+      }
+    },
+    "/api/v1/renders/{render_id}/download": {
+      "get": {
+        "description": "Stream one file (`Range` works, repeatable). `with_song` needs Mode A to be `ready`.",
+        "operationId": "download_render",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "render_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Render Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "kind",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/DownloadKind"
+            }
+          },
+          {
+            "in": "header",
+            "name": "range",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Range"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "forbidden; details.reason is one of host_not_allowed, origin_mismatch, cross_site"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "not found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "conflict; details.reason is one of not_ready, wrong_state, upload_in_progress, retry_limit, job_active, no_plan_yet, too_many_streams, render_active, intermediates_missing"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "validation_error (details.fields)"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "internal_error"
+          }
+        },
+        "summary": "Download",
+        "tags": [
+          "renders"
+        ]
+      }
+    },
+    "/api/v1/renders/{render_id}/mode-a": {
+      "post": {
+        "description": "Put the song on the master (video untouched). A repeat returns the existing state, except\nafter a failure, which queues one new attempt. 409 when the render is not ready.",
+        "operationId": "request_mode_a",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "render_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Render Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ModeAAccepted"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "forbidden; details.reason is one of host_not_allowed, origin_mismatch, cross_site"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "not found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "conflict; details.reason is one of not_ready, wrong_state, upload_in_progress, retry_limit, job_active, no_plan_yet, too_many_streams, render_active, intermediates_missing"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "validation_error (details.fields)"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "internal_error"
+          }
+        },
+        "summary": "Mode A",
+        "tags": [
+          "renders"
         ]
       }
     },

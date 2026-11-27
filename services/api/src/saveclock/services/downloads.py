@@ -51,8 +51,7 @@ async def download(
             raise Conflict(ConflictReason.NOT_READY)
     elif render.state != RenderState.READY.value:
         raise Conflict(ConflictReason.NOT_READY)
-    project = await ProjectRepository(session).get(user_id=user_id, project_id=render.project_id)
-    title = project.title if project is not None else None
+    title = await RenderRepository(session).project_title(user_id=user_id, render=render)
     key = render_file_key(render_id, RENDER_FILES[kind.value])
     served = serve(blobs, key, range_header, download_name=download_name(title, render_id, kind))
     await ProjectRepository(session).touch(user_id=user_id, project_id=render.project_id)

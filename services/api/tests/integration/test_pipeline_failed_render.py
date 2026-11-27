@@ -1,13 +1,14 @@
 """The shared failure hook for the `render` and `remux` stages (plan 007)."""
 
 import json
-from collections.abc import Mapping
-from typing import NamedTuple
+from collections.abc import Awaitable, Callable, Mapping
+from typing import Any, NamedTuple
 from uuid import UUID
 
 import pytest
+from redis.asyncio import Redis
 
-from saveclock.domain.events import FailedEvent
+from tests.integration.conftest import REDIS_URL
 from tests.integration.render_harness import Renders
 
 pytestmark = [pytest.mark.integration, pytest.mark.ffmpeg]
@@ -27,6 +28,24 @@ class Running(NamedTuple):
     job: UUID
 
 
+async def failed_events(pid: UUID, action: Callable[[], Awaitable[None]]) -> list[dict[str, Any]]:
+    """The `failed` events published on the project's channel while `action` runs (the hook
+    publishes through Redis, like the worker)."""
+    redis = Redis.from_url(REDIS_URL)
+    pubsub = redis.pubsub()
+    await pubsub.subscribe(f"proj:{pid}")
+    await pubsub.get_message(timeout=1.0)  # the subscribe confirmation
+    await action()
+    found: list[dict[str, Any]] = []
+    while msg := await pubsub.get_message(ignore_subscribe_messages=True, timeout=1.5):
+        body = json.loads(msg["data"])
+        if body["type"] == "failed":
+            found.append(body["data"])
+    await pubsub.aclose()
+    await redis.aclose()
+    return found
+
+
 async def running_render(renderer: Renders, verify: Mapping[str, object] | None) -> Running:
     d = renderer.draft
     pid = await d.drafted()
@@ -43,15 +62,12 @@ async def test_a_dead_render_with_a_failed_block_check_is_verification_failed(
 ) -> None:
     d = renderer.draft
     pid, rid, job = await running_render(renderer, BLOCKED)
-    await renderer.kill_job(job)
+    events = await failed_events(pid, lambda: renderer.kill_job(job))
     assert await d.status(pid) == ("failed_render", "verification_failed")
     row = await renderer.render_row(rid)
     assert (row["state"], row["error_code"]) == ("failed", "verification_failed")
     assert await d.job(job) == ("dead", "internal_error")
-    failed = [e for e in d.recorder.sent if isinstance(e, FailedEvent)]
-    assert [(e.stage, e.code, e.retryable) for e in failed] == [
-        ("render", "verification_failed", True)
-    ]
+    assert events == [{"stage": "render", "code": "verification_failed", "retryable": True}]
 
 
 @pytest.mark.parametrize("verify", [None, ONLY_WARNS])
@@ -60,12 +76,11 @@ async def test_a_dead_render_without_a_failed_block_is_an_internal_error(
 ) -> None:
     d = renderer.draft
     pid, rid, job = await running_render(renderer, verify)
-    await renderer.kill_job(job)
+    events = await failed_events(pid, lambda: renderer.kill_job(job))
     assert await d.status(pid) == ("failed_render", "retries_exhausted")
     row = await renderer.render_row(rid)
     assert (row["state"], row["error_code"]) == ("failed", "internal_error")
-    failed = [e for e in d.recorder.sent if isinstance(e, FailedEvent)]
-    assert [e.code for e in failed] == ["internal_error"]
+    assert [e["code"] for e in events] == ["internal_error"]
 
 
 async def test_a_dead_remux_fails_mode_a_only(renderer: Renders) -> None:
@@ -74,12 +89,12 @@ async def test_a_dead_remux_fails_mode_a_only(renderer: Renders) -> None:
     rid = await renderer.ready(pid)
     await renderer.mode_a(rid)
     job = await renderer.job_of(rid, "remux")
-    await renderer.kill_job(job)
+    events = await failed_events(pid, lambda: renderer.kill_job(job))
     row = await renderer.render_row(rid)
     assert (row["state"], row["mode_a_state"]) == ("ready", "failed")
     assert await d.status(pid) == ("ready", None)
     assert await d.job(job) == ("dead", "internal_error")
-    assert [e for e in d.recorder.sent if isinstance(e, FailedEvent)] == []
+    assert events == []  # the project is fine: no `failed` event
 
 
 async def test_the_earlier_stages_of_the_hook_are_untouched(renderer: Renders) -> None:

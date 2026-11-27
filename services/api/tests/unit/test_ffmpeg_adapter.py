@@ -168,6 +168,23 @@ def test_prlimit_wraps_the_command_when_present(monkeypatch: pytest.MonkeyPatch)
     assert seen[0][-1] == "/bin/true"
 
 
+def test_the_render_gets_a_larger_address_space_than_a_probe(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    seen: list[list[str]] = []
+    real = subprocess.Popen
+
+    def spy(argv: list[str], **kw: object) -> object:
+        seen.append(argv)
+        return real(argv, **kw)  # type: ignore[call-overload]
+
+    monkeypatch.setattr(subprocess, "Popen", spy)
+    run(["/bin/true"], 10, as_bytes=ffmpeg.RENDER_AS_BYTES)
+    if ffmpeg.PRLIMIT.exists():
+        assert f"--as={ffmpeg.RENDER_AS_BYTES}" in seen[0]
+    assert ffmpeg.RENDER_AS_BYTES > ffmpeg.LIMIT_AS_BYTES
+
+
 # --- the real binary --------------------------------------------------------------------------
 
 

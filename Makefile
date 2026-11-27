@@ -23,9 +23,9 @@ TRIVY := ghcr.io/aquasecurity/trivy@sha256:6e7f515a46af13a01d534734c666261de65c6
 FAST_STAGES := guard help-lint tooling-test secrets banned toolchain env-docs-check fmt-check lint types arch pins \
   compose-lint test-deps-up ffmpeg-bin test migrations web-install contracts-check audit \
   web-env web-lint web-test web-build bundle-scan web-audit-prod
-CHECK_STAGES := $(FAST_STAGES) images image-guards hadolint
+CHECK_STAGES := $(FAST_STAGES) golden images image-guards hadolint
 
-.PHONY: help help-lint tooling-test rollback toolchain doctor-dev guard secrets banned doctor fmt-check lint types arch pins compose-lint test \
+.PHONY: help help-lint tooling-test rollback toolchain doctor-dev guard secrets banned doctor fmt-check lint types arch pins compose-lint test golden \
   migrations audit env env-docs env-docs-check contracts contracts-check test-deps-up \
   test-deps-down ffmpeg-cache ffmpeg-bin models-cache test-ml fake-stock images image-guards hadolint scan-images up dev down \
   down-volumes sandbox check-fast check web-install web-env web-lint web-test web-build \
@@ -98,6 +98,11 @@ test: ## run the unit and integration tests with coverage floors
 	$(UV) run pytest -q -m "not golden and not live and not ml and not migration_roundtrip" --cov --cov-branch \
 	  --cov-report=json:coverage.json --cov-fail-under=85
 	python3 scripts/cov_floors.py
+
+# the frame-exact render, the Mode A offsets and the sync canary on real media (plan 007); also runs
+# plan 006's golden plan frames. Needs the pinned FFmpeg (ffmpeg-bin) and the test deps (test-deps-up).
+golden: ## run the golden tests: frame-exact render, Mode A offsets, sync canary (needs ffmpeg-bin and the test deps)
+	$(UV) run pytest -q -s -m golden
 
 # the real Beat This model on a generated click track; needs the worker's ml extra and the weights
 test-ml: ## run the real Beat This test (needs the ml extra and the weights)

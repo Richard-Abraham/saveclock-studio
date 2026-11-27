@@ -37,6 +37,10 @@ PROBE_ENTRIES = (
 )
 PRLIMIT = Path("/usr/bin/prlimit")
 LIMIT_AS_BYTES = 4 * 1024**3
+# the render opens up to 60 decoders next to x264's threads: that is more address space than a probe
+# needs (a 30-input render failed to open the encoder at 4 GB); the container's memory limit still
+# bounds what is resident. shortcut: one fixed number, upgrade if a 60-input render ever nears it.
+RENDER_AS_BYTES = 16 * 1024**3
 LIMIT_CPU_S = 600
 POLL_S = 0.5
 CANCEL_POLL_S = 2.0  # the cancel check may open a database connection
@@ -137,12 +141,14 @@ def run(
     *,
     cancel: Callable[[], bool] | None = None,
     check: bool = True,
+    as_bytes: int = LIMIT_AS_BYTES,
 ) -> RunResult:
-    """Run an argument list: no shell, empty environment, own process group, 4 GB / 600 s limits."""
+    """Run an argument list: no shell, empty environment, own process group, 4 GB / 600 s limits
+    (`as_bytes` raises the address-space limit for the render only)."""
     check_args(cmd)
     argv = cmd
     if PRLIMIT.exists():
-        argv = [str(PRLIMIT), f"--as={LIMIT_AS_BYTES}", f"--cpu={LIMIT_CPU_S}", "--", *cmd]
+        argv = [str(PRLIMIT), f"--as={as_bytes}", f"--cpu={LIMIT_CPU_S}", "--", *cmd]
     started = last_cancel_check = time.monotonic()
     proc = subprocess.Popen(  # noqa: S603 - an audited argument list, never a shell
         argv,

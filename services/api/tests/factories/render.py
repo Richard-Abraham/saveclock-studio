@@ -12,7 +12,15 @@ from pathlib import Path
 import numpy as np
 import numpy.typing as npt
 
-from saveclock.adapters.ffmpeg import MP4_FMT, Tools, build_mezz, ffmpeg_cmd, render_cmd, run
+from saveclock.adapters.ffmpeg import (
+    MP4_FMT,
+    RENDER_AS_BYTES,
+    Tools,
+    build_mezz,
+    ffmpeg_cmd,
+    render_cmd,
+    run,
+)
 from saveclock.domain.edit_plan import EditPlan
 from saveclock.domain.windows import Window
 from tests.factories.stock import fake_stock
@@ -107,6 +115,6 @@ def render_plan(
     paths = [mezz[c.clip.provider_id] for c in plan.cuts]
     master = tmp / "master.mp4"
     cmd = render_cmd(tools, plan, paths, master, progress=tmp / "progress.txt", threads=threads)
-    run(cmd, 300)
+    run(cmd, 300, as_bytes=RENDER_AS_BYTES)
     palette = np.asarray([measured_colour(tools, mezz[c.provider_id]) for c in clips])
     return Rendered(plan, master, palette)

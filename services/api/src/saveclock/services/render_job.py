@@ -27,6 +27,7 @@ from saveclock.adapters.blobstore.port import BlobStore
 from saveclock.adapters.events import EventPublisher
 from saveclock.adapters.ffmpeg import (
     MP4_FMT,
+    RENDER_AS_BYTES,
     FfCanceled,
     ProgressTail,
     Tools,
@@ -165,7 +166,11 @@ async def _render_and_verify(ctx: WorkerContext, ids: _Ids, plan: EditPlan) -> N
             await session.commit()
         await emitter.aemit("verifying", 0.0, force=True)
         verified = time.monotonic()
-        outcome = await asyncio.to_thread(verify_master, ctx.tools, plan, master)
+        try:
+            outcome = await asyncio.to_thread(verify_master, ctx.tools, plan, master)
+        except Exception:  # a crash while verifying: back to `running` so the retry can begin
+            await _back_to_running(ctx, ids)
+            raise
         verify_ms = _ms(verified)
         verify = {**outcome, "timing": {"render_ms": render_ms, "verify_ms": verify_ms}}
         async with ctx.sessionmaker() as session:  # stored before a Block raises: the hook reads it
@@ -178,6 +183,7 @@ async def _render_and_verify(ctx: WorkerContext, ids: _Ids, plan: EditPlan) -> N
                 {c["id"] for c in verify["checks"] if not c["ok"] and c["level"] == "block"}
             )
             msg = f"verification failed: {', '.join(names)}"
+            await _back_to_running(ctx, ids)  # `begin` only starts queued or running renders
             raise VerificationFailed(msg)
         if await _cancelled(ctx, ids):
             raise JobCanceled
@@ -207,7 +213,7 @@ def _encode(
         slot = HeavyLock(redis, tuning.heavy, ctx.settings.heavy_ttl_s).hold(RENDER_HEAVY_WAIT_S)
         tail = ProgressTail(progress, plan.total_frames, lambda f: emitter.emit("rendering", f))
         with slot, tail:
-            run(cmd, RENDER_FFMPEG_S, cancel=cancel)
+            run(cmd, RENDER_FFMPEG_S, cancel=cancel, as_bytes=RENDER_AS_BYTES)
         emitter.emit("rendering", 1.0, force=True)
     finally:
         redis.close()
@@ -304,13 +310,24 @@ async def _finish(
     log.info("render.done", render_id=str(ids.render_id), **verify["timing"])
 
 
+async def _back_to_running(ctx: WorkerContext, ids: _Ids) -> None:
+    async with ctx.sessionmaker() as session:
+        await RenderRepository(session).set_state(
+            user_id=ids.user_id,
+            render_id=ids.render_id,
+            from_=(RenderState.VERIFYING.value,),
+            to=RenderState.RUNNING.value,
+        )
+        await session.commit()
+
+
 async def _cancelled(ctx: WorkerContext, ids: _Ids) -> bool:
     async with ctx.sessionmaker() as session:
         return await JobRepository(session).cancel_requested(user_id=ids.user_id, job_id=ids.job_id)
 
 
 async def _delete_outputs(ctx: WorkerContext, ids: _Ids) -> None:
-    await asyncio.to_thread(ctx.blobs.delete_prefix, f"renders/{ids.render_id}/")
+    await asyncio.to_thread(ctx.blobs.delete_prefix, f"renders/{ids.render_id}")
 
 
 async def _end_failed(ctx: WorkerContext, ids: _Ids, code: ErrorCode, reason: str) -> None:
