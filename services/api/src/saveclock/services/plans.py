@@ -42,6 +42,7 @@ from saveclock.domain.planner import (
     build_plan,
     fit_length,
     layout_cuts,
+    room_s,
     snap_start,
 )
 from saveclock.domain.segment import select_segment
@@ -205,16 +206,21 @@ def initial_state(basis: Basis) -> ReplanState:
     mode = "energy" if a.fallback == "energy_grid" else "detected"
     requested = int(project.options.get("duration", DEFAULT_DURATION_S))
     choice = GridChoice(mode)  # type: ignore[arg-type]
-    # the segment starts on a downbeat, so the first one eats into the song: a 30.0 s song with a
-    # downbeat at 0.02 s cannot hold a 30 s segment and drafts 15 s instead of failing
-    downs = grid_for(basis, choice).downbeats_s
-    first_downbeat = float(downs[0]) if len(downs) else 0.0
+    # a first downbeat near 0.0 starts the segment at 0.0 (all the song is room); a late one eats
+    # into the song, so a short song drafts the next length down instead of failing
     return ReplanState(
         choice,
         float(a.beat_map.get("segment", {}).get("start_s", 0.0)),
-        fit_length(requested, song_duration(basis) - first_downbeat),
+        fit_length(requested, room_s(grid_for(basis, choice), song_duration(basis))),
         int(project.options.get("density", 0)),
     )
+
+
+def length_notice(requested_s: int, drafted_s: int) -> dict[str, int] | None:
+    """The `length_reduced` flag value: the draft is shorter than asked, else None."""
+    if drafted_s >= requested_s:
+        return None
+    return {"requested_s": requested_s, "drafted_s": drafted_s}
 
 
 def segment_start(basis: Basis, grid: GridView, state: ReplanState) -> float:

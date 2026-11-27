@@ -67,6 +67,10 @@ PURGE_LIMIT_S = 600
 STUCK_QUEUED_S = 600
 STUCK_RUNNING_S = 3 * HEAVY_TTL_S
 
+# The `projects.flags` key of the "drafted shorter than asked" notice (plan 011): the draft writes
+# it and the CLI reads it, so it lives here, the one module both may import.
+LENGTH_REDUCED = "length_reduced"
+
 
 def _f(
     default: Any,  # noqa: ANN401

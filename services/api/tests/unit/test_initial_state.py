@@ -1,4 +1,4 @@
-"""The draft's default length leaves room for the first downbeat (found by the plan 009 dry run)."""
+"""The draft length against the song: near-zero first downbeats keep it, late ones shorten it."""
 
 from types import SimpleNamespace
 from typing import Any
@@ -27,10 +27,10 @@ def basis(duration: float, first: float, requested: int) -> Basis:
 
 
 @pytest.mark.unit
-def test_a_30_s_song_with_a_downbeat_at_0_02_drafts_15_s_not_a_failure() -> None:
+def test_a_30_s_song_with_a_downbeat_at_0_02_drafts_30_s_from_the_start() -> None:
     b = basis(30.0, 0.02, 30)
     state = initial_state(b)
-    assert state.length_s == 15
+    assert state.length_s == 30
     assert estimate_cuts(b, state) > 0
 
 
@@ -42,6 +42,6 @@ def test_a_song_with_room_keeps_the_requested_length() -> None:
 
 @pytest.mark.unit
 def test_an_explicit_length_that_cannot_fit_is_still_refused() -> None:
-    grid = grid_for(basis(30.0, 0.02, 30), GridChoice("detected"))
+    grid = grid_for(basis(30.0, 0.8, 30), GridChoice("detected"))
     with pytest.raises(PlanError, match="segment_out_of_range"):
-        snap_start(grid, 0.0, 30, 30.0)  # snap_start is unchanged
+        snap_start(grid, 0.0, 30, 30.0)  # a late first downbeat: no room

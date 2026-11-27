@@ -9,7 +9,7 @@ frame rule.
 
 import math
 from collections.abc import Sequence
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from uuid import UUID
 
 from saveclock.domain import edit_plan as ep
@@ -31,6 +31,7 @@ PLANNER_VERSION = f"0.1.0+rules{rules.RULES_VERSION}"
 MAX_WIDEN = 64  # the step cannot widen forever: 64 more beats is already one shot per segment
 EPS = 1e-6
 LENGTHS_S = (60, 30, 15)  # the output lengths, largest first
+LEAD_MAX_S = 0.5  # a first downbeat this close to the start (and within one beat) counts as 0.0
 
 
 class PlanError(Exception):
@@ -58,12 +59,39 @@ def fit_length(requested_s: int, song_duration_s: float) -> int:
     return fitting[0]
 
 
+def _lead(grid: GridView) -> float | None:
+    """The first downbeat when it is near the song start (0 < d0 <= min(0.5 s, one beat))."""
+    if not len(grid.downbeats_s):
+        return None
+    d0 = float(grid.downbeats_s[0])
+    limit = min(LEAD_MAX_S, 60.0 / grid.bpm) if grid.bpm > 0 else LEAD_MAX_S
+    return d0 if 0 < d0 <= limit + EPS else None
+
+
+def align_leading_beat(grid: GridView, start_s: float) -> GridView:
+    """A segment at 0.0 whose first downbeat is near zero starts on a beat and downbeat at 0.0."""
+    d0 = _lead(grid)
+    if d0 is None or abs(start_s) > EPS:
+        return grid
+    beats = (0.0, *(b for b in grid.beats_s if b > d0 + EPS))  # d0 itself becomes 0.0
+    return replace(grid, beats_s=beats, downbeats_s=(0.0, *grid.downbeats_s[1:]))
+
+
+def room_s(grid: GridView, duration_s: float) -> float:
+    """The song length a segment can use: all of it near zero, else after the first downbeat."""
+    if _lead(grid) is not None:
+        return duration_s
+    return duration_s - float(grid.downbeats_s[0]) if len(grid.downbeats_s) else duration_s
+
+
 def snap_start(
     grid: GridView, requested_s: float, length_s: float, song_duration_s: float
 ) -> float:
     """The downbeat nearest `requested_s` that leaves room for the whole segment."""
     fits = [d for d in grid.downbeats_s if d + length_s <= song_duration_s + EPS]
     if not fits:
+        if _lead(grid) is not None and length_s <= song_duration_s + EPS:
+            return 0.0
         raise PlanError("segment_out_of_range")
     return min(fits, key=lambda d: (abs(d - requested_s), d))
 
@@ -223,6 +251,7 @@ def layout_cuts(
     density: int,
     lead_frames: int = 0,
 ) -> Layout:
+    grid = align_leading_beat(grid, start_s)
     times = plan_beats(grid, start_s, total_frames)
     if not times or abs(times[0] - start_s) > EPS:
         raise PlanError("segment_start_not_on_grid")
@@ -332,8 +361,9 @@ def _cut_models(assignment: Assignment, layout: Layout) -> list[ep.Cut]:
 
 def build_plan(inp: PlanInputs) -> BuiltPlan:
     """Layout, clips, the model, the validator (a BLOCK is a bug: `PlanError`) and the hash."""
+    grid = align_leading_beat(inp.grid, inp.start_s)
     layout = layout_cuts(
-        inp.grid, inp.sections, inp.start_s, inp.total_frames,
+        grid, inp.sections, inp.start_s, inp.total_frames,
         density=inp.density, lead_frames=inp.lead_frames,
     )  # fmt: skip
     assignment = assign(
@@ -341,8 +371,8 @@ def build_plan(inp: PlanInputs) -> BuiltPlan:
         locked=inp.locked, seed=inp.seed, bpb=layout.bpb, beats=layout.points,
     )  # fmt: skip
     end_s = inp.start_s + inp.total_frames / FPS
-    beats = plan_beats(inp.grid, inp.start_s, inp.total_frames)
-    downs = [d for d in inp.grid.downbeats_s if inp.start_s - EPS <= d <= end_s + EPS]
+    beats = plan_beats(grid, inp.start_s, inp.total_frames)
+    downs = [d for d in grid.downbeats_s if inp.start_s - EPS <= d <= end_s + EPS]
     plan = ep.EditPlan(
         schema_version=ep.SCHEMA_VERSION,
         plan_id=inp.plan_id,

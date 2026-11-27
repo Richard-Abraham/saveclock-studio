@@ -21,9 +21,11 @@ import structlog
 from redis import Redis
 
 from saveclock.adapters.llm import AnthropicLlm, HashLlm, LlmClient
+from saveclock.config import LENGTH_REDUCED
 from saveclock.domain import edit_plan as ep
 from saveclock.domain.clip_assign import LockConflict, NoUsableClips, matches
 from saveclock.domain.events import FailedEvent
+from saveclock.domain.framemath import FPS
 from saveclock.domain.grid import GridError
 from saveclock.domain.keywords import KeywordSource, summary_from_analysis
 from saveclock.domain.plan_hash import content_hash, with_hash
@@ -355,6 +357,13 @@ async def _persist(
             "pool_exhausted": built.pool_exhausted,
             "degraded_keywords": keywords.degraded,
         }
+        if latest is None:  # a first draft: say so when the song forced a shorter video
+            requested = int(basis.project.options.get("duration", plans.DEFAULT_DURATION_S))
+            notice = plans.length_notice(requested, plan.total_frames // FPS)
+            if notice is None:
+                flags.pop(LENGTH_REDUCED, None)
+            else:
+                flags[LENGTH_REDUCED] = notice
         await ProjectRepository(session).update_fields(
             user_id=user_id, project_id=project_id, values={"flags": flags}
         )

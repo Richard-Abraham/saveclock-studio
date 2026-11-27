@@ -40,8 +40,10 @@ there is no Pexels key).
    are the required footage attribution; keep them with the video.
 8. `saveclock status` (no id) lists every project.
 
-Note: a song about as long as the requested length drafts a shorter video (15 s for a 30.0 s
-song); `plan.total_frames` shows the real length (30 frames per second).
+Note: a song whose first downbeat is within one beat and 0.5 s of its start drafts the full
+length from 0.0 s. A shorter song drafts the next length down, and `show` prints a `notice:` line
+(`flags.length_reduced` in `show --json`): tell the user the video is shorter than requested.
+`plan.total_frames` shows the real length (30 frames per second).
 
 ## Commands
 
@@ -135,7 +137,7 @@ or written).
     `saveclock new` and `--keywords` of your own (5 to 8 short phrases).
   - `stock_unavailable`: stock search failed; retry later with a new `saveclock new`.
   - `plan_failed`: the planner could not lay out the video. The usual cause is a song shorter than
-    15 s plus its first downbeat, so no bar start leaves room for a video. Start again with a
+    15 s (or little more, with a late first downbeat), so no bar start leaves room for a video. Start again with a
     longer song. The server log line `draft.plan_failed` has the exact reason.
     The CLI has no `retry` command: the API's retry
     operation is not part of this tool, and a new `saveclock new` is the recovery.
