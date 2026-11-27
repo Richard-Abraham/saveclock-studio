@@ -109,7 +109,6 @@ class Settings(BaseSettings):
     redis_url: SecretStr = _f(..., "A,K,M", secret=True)
     allowed_hosts: CsvList = _f(["localhost", "127.0.0.1"], "A,W")
     bind_addr: str = _f("127.0.0.1", "compose", example="127.0.0.1")
-    saveclock_api_url: str = _f("http://127.0.0.1:8000", "CLI")
     pexels_key_configured: bool = _f(False, "A", example="false")
     pixabay_key_configured: bool = _f(False, "A", example="false")
     anthropic_key_configured: bool = _f(False, "A", example="false")
@@ -157,6 +156,8 @@ class Settings(BaseSettings):
     next_public_app_origin: str | None = _f(None, "W")
     # Branch B of OQ-26 (plan 002): the browser calls the API directly at this origin.
     next_public_api_origin: str = _f("http://localhost:8000", "W", example="http://localhost:8000")
+    # plan 009: the dev-only driver page (apps/web /dev) exists only when this is true
+    dev_driver: bool = _f(False, "W", doc="plan 009; dev-only driver page, off by default")
     fake_stock: bool = _f(False, "local/CI")
     fake_ml: bool = _f(False, "local/CI")
     fake_llm: bool = _f(False, "local/CI")
@@ -206,6 +207,18 @@ class MigrateSettings(BaseSettings):
     migrator_database_url: SecretStr = _f(..., "migrate", secret=True)
     owner_display_name: str = _f(..., "migrate", example="")
     owner_email: str = _f("owner@saveclock.local", "migrate", example="owner@saveclock.local")
+
+
+class CliSettings(BaseSettings):
+    """What the `saveclock` CLI reads (plan 009). The CLI is a separate process that must never
+    build `Settings` (it requires DATABASE_URL and more), so its two names live here."""
+
+    model_config = SettingsConfigDict(
+        extra="ignore", hide_input_in_errors=True, env_ignore_empty=True
+    )
+
+    saveclock_api_url: str = _f("http://127.0.0.1:8000", "CLI")
+    app_origin: str = _f("http://localhost:3000", "CLI", doc="plan 009; the CLI's `open` command")
 
 
 class ComposeVar(BaseModel):

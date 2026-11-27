@@ -10,7 +10,7 @@ from pydantic import BaseModel
 from pydantic.fields import FieldInfo
 from pydantic_core import PydanticUndefined
 
-from saveclock.config import COMPOSE_ONLY, MigrateSettings, Settings
+from saveclock.config import COMPOSE_ONLY, CliSettings, MigrateSettings, Settings
 
 ROOT = Path(__file__).resolve().parent.parent
 
@@ -42,10 +42,14 @@ def env_example() -> str:
     ]
     for c in COMPOSE_ONLY:
         out += [f"# {c.doc}", f"{c.name}=CHANGE_ME" if c.default is None else f"# {c.name}={c.default}"]
-    for model in (Settings, MigrateSettings):
+    seen: set[str] = set()
+    for model in (Settings, MigrateSettings, CliSettings):
         out.append("")
         out.append(f"# {model.__name__}")
         for name, f in _rows(model):
+            if name in seen:  # APP_ORIGIN is owned by Settings and read by the CLI too
+                continue
+            seen.add(name)
             extra = f.json_schema_extra if isinstance(f.json_schema_extra, dict) else {}
             if "example" in extra:
                 out.append(f"{name}={extra['example']}")
@@ -62,8 +66,12 @@ def env_md() -> str:
         "| Name | Type | Default | Required | Secret | Service | Owner doc |",
         "|---|---|---|---|---|---|---|",
     ]
-    for model in (Settings, MigrateSettings):
+    seen: set[str] = set()
+    for model in (Settings, MigrateSettings, CliSettings):
         for name, f in _rows(model):
+            if name in seen:
+                continue
+            seen.add(name)
             extra = f.json_schema_extra if isinstance(f.json_schema_extra, dict) else {}
             out.append(
                 f"| `{name}` | `{_type(f)}` | `{_default(f)}` | "

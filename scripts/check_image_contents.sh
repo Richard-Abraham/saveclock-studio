@@ -24,7 +24,7 @@ elif [ "$kind" = api ]; then
   check "no ffmpeg in api image" '! command -v ffmpeg'
   check "no ffprobe in api image" '! command -v ffprobe'
   # the api image never imports the ML stack (plan 004) or the footage vetting stack (plan 005)
-  for mod in torch scipy soundfile beat_this transformers scenedetect cv2 PIL; do
+  for mod in torch scipy soundfile beat_this transformers scenedetect cv2 PIL mir_eval; do
     check "no $mod in api image" "! python -c 'import $mod' 2>/dev/null"
   done
 else
@@ -43,5 +43,6 @@ else
   check "SigLIP weights are safetensors, read-only and root-owned" '[ "$(stat -c %U:%a /opt/models/siglip/model.safetensors)" = root:444 ] && [ -z "$(find /opt/models -name "*.bin" -o -name "*.pt" -o -name "*.pth" -o -name "*.pkl")" ]'
   check "HF_HUB_OFFLINE=1" '[ "$HF_HUB_OFFLINE" = 1 ]'
   check "madmom is not installed" '! python -c "import madmom" 2>/dev/null'
+  check "mir_eval is not installed (eval tooling only, plan 009)" '! python -c "import mir_eval" 2>/dev/null'
 fi
 [ "$fail" = 0 ]

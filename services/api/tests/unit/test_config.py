@@ -1,7 +1,7 @@
 import pytest
 from pydantic import ValidationError
 
-from saveclock.config import COMPOSE_ONLY, MigrateSettings, Settings
+from saveclock.config import COMPOSE_ONLY, CliSettings, MigrateSettings, Settings
 
 BASE = {
     "APP_ENV": "local",
@@ -96,6 +96,7 @@ def test_inventory_parity_with_arch_18() -> None:
     ours = (
         {n.upper() for n in Settings.model_fields}
         | {n.upper() for n in MigrateSettings.model_fields}
+        | {n.upper() for n in CliSettings.model_fields}
         | {c.name for c in COMPOSE_ONLY}
     )
     compose_only = {c.name for c in COMPOSE_ONLY}
@@ -110,6 +111,7 @@ def test_inventory_parity_with_arch_18() -> None:
         "FAKE_STOCK_DIR",  # plan 005
         "LLM_MONTHLY_BUDGET_USD",  # plan 005
         "NEXT_PUBLIC_API_ORIGIN",  # plan 002 Branch B (OQ-26)
+        "DEV_DRIVER",  # plan 009
         # plan 003: the host backup script's variables (ARCH §18 only says BACKUP_*)
         "BACKUP_REPO",
         "BACKUP_STAGING_DIR",

@@ -1,0 +1,5 @@
+#!/usr/bin/env bash
+# The saveclock CLI (plan 009). `uv run --project` keeps the caller's working directory, so a
+# relative song path or --out means what the caller meant; readlink -f makes a symlinked install work.
+set -eu
+exec uv run --project "$(dirname "$(readlink -f "$0")")/../services/api" --locked --no-dev saveclock "$@"

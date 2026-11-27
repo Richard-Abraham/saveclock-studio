@@ -1,0 +1,437 @@
+{
+  "$defs": {
+    "ShowAnalysis": {
+      "additionalProperties": false,
+      "properties": {
+        "confidence": {
+          "$ref": "#/$defs/ShowConfidence"
+        },
+        "fallback": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Fallback"
+        },
+        "low_confidence_ranges": {
+          "items": {
+            "items": {
+              "type": "number"
+            },
+            "type": "array"
+          },
+          "title": "Low Confidence Ranges",
+          "type": "array"
+        },
+        "n_beats": {
+          "title": "N Beats",
+          "type": "integer"
+        },
+        "n_downbeats": {
+          "title": "N Downbeats",
+          "type": "integer"
+        },
+        "sections": {
+          "items": {
+            "$ref": "#/$defs/ShowSection"
+          },
+          "title": "Sections",
+          "type": "array"
+        },
+        "segment": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ShowSegment"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "tempo_bpm": {
+          "title": "Tempo Bpm",
+          "type": "number"
+        },
+        "tempo_octave_adjust": {
+          "title": "Tempo Octave Adjust",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "tempo_bpm",
+        "tempo_octave_adjust",
+        "confidence",
+        "fallback",
+        "n_beats",
+        "n_downbeats",
+        "sections",
+        "segment",
+        "low_confidence_ranges"
+      ],
+      "title": "ShowAnalysis",
+      "type": "object"
+    },
+    "ShowConfidence": {
+      "additionalProperties": false,
+      "properties": {
+        "band": {
+          "title": "Band",
+          "type": "string"
+        },
+        "reasons": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Reasons",
+          "type": "array"
+        },
+        "score": {
+          "title": "Score",
+          "type": "number"
+        }
+      },
+      "required": [
+        "score",
+        "band",
+        "reasons"
+      ],
+      "title": "ShowConfidence",
+      "type": "object"
+    },
+    "ShowKeywords": {
+      "additionalProperties": false,
+      "properties": {
+        "override": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Override"
+        },
+        "source": {
+          "title": "Source",
+          "type": "string"
+        }
+      },
+      "required": [
+        "source",
+        "override"
+      ],
+      "title": "ShowKeywords",
+      "type": "object"
+    },
+    "ShowPlan": {
+      "additionalProperties": false,
+      "properties": {
+        "frozen": {
+          "title": "Frozen",
+          "type": "boolean"
+        },
+        "n_cuts": {
+          "title": "N Cuts",
+          "type": "integer"
+        },
+        "total_frames": {
+          "title": "Total Frames",
+          "type": "integer"
+        },
+        "version": {
+          "title": "Version",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "version",
+        "frozen",
+        "total_frames",
+        "n_cuts"
+      ],
+      "title": "ShowPlan",
+      "type": "object"
+    },
+    "ShowProject": {
+      "additionalProperties": false,
+      "properties": {
+        "flags": {
+          "additionalProperties": true,
+          "title": "Flags",
+          "type": "object"
+        },
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "options": {
+          "additionalProperties": true,
+          "title": "Options",
+          "type": "object"
+        },
+        "status_reason": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Status Reason"
+        },
+        "title": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Title"
+        },
+        "ui_status": {
+          "title": "Ui Status",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "title",
+        "ui_status",
+        "status_reason",
+        "flags",
+        "options"
+      ],
+      "title": "ShowProject",
+      "type": "object"
+    },
+    "ShowRender": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "mode_a_state": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Mode A State"
+        },
+        "state": {
+          "title": "State",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "state",
+        "mode_a_state"
+      ],
+      "title": "ShowRender",
+      "type": "object"
+    },
+    "ShowSection": {
+      "additionalProperties": false,
+      "properties": {
+        "end_s": {
+          "title": "End S",
+          "type": "number"
+        },
+        "energy": {
+          "title": "Energy",
+          "type": "string"
+        },
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "label": {
+          "title": "Label",
+          "type": "string"
+        },
+        "start_s": {
+          "title": "Start S",
+          "type": "number"
+        }
+      },
+      "required": [
+        "id",
+        "start_s",
+        "end_s",
+        "label",
+        "energy"
+      ],
+      "title": "ShowSection",
+      "type": "object"
+    },
+    "ShowSegment": {
+      "additionalProperties": false,
+      "properties": {
+        "end_s": {
+          "title": "End S",
+          "type": "number"
+        },
+        "start_s": {
+          "title": "Start S",
+          "type": "number"
+        },
+        "total_frames": {
+          "title": "Total Frames",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "start_s",
+        "end_s",
+        "total_frames"
+      ],
+      "title": "ShowSegment",
+      "type": "object"
+    },
+    "ShowSong": {
+      "additionalProperties": false,
+      "properties": {
+        "channels": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Channels"
+        },
+        "codec": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Codec"
+        },
+        "duration_s": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Duration S"
+        },
+        "sample_rate": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Sample Rate"
+        }
+      },
+      "required": [
+        "duration_s",
+        "codec",
+        "sample_rate",
+        "channels"
+      ],
+      "title": "ShowSong",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "analysis": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/ShowAnalysis"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "keywords": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/ShowKeywords"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "plan": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/ShowPlan"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "project": {
+      "$ref": "#/$defs/ShowProject"
+    },
+    "render": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/ShowRender"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "schema_version": {
+      "const": "1",
+      "default": "1",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "song": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/ShowSong"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    }
+  },
+  "required": [
+    "project",
+    "song",
+    "analysis",
+    "keywords",
+    "plan",
+    "render"
+  ],
+  "title": "ShowOut",
+  "type": "object"
+}

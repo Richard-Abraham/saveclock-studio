@@ -1,0 +1,102 @@
+{
+  "$defs": {
+    "PlanCut": {
+      "additionalProperties": false,
+      "properties": {
+        "clip_id": {
+          "title": "Clip Id",
+          "type": "string"
+        },
+        "clip_provider": {
+          "title": "Clip Provider",
+          "type": "string"
+        },
+        "index": {
+          "title": "Index",
+          "type": "integer"
+        },
+        "keywords": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Keywords",
+          "type": "array"
+        },
+        "locked": {
+          "title": "Locked",
+          "type": "boolean"
+        },
+        "out_end_frame": {
+          "title": "Out End Frame",
+          "type": "integer"
+        },
+        "out_start_frame": {
+          "title": "Out Start Frame",
+          "type": "integer"
+        },
+        "section": {
+          "title": "Section",
+          "type": "string"
+        }
+      },
+      "required": [
+        "index",
+        "out_start_frame",
+        "out_end_frame",
+        "section",
+        "clip_provider",
+        "clip_id",
+        "keywords",
+        "locked"
+      ],
+      "title": "PlanCut",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "cuts": {
+      "items": {
+        "$ref": "#/$defs/PlanCut"
+      },
+      "title": "Cuts",
+      "type": "array"
+    },
+    "frozen": {
+      "title": "Frozen",
+      "type": "boolean"
+    },
+    "keyword_source": {
+      "title": "Keyword Source",
+      "type": "string"
+    },
+    "project_id": {
+      "title": "Project Id",
+      "type": "string"
+    },
+    "schema_version": {
+      "const": "1",
+      "default": "1",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "total_frames": {
+      "title": "Total Frames",
+      "type": "integer"
+    },
+    "version": {
+      "title": "Version",
+      "type": "integer"
+    }
+  },
+  "required": [
+    "project_id",
+    "version",
+    "frozen",
+    "total_frames",
+    "keyword_source",
+    "cuts"
+  ],
+  "title": "PlanCliOut",
+  "type": "object"
+}

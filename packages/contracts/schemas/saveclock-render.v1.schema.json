@@ -1,0 +1,130 @@
+{
+  "$defs": {
+    "VerifyLine": {
+      "additionalProperties": false,
+      "properties": {
+        "blocks": {
+          "title": "Blocks",
+          "type": "integer"
+        },
+        "failed_checks": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Failed Checks",
+          "type": "array"
+        },
+        "passed": {
+          "title": "Passed",
+          "type": "boolean"
+        },
+        "render_ms": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Render Ms"
+        },
+        "verify_ms": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Verify Ms"
+        },
+        "warns": {
+          "title": "Warns",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "passed",
+        "blocks",
+        "warns",
+        "failed_checks",
+        "render_ms",
+        "verify_ms"
+      ],
+      "title": "VerifyLine",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "error_code": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "title": "Error Code"
+    },
+    "plan_version": {
+      "anyOf": [
+        {
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "title": "Plan Version"
+    },
+    "project_id": {
+      "title": "Project Id",
+      "type": "string"
+    },
+    "render_id": {
+      "title": "Render Id",
+      "type": "string"
+    },
+    "schema_version": {
+      "const": "1",
+      "default": "1",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "state": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "title": "State"
+    },
+    "verify": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/VerifyLine"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    }
+  },
+  "required": [
+    "project_id",
+    "render_id",
+    "plan_version",
+    "state",
+    "error_code",
+    "verify"
+  ],
+  "title": "RenderCliOut",
+  "type": "object"
+}
