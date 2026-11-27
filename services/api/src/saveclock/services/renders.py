@@ -94,8 +94,6 @@ async def create_render(
     if project.status not in RENDERABLE:
         raise Conflict(ConflictReason.WRONG_STATE)
     blobs.ensure_free_space(int(plan.total_frames / FPS * ESTIMATE_BYTES_PER_S))  # 507
-    if any(not blobs.exists(k) for k in {c.clip.mezzanine_key for c in plan.cuts}):
-        raise Conflict(ConflictReason.INTERMEDIATES_MISSING)
     render_id, job_id = new_id(), new_id()
     try:
         await plans.freeze(user_id=user_id, project_id=project_id, version=row.version)
@@ -146,6 +144,8 @@ async def create_render(
 
 async def get_render(session: AsyncSession, user_id: UUID, render_id: UUID) -> RenderView:
     render = await _owned(session, user_id, render_id)
+    await ProjectRepository(session).touch(user_id=user_id, project_id=render.project_id)
+    await session.commit()  # reading a render is activity (ARCH §4 retention)
     renders = RenderRepository(session)
     plan = await renders.plan_row(user_id=user_id, render=render)
     return RenderView(
@@ -229,6 +229,8 @@ async def request_mode_a(
     """Queue the remux (P7-7): `NULL` or `failed` re-queues, `queued|running|ready` is returned as
     it is. Never creates a render and never touches the project."""
     render = await _owned(session, user_id, render_id)
+    await ProjectRepository(session).touch(user_id=user_id, project_id=render.project_id)
+    await session.commit()
     if render.state != RenderState.READY.value:
         raise Conflict(ConflictReason.NOT_READY)
     if render.mode_a_state in (

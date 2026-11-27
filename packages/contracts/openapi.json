@@ -556,15 +556,34 @@
         "title": "Cut",
         "type": "object"
       },
+      "DeleteAccepted": {
+        "additionalProperties": false,
+        "properties": {
+          "project_id": {
+            "format": "uuid",
+            "title": "Project Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "project_id"
+        ],
+        "title": "DeleteAccepted",
+        "type": "object"
+      },
       "Disk": {
         "additionalProperties": false,
         "properties": {
           "by_area": {
             "$ref": "#/components/schemas/ByArea"
           },
+          "low": {
+            "title": "Low",
+            "type": "boolean"
+          },
           "projects": {
             "items": {
-              "type": "string"
+              "$ref": "#/components/schemas/ProjectDisk"
             },
             "title": "Projects",
             "type": "array"
@@ -576,7 +595,8 @@
         "required": [
           "volume",
           "by_area",
-          "projects"
+          "projects",
+          "low"
         ],
         "title": "Disk",
         "type": "object"
@@ -742,6 +762,69 @@
           "checks"
         ],
         "title": "HealthReady",
+        "type": "object"
+      },
+      "HousekeepingAccepted": {
+        "additionalProperties": false,
+        "properties": {
+          "project_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Project Id"
+          },
+          "scope": {
+            "enum": [
+              "intermediates",
+              "abandoned_uploads",
+              "all"
+            ],
+            "title": "Scope",
+            "type": "string"
+          }
+        },
+        "required": [
+          "scope",
+          "project_id"
+        ],
+        "title": "HousekeepingAccepted",
+        "type": "object"
+      },
+      "HousekeepingRun": {
+        "additionalProperties": false,
+        "properties": {
+          "project_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Project Id"
+          },
+          "scope": {
+            "enum": [
+              "intermediates",
+              "abandoned_uploads",
+              "all"
+            ],
+            "title": "Scope",
+            "type": "string"
+          }
+        },
+        "required": [
+          "scope"
+        ],
+        "title": "HousekeepingRun",
         "type": "object"
       },
       "Keys": {
@@ -1247,6 +1330,49 @@
           "created_at"
         ],
         "title": "ProjectDetail",
+        "type": "object"
+      },
+      "ProjectDisk": {
+        "additionalProperties": false,
+        "properties": {
+          "bytes": {
+            "title": "Bytes",
+            "type": "integer"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "intermediate_bytes": {
+            "title": "Intermediate Bytes",
+            "type": "integer"
+          },
+          "last_activity_at": {
+            "format": "date-time",
+            "title": "Last Activity At",
+            "type": "string"
+          },
+          "title": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Title"
+          }
+        },
+        "required": [
+          "id",
+          "title",
+          "bytes",
+          "intermediate_bytes",
+          "last_activity_at"
+        ],
+        "title": "ProjectDisk",
         "type": "object"
       },
       "ProjectItem": {
@@ -2011,6 +2137,20 @@
         "title": "SettingsOut",
         "type": "object"
       },
+      "SettingsPut": {
+        "additionalProperties": false,
+        "properties": {
+          "pixabay_enabled": {
+            "title": "Pixabay Enabled",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "pixabay_enabled"
+        ],
+        "title": "SettingsPut",
+        "type": "object"
+      },
       "Song": {
         "additionalProperties": false,
         "properties": {
@@ -2115,117 +2255,6 @@
           "pixabay_enabled"
         ],
         "title": "Stock",
-        "type": "object"
-      },
-      "StubChain": {
-        "additionalProperties": false,
-        "properties": {
-          "hops": {
-            "items": {
-              "$ref": "#/components/schemas/StubHop"
-            },
-            "title": "Hops",
-            "type": "array"
-          },
-          "job_id": {
-            "format": "uuid",
-            "title": "Job Id",
-            "type": "string"
-          },
-          "project_id": {
-            "format": "uuid",
-            "title": "Project Id",
-            "type": "string"
-          }
-        },
-        "required": [
-          "job_id",
-          "project_id",
-          "hops"
-        ],
-        "title": "StubChain",
-        "type": "object"
-      },
-      "StubHop": {
-        "additionalProperties": false,
-        "properties": {
-          "attempt": {
-            "title": "Attempt",
-            "type": "integer"
-          },
-          "job_id": {
-            "format": "uuid",
-            "title": "Job Id",
-            "type": "string"
-          },
-          "queue": {
-            "title": "Queue",
-            "type": "string"
-          },
-          "run_ms": {
-            "anyOf": [
-              {
-                "type": "integer"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Run Ms"
-          },
-          "stage": {
-            "title": "Stage",
-            "type": "string"
-          },
-          "state": {
-            "title": "State",
-            "type": "string"
-          }
-        },
-        "required": [
-          "job_id",
-          "queue",
-          "stage",
-          "state",
-          "attempt",
-          "run_ms"
-        ],
-        "title": "StubHop",
-        "type": "object"
-      },
-      "StubJobIn": {
-        "additionalProperties": false,
-        "properties": {
-          "sleep_s": {
-            "default": 0,
-            "maximum": 30.0,
-            "minimum": 0.0,
-            "title": "Sleep S",
-            "type": "integer"
-          }
-        },
-        "title": "StubJobIn",
-        "type": "object"
-      },
-      "StubJobOut": {
-        "additionalProperties": false,
-        "properties": {
-          "job_id": {
-            "format": "uuid",
-            "title": "Job Id",
-            "type": "string"
-          },
-          "project_id": {
-            "format": "uuid",
-            "title": "Project Id",
-            "type": "string"
-          }
-        },
-        "required": [
-          "job_id",
-          "project_id"
-        ],
-        "title": "StubJobOut",
         "type": "object"
       },
       "Tuning": {
@@ -2459,237 +2488,6 @@
   },
   "openapi": "3.1.0",
   "paths": {
-    "/api/v1/_stub/jobs": {
-      "post": {
-        "operationId": "stub_create_job",
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/StubJobIn"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "202": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/StubJobOut"
-                }
-              }
-            },
-            "description": "Successful Response"
-          },
-          "403": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            },
-            "description": "forbidden; details.reason is one of host_not_allowed, origin_mismatch, cross_site"
-          },
-          "404": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            },
-            "description": "not found"
-          },
-          "422": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            },
-            "description": "validation_error (details.fields)"
-          },
-          "500": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            },
-            "description": "internal_error"
-          }
-        },
-        "summary": "Create",
-        "tags": [
-          "stub"
-        ]
-      }
-    },
-    "/api/v1/_stub/jobs/{job_id}": {
-      "get": {
-        "operationId": "stub_get_job",
-        "parameters": [
-          {
-            "in": "path",
-            "name": "job_id",
-            "required": true,
-            "schema": {
-              "format": "uuid",
-              "title": "Job Id",
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/StubChain"
-                }
-              }
-            },
-            "description": "Successful Response"
-          },
-          "403": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            },
-            "description": "forbidden; details.reason is one of host_not_allowed, origin_mismatch, cross_site"
-          },
-          "404": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            },
-            "description": "not found"
-          },
-          "422": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            },
-            "description": "validation_error (details.fields)"
-          },
-          "500": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            },
-            "description": "internal_error"
-          }
-        },
-        "summary": "Read",
-        "tags": [
-          "stub"
-        ]
-      }
-    },
-    "/api/v1/_stub/jobs/{job_id}/download": {
-      "get": {
-        "operationId": "stub_download",
-        "parameters": [
-          {
-            "in": "path",
-            "name": "job_id",
-            "required": true,
-            "schema": {
-              "format": "uuid",
-              "title": "Job Id",
-              "type": "string"
-            }
-          },
-          {
-            "in": "header",
-            "name": "range",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "Range"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "content": {
-              "application/json": {
-                "schema": {}
-              }
-            },
-            "description": "Successful Response"
-          },
-          "403": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            },
-            "description": "forbidden; details.reason is one of host_not_allowed, origin_mismatch, cross_site"
-          },
-          "404": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            },
-            "description": "not found"
-          },
-          "422": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            },
-            "description": "validation_error (details.fields)"
-          },
-          "500": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            },
-            "description": "internal_error"
-          }
-        },
-        "summary": "Download",
-        "tags": [
-          "stub"
-        ]
-      }
-    },
     "/api/v1/health/live": {
       "get": {
         "operationId": "health_live",
@@ -2819,6 +2617,88 @@
         "summary": "Ready",
         "tags": [
           "health"
+        ]
+      }
+    },
+    "/api/v1/housekeeping/run": {
+      "post": {
+        "description": "Sweep now. `intermediates` removes what is past the retention period (with `project_id`:\nthat project's intermediates, now); `abandoned_uploads` reaps leftover upload files; `all` is\nboth. 409 `job_active` while a sweep runs or the project has a job; 404 for a foreign\nproject.",
+        "operationId": "run_housekeeping",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/HousekeepingRun"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HousekeepingAccepted"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "forbidden; details.reason is one of host_not_allowed, origin_mismatch, cross_site"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "not found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "conflict; details.reason is one of not_ready, wrong_state, upload_in_progress, retry_limit, job_active, no_plan_yet, too_many_streams, render_active"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "validation_error (details.fields)"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "internal_error"
+          }
+        },
+        "summary": "Run",
+        "tags": [
+          "housekeeping"
         ]
       }
     },
@@ -2983,6 +2863,78 @@
       }
     },
     "/api/v1/projects/{project_id}": {
+      "delete": {
+        "description": "Delete the project now: jobs are cancelled, it leaves the list at once and every file and\nrow is removed within minutes. A second delete is 404.",
+        "operationId": "delete_project",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Project Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeleteAccepted"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "forbidden; details.reason is one of host_not_allowed, origin_mismatch, cross_site"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "not found"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "validation_error (details.fields)"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "internal_error"
+          }
+        },
+        "summary": "Delete",
+        "tags": [
+          "projects"
+        ]
+      },
       "get": {
         "operationId": "get_project",
         "parameters": [
@@ -3117,7 +3069,7 @@
                 }
               }
             },
-            "description": "conflict; details.reason is one of not_ready, wrong_state, upload_in_progress, retry_limit, job_active, no_plan_yet, too_many_streams, render_active, intermediates_missing"
+            "description": "conflict; details.reason is one of not_ready, wrong_state, upload_in_progress, retry_limit, job_active, no_plan_yet, too_many_streams, render_active"
           },
           "422": {
             "content": {
@@ -3201,7 +3153,7 @@
                 }
               }
             },
-            "description": "conflict; details.reason is one of not_ready, wrong_state, upload_in_progress, retry_limit, job_active, no_plan_yet, too_many_streams, render_active, intermediates_missing"
+            "description": "conflict; details.reason is one of not_ready, wrong_state, upload_in_progress, retry_limit, job_active, no_plan_yet, too_many_streams, render_active"
           },
           "422": {
             "content": {
@@ -3284,7 +3236,7 @@
                 }
               }
             },
-            "description": "conflict; details.reason is one of not_ready, wrong_state, upload_in_progress, retry_limit, job_active, no_plan_yet, too_many_streams, render_active, intermediates_missing"
+            "description": "conflict; details.reason is one of not_ready, wrong_state, upload_in_progress, retry_limit, job_active, no_plan_yet, too_many_streams, render_active"
           },
           "422": {
             "content": {
@@ -3368,7 +3320,7 @@
                 }
               }
             },
-            "description": "conflict; details.reason is one of not_ready, wrong_state, upload_in_progress, retry_limit, job_active, no_plan_yet, too_many_streams, render_active, intermediates_missing"
+            "description": "conflict; details.reason is one of not_ready, wrong_state, upload_in_progress, retry_limit, job_active, no_plan_yet, too_many_streams, render_active"
           },
           "422": {
             "content": {
@@ -3452,7 +3404,7 @@
                 }
               }
             },
-            "description": "conflict; details.reason is one of not_ready, wrong_state, upload_in_progress, retry_limit, job_active, no_plan_yet, too_many_streams, render_active, intermediates_missing"
+            "description": "conflict; details.reason is one of not_ready, wrong_state, upload_in_progress, retry_limit, job_active, no_plan_yet, too_many_streams, render_active"
           },
           "422": {
             "content": {
@@ -3553,7 +3505,7 @@
                 }
               }
             },
-            "description": "conflict; details.reason is one of not_ready, wrong_state, upload_in_progress, retry_limit, job_active, no_plan_yet, too_many_streams, render_active, intermediates_missing"
+            "description": "conflict; details.reason is one of not_ready, wrong_state, upload_in_progress, retry_limit, job_active, no_plan_yet, too_many_streams, render_active"
           },
           "422": {
             "content": {
@@ -3686,7 +3638,7 @@
     },
     "/api/v1/projects/{project_id}/renders": {
       "post": {
-        "description": "Freeze the plan (`plan_version`, default the latest) and render it: the silent master plus\nthe cut lists. An identical active or ready render is returned instead. 409 `conflict`\n(`wrong_state`, `job_active`, `intermediates_missing`, `no_plan_yet`), 507 low disk.",
+        "description": "Freeze the plan (`plan_version`, default the latest) and render it: the silent master plus\nthe cut lists. An identical active or ready render is returned instead. 409 `conflict`\n(`wrong_state`, `job_active`, `no_plan_yet`), 507 low disk. Swept clips are fetched again by\nthe job itself.",
         "operationId": "create_render",
         "parameters": [
           {
@@ -3756,7 +3708,7 @@
                 }
               }
             },
-            "description": "conflict; details.reason is one of not_ready, wrong_state, upload_in_progress, retry_limit, job_active, no_plan_yet, too_many_streams, render_active, intermediates_missing"
+            "description": "conflict; details.reason is one of not_ready, wrong_state, upload_in_progress, retry_limit, job_active, no_plan_yet, too_many_streams, render_active"
           },
           "422": {
             "content": {
@@ -3849,7 +3801,7 @@
                 }
               }
             },
-            "description": "conflict; details.reason is one of not_ready, wrong_state, upload_in_progress, retry_limit, job_active, no_plan_yet, too_many_streams, render_active, intermediates_missing"
+            "description": "conflict; details.reason is one of not_ready, wrong_state, upload_in_progress, retry_limit, job_active, no_plan_yet, too_many_streams, render_active"
           },
           "422": {
             "content": {
@@ -4002,7 +3954,7 @@
                 }
               }
             },
-            "description": "conflict; details.reason is one of not_ready, wrong_state, upload_in_progress, retry_limit, job_active, no_plan_yet, too_many_streams, render_active, intermediates_missing"
+            "description": "conflict; details.reason is one of not_ready, wrong_state, upload_in_progress, retry_limit, job_active, no_plan_yet, too_many_streams, render_active"
           },
           "413": {
             "content": {
@@ -4109,7 +4061,7 @@
                 }
               }
             },
-            "description": "conflict; details.reason is one of not_ready, wrong_state, upload_in_progress, retry_limit, job_active, no_plan_yet, too_many_streams, render_active, intermediates_missing"
+            "description": "conflict; details.reason is one of not_ready, wrong_state, upload_in_progress, retry_limit, job_active, no_plan_yet, too_many_streams, render_active"
           },
           "422": {
             "content": {
@@ -4265,7 +4217,7 @@
                 }
               }
             },
-            "description": "conflict; details.reason is one of not_ready, wrong_state, upload_in_progress, retry_limit, job_active, no_plan_yet, too_many_streams, render_active, intermediates_missing"
+            "description": "conflict; details.reason is one of not_ready, wrong_state, upload_in_progress, retry_limit, job_active, no_plan_yet, too_many_streams, render_active"
           },
           "422": {
             "content": {
@@ -4366,7 +4318,7 @@
                 }
               }
             },
-            "description": "conflict; details.reason is one of not_ready, wrong_state, upload_in_progress, retry_limit, job_active, no_plan_yet, too_many_streams, render_active, intermediates_missing"
+            "description": "conflict; details.reason is one of not_ready, wrong_state, upload_in_progress, retry_limit, job_active, no_plan_yet, too_many_streams, render_active"
           },
           "422": {
             "content": {
@@ -4450,7 +4402,7 @@
                 }
               }
             },
-            "description": "conflict; details.reason is one of not_ready, wrong_state, upload_in_progress, retry_limit, job_active, no_plan_yet, too_many_streams, render_active, intermediates_missing"
+            "description": "conflict; details.reason is one of not_ready, wrong_state, upload_in_progress, retry_limit, job_active, no_plan_yet, too_many_streams, render_active"
           },
           "422": {
             "content": {
@@ -4535,6 +4487,86 @@
           }
         },
         "summary": "Get ",
+        "tags": [
+          "settings"
+        ]
+      },
+      "put": {
+        "description": "Switch Pixabay on or off. 409 `pixabay_not_configured` when enabling without a key.",
+        "operationId": "put_settings",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SettingsPut"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SettingsOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "forbidden; details.reason is one of host_not_allowed, origin_mismatch, cross_site"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "not found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "conflict; details.reason is one of not_ready, wrong_state, upload_in_progress, retry_limit, job_active, no_plan_yet, too_many_streams, render_active"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "validation_error (details.fields)"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "internal_error"
+          }
+        },
+        "summary": "Put",
         "tags": [
           "settings"
         ]

@@ -7,6 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from saveclock.api.deps import current_user, get_deps, get_session
 from saveclock.api.schemas.common import CONFLICT_RESPONSE, ERROR_RESPONSES
 from saveclock.api.schemas.projects import (
+    DeleteAccepted,
     ProjectCreate,
     ProjectDetail,
     ProjectItem,
@@ -19,6 +20,7 @@ from saveclock.services import projects as svc
 from saveclock.services.identity import CurrentUser
 from saveclock.services.projects import DEFAULT_LIMIT, MAX_LIMIT, list_projects, ui_status
 from saveclock.services.renders import latest_render
+from saveclock.services.settings import project_disk
 
 router = APIRouter(prefix="/projects", tags=["projects"], responses=ERROR_RESPONSES)
 
@@ -37,17 +39,20 @@ async def _detail(session: AsyncSession, user: CurrentUser, project_id: UUID) ->
 async def list_(
     user: UserDep,
     session: SessionDep,
+    deps: DepsDep,
     limit: Annotated[int, Query(ge=1, le=MAX_LIMIT)] = DEFAULT_LIMIT,
     cursor: str | None = None,
 ) -> ProjectList:
     page = await list_projects(session, user.id, limit, cursor)
+    disk = await project_disk(
+        session, user.id, deps.blobs, deps.usage_cache, [p.id for p in page.items]
+    )
     items = [
         ProjectItem(
             id=p.id,
             title=p.title,
             ui_status=ui_status(p.status),
-            # shortcut: 0 until the BlobStore sweep reports usage, upgrade in T-2.11
-            disk_bytes=0,
+            disk_bytes=disk[p.id].total,
             last_activity_at=p.last_activity_at,
             created_at=p.created_at,
         )
@@ -105,3 +110,17 @@ async def retry(
 ) -> ProjectDetail:
     await svc.retry(session, user.id, project_id, deps.enqueuer, deps.publisher)
     return await _detail(session, user, project_id)
+
+
+@router.delete(
+    "/{project_id}",
+    operation_id="delete_project",
+    status_code=status.HTTP_202_ACCEPTED,
+)
+async def delete(
+    project_id: UUID, user: UserDep, session: SessionDep, deps: DepsDep
+) -> DeleteAccepted:
+    """Delete the project now: jobs are cancelled, it leaves the list at once and every file and
+    row is removed within minutes. A second delete is 404."""
+    await svc.delete_project(session, user.id, project_id, deps.enqueuer)
+    return DeleteAccepted(project_id=project_id)

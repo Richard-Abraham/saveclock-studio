@@ -14,7 +14,6 @@ from saveclock.adapters.blobstore.blob_keys import (
     render_file_key,
     song_incoming_key,
     song_source_key,
-    stub_key,
     validate_key,
     work_key,
 )
@@ -75,7 +74,6 @@ def test_key_builders() -> None:
     assert song_incoming_key(PID) == f"songs/{PID}/incoming.bin"
     assert work_key(PID, "raw", "pexels_1.mp4") == f"work/{PID}/raw/pexels_1.mp4"
     assert render_file_key(PID, "master.mp4") == f"renders/{PID}/master.mp4"
-    assert stub_key(PID) == f"renders/{PID}/stub.txt"
     assert canonical_key(PID) == f"work/{PID}/canonical.flac"
     with pytest.raises(InvalidKey):
         song_source_key(PID, "../x")
@@ -90,7 +88,6 @@ def test_key_builders() -> None:
     ("key", "servable"),
     [
         (f"renders/{PID}/master.mp4", True),
-        (f"renders/{PID}/stub.txt", True),
         (f"renders/{PID}/cutlist.csv", True),
         (f"work/{PID}/proxy/pexels_9.mp4", True),
         (f"work/{PID}/audio_proxy.m4a", True),

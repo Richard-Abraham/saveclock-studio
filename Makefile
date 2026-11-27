@@ -21,15 +21,15 @@ TRIVY := ghcr.io/aquasecurity/trivy@sha256:6e7f515a46af13a01d534734c666261de65c6
 
 # Stages, in order; the first failure stops the run and names the stage.
 FAST_STAGES := guard help-lint tooling-test secrets banned toolchain env-docs-check fmt-check lint types arch pins \
-  compose-lint test-deps-up ffmpeg-bin test migrations web-install contracts-check audit \
+  compose-lint test-deps-up ffmpeg-bin test security-pytest migrations web-install contracts-check audit \
   web-env web-lint web-test web-build bundle-scan web-audit-prod
-CHECK_STAGES := $(FAST_STAGES) golden images image-guards hadolint
+CHECK_STAGES := $(FAST_STAGES) golden images image-guards security-container hadolint
 
 .PHONY: help help-lint tooling-test rollback toolchain doctor-dev guard secrets banned doctor fmt-check lint types arch pins compose-lint test golden \
   migrations audit env env-docs env-docs-check contracts contracts-check test-deps-up \
   test-deps-down ffmpeg-cache ffmpeg-bin models-cache test-ml fake-stock images image-guards hadolint scan-images up dev down \
   down-volumes sandbox check-fast check web-install web-env web-lint web-test web-build \
-  bundle-scan web-audit-prod measure-rewrite smoke-web web-audit stack-up seed smoke-stub \
+  bundle-scan web-audit-prod measure-rewrite smoke-web web-audit stack-up seed smoke-stack security-pytest security-container security-pass hostile-corpus \
   predeploy-scan backup backup-init backup-test restore-proof backup-install-timer backup-timer-uninstall rollback-demo fresh-clone-timing
 
 help: ## list every public target with a one-line description
@@ -95,7 +95,7 @@ test-deps-down: ## stop the test postgres and redis
 	$(COMPOSE_TEST) down
 
 test: ## run the unit and integration tests with coverage floors
-	$(UV) run pytest -q -m "not golden and not live and not ml and not migration_roundtrip" --cov --cov-branch \
+	$(UV) run pytest -q -m "not golden and not live and not ml and not migration_roundtrip and not security" --cov --cov-branch \
 	  --cov-report=json:coverage.json --cov-fail-under=85
 	python3 scripts/cov_floors.py
 
@@ -103,6 +103,19 @@ test: ## run the unit and integration tests with coverage floors
 # plan 006's golden plan frames. Needs the pinned FFmpeg (ffmpeg-bin) and the test deps (test-deps-up).
 golden: ## run the golden tests: frame-exact render, Mode A offsets, sync canary (needs ffmpeg-bin and the test deps)
 	$(UV) run pytest -q -s -m golden
+
+# plan 008: hostile media, the route matrix, path containment; real FFmpeg, no mocks
+hostile-corpus: ffmpeg-bin ## write the hostile media corpus into .data/hostile (git-ignored, generated, never downloaded)
+	$(UV) run python ../../eval/scripts/make_hostile_corpus.py ../../.data/hostile --ffmpeg ../../.data/ffmpeg/ffmpeg
+
+security-pytest: ## run the security tests: hostile corpus, route matrix, path containment (needs ffmpeg-bin and the test deps)
+	$(UV) run pytest -q -s -m security
+
+security-container: ## run FFmpeg's sandbox checks inside the built worker image (needs make images)
+	bash scripts/test_container_ffmpeg.sh
+
+security-pass: security-pytest security-container ## run every security check
+	@echo "SECURITY PASS OK"
 
 # the real Beat This model on a generated click track; needs the worker's ml extra and the weights
 test-ml: ## run the real Beat This test (needs the ml extra and the weights)
@@ -288,11 +301,11 @@ web-audit: guard ## run Lighthouse on the running web shell
 # These need the running stack. PROJECT=<name> picks the compose project; API_PORT/WEB_PORT the ports.
 STACK_ENV = PROJECT=$(PROJECT) CONTAINER=$(CONTAINER) COMPOSE="$(COMPOSE)" API_PORT=$(API_PORT) WEB_PORT=$(WEB_PORT)
 
-seed: ## add one stub project to the running stack
-	python3 scripts/smoke_stub.py --seed --web http://localhost:$(WEB_PORT) --api http://127.0.0.1:$(API_PORT)
+seed: ## add the analysed click-track project to the running stack (needs make images; prints created or exists)
+	$(STACK_ENV) bash scripts/seed.sh
 
-smoke-stub: ## push a stub job through every hop
-	COMPOSE="$(COMPOSE)" python3 scripts/smoke_stub.py --web http://localhost:$(WEB_PORT) \
+smoke-stack: ## smoke-test the running stack: create, list, guards, logs, delete
+	COMPOSE="$(COMPOSE)" python3 scripts/smoke_stack.py --web http://localhost:$(WEB_PORT) \
 	  --api http://127.0.0.1:$(API_PORT)
 
 predeploy-scan: ## scan what is about to leave the machine

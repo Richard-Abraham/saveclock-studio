@@ -1,4 +1,6 @@
+from datetime import datetime
 from typing import Literal
+from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict
 
@@ -47,10 +49,19 @@ class ByArea(_Model):
     renders: int
 
 
+class ProjectDisk(_Model):
+    id: UUID
+    title: str | None
+    bytes: int  # kept until the owner deletes the project: the song and every render
+    intermediate_bytes: int  # work/{id}: swept after the retention period, rebuilt on demand
+    last_activity_at: datetime
+
+
 class Disk(_Model):
     volume: Volume
     by_area: ByArea
-    projects: list[str]  # per-project rows arrive in Phase 2/4; always empty now
+    projects: list[ProjectDisk]  # at most 100, biggest first
+    low: bool  # free space is under DISK_LOW_WATERMARK_GB
 
 
 class SettingsOut(_Model):
@@ -59,3 +70,9 @@ class SettingsOut(_Model):
     tuning: Tuning | None
     disk: Disk
     intermediate_ttl_days: int
+
+
+class SettingsPut(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    pixabay_enabled: bool

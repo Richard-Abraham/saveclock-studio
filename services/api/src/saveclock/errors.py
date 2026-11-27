@@ -77,7 +77,6 @@ class ConflictReason(StrEnum):
     NO_PLAN_YET = "no_plan_yet"
     TOO_MANY_STREAMS = "too_many_streams"
     RENDER_ACTIVE = "render_active"  # a replan-fetch while a render runs (P6-11)
-    INTERMEDIATES_MISSING = "intermediates_missing"  # a mezzanine of the plan is gone (plan 008)
 
 
 # ARCH §7: which codes a client (or the job runner) may retry; derived from the code, no column.
@@ -203,6 +202,15 @@ class RangeNotSatisfiable(BadRequest):
         super().__init__(
             "range not satisfiable", {"size": size}, {"content-range": f"bytes */{size}"}
         )
+
+
+class PixabayNotConfigured(AppError):
+    """`PUT /settings` enabled Pixabay while no key is configured on the worker."""
+
+    code = ErrorCode.PIXABAY_NOT_CONFIGURED
+
+    def __init__(self) -> None:
+        super().__init__("no Pixabay key is configured")
 
 
 class StockUnavailable(AppError):

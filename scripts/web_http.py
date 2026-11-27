@@ -23,7 +23,7 @@ def fetch(
         conn.close()
 
 
-def preflight(base: str, origin: str, path: str = "/api/v1/_stub/upload-sink") -> tuple[int, str | None]:
+def preflight(base: str, origin: str, path: str = "/api/v1/_measure/upload-sink") -> tuple[int, str | None]:
     """CORS preflight as the browser sends it: (status, Access-Control-Allow-Origin or None)."""
     status, headers, _ = fetch(
         base,

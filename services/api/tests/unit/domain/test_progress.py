@@ -6,12 +6,14 @@ import pytest
 from saveclock.domain import events, progress
 from saveclock.models import ProjectStatus
 
+RESTORING = "restoring_clips"
 # ARCH §12, copied by hand: the UX step, the project status it belongs to
 ARCH_STEPS = [
     ("checking_file", "validating"),
     ("finding_beat", "analyzing"),
     ("choosing_clips", "planning"),
     ("building_draft", "planning"),
+    ("restoring_clips", "rendering"),  # plan 008: before the encode, on a swept project
     ("rendering", "rendering"),  # plan 007: a render and a remux restart the bar
     ("verifying", "rendering"),
     ("remuxing", "ready"),
@@ -29,6 +31,7 @@ def test_message_keys_are_i18n_keys_not_text() -> None:
         "progress.finding_beat",
         "progress.choosing_clips",
         "progress.building_draft",
+        "progress.restoring_clips",
         "progress.rendering",
         "progress.verifying",
         "progress.remuxing",
@@ -39,6 +42,8 @@ def pipelines() -> list[list[progress.Step]]:
     """The steps split where a bar restarts at 0: draft, render, remux."""
     out: list[list[progress.Step]] = []
     for s in progress.STEPS:
+        if s.key == RESTORING:  # an overlay on the render's bar, not a pipeline of its own
+            continue
         if s.lo == 0:
             out.append([])
         out[-1].append(s)
@@ -112,3 +117,9 @@ def test_every_event_type_has_a_class_and_the_terminal_ones_are_named() -> None:
     assert [e.type for e in made] == list(events.EVENT_TYPES)
     assert {"failed", "render_ready", "mode_a_ready"} == events.TERMINAL
     assert json.loads(events.to_wire(made[-1]))["data"]["retryable"] is True
+
+
+def test_restoring_clips_sits_under_the_render_and_the_bar_never_goes_back() -> None:
+    restoring, rendering = progress.BY_KEY[RESTORING], progress.BY_KEY["rendering"]
+    assert (restoring.lo, restoring.hi, restoring.status) == (0, 20, "rendering")
+    assert restoring.hi < rendering.hi  # the encode passes it; the emitter keeps the maximum

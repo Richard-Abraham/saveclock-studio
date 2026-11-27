@@ -3,12 +3,12 @@ from datetime import datetime, timedelta
 from typing import Any
 from uuid import UUID
 
-from sqlalchemy import and_, func, or_, select, update
+from sqlalchemy import and_, delete, exists, func, or_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from saveclock.domain.states import can_transition
 from saveclock.ids import new_id
-from saveclock.models import Project, ProjectStatus
+from saveclock.models import Job, JobState, Project, ProjectStatus
 
 
 class ProjectRepository:
@@ -36,6 +36,13 @@ class ProjectRepository:
             )
         return list((await self.session.scalars(stmt)).all())
 
+    async def list_all(self, *, user_id: UUID) -> Sequence[Project]:
+        """Every live project of the user (the Settings disk table)."""
+        stmt = select(Project).where(
+            Project.user_id == user_id, Project.status != ProjectStatus.DELETED.value
+        )
+        return list((await self.session.scalars(stmt)).all())
+
     async def get(self, *, user_id: UUID, project_id: UUID) -> Project | None:
         stmt = select(Project).where(Project.id == project_id, Project.user_id == user_id)
         return (await self.session.scalars(stmt)).one_or_none()
@@ -59,19 +66,29 @@ class ProjectRepository:
     ) -> bool:
         """`UPDATE ... WHERE status = :from`: False means 0 rows (a lost race, or not the user's).
 
-        An edge that ARCH §4 does not draw is a programming error and raises.
+        An edge that ARCH §4 does not draw is a programming error and raises. Every status change
+        is activity (`last_activity_at`, so upload, retry, replan and render keep a project out of
+        the sweep); `to == deleted` also stamps `deleted_at`.
         """
         sources = [from_] if isinstance(from_, str) else list(from_)
         for source in sources:
             if not can_transition(source, to):
                 msg = f"undrawn transition {source} -> {to}"
                 raise ValueError(msg)
+        values: dict[str, Any] = {
+            "status": to,
+            "status_reason": reason,
+            "updated_at": func.now(),
+            "last_activity_at": func.now(),
+        }
+        if to == ProjectStatus.DELETED.value:
+            values["deleted_at"] = func.now()
         stmt = (
             update(Project)
             .where(
                 Project.id == project_id, Project.user_id == user_id, Project.status.in_(sources)
             )
-            .values(status=to, status_reason=reason, updated_at=func.now())
+            .values(**values)
             .execution_options(synchronize_session=False)
         )
         return bool((await self.session.execute(stmt)).rowcount)  # type: ignore[attr-defined]
@@ -143,5 +160,77 @@ class ProjectRepository:
             )
             .values(manual_retries=Project.manual_retries + 1)
             .execution_options(synchronize_session=False)
+        )
+        return bool((await self.session.execute(stmt)).rowcount)  # type: ignore[attr-defined]
+
+    async def mark_intermediates_restored(self, *, user_id: UUID, project_id: UUID) -> None:
+        """Rehydration wrote `work/` again: it is eligible for the next sweep (P8-16)."""
+        stmt = (
+            update(Project)
+            .where(Project.id == project_id, Project.user_id == user_id)
+            .values(intermediates_purged_at=None, last_activity_at=func.now())
+            .execution_options(synchronize_session=False)
+        )
+        await self.session.execute(stmt)
+
+    async def mark_intermediates_purged(self, *, user_id: UUID, project_id: UUID) -> None:
+        stmt = (
+            update(Project)
+            .where(Project.id == project_id, Project.user_id == user_id)
+            .values(intermediates_purged_at=func.now())
+            .execution_options(synchronize_session=False)
+        )
+        await self.session.execute(stmt)
+
+    async def sweep_candidates(self, *, user_id: UUID, cutoff: datetime) -> Sequence[Project]:
+        """Projects whose intermediates are due: idle since before `cutoff`, not purged yet, not
+        deleted (a purge handles those) and with no queued or running job."""
+        active = exists().where(
+            Job.project_id == Project.id,
+            Job.state.in_([JobState.QUEUED.value, JobState.RUNNING.value]),
+        )
+        stmt = select(Project).where(
+            Project.user_id == user_id,
+            Project.intermediates_purged_at.is_(None),
+            Project.last_activity_at < cutoff,
+            Project.status != ProjectStatus.DELETED.value,
+            ~active,
+        )
+        return list((await self.session.scalars(stmt)).all())
+
+    async def has_active_job(self, *, user_id: UUID, project_id: UUID) -> bool:
+        stmt = select(
+            exists().where(
+                Job.project_id == project_id,
+                Job.state.in_([JobState.QUEUED.value, JobState.RUNNING.value]),
+                Job.project_id.in_(select(Project.id).where(Project.user_id == user_id)),
+            )
+        )
+        return bool(await self.session.scalar(stmt))
+
+    async def list_deleted(self, *, user_id: UUID) -> Sequence[Project]:
+        stmt = select(Project).where(
+            Project.user_id == user_id, Project.status == ProjectStatus.DELETED.value
+        )
+        return list((await self.session.scalars(stmt)).all())
+
+    async def list_ids(self, *, user_id: UUID) -> set[UUID]:
+        """Every project id of the user, deleted included (the orphan reconcile)."""
+        stmt = select(Project.id).where(Project.user_id == user_id)
+        return set((await self.session.scalars(stmt)).all())
+
+    async def list_with_status(
+        self, *, user_id: UUID, statuses: Sequence[str]
+    ) -> Sequence[Project]:
+        stmt = select(Project).where(Project.user_id == user_id, Project.status.in_(statuses))
+        return list((await self.session.scalars(stmt)).all())
+
+    async def hard_delete(self, *, user_id: UUID, project_id: UUID) -> bool:
+        """Removes the row (every child table cascades). Only a `deleted` project: anything else
+        is a programming error and deletes nothing."""
+        stmt = delete(Project).where(
+            Project.id == project_id,
+            Project.user_id == user_id,
+            Project.status == ProjectStatus.DELETED.value,
         )
         return bool((await self.session.execute(stmt)).rowcount)  # type: ignore[attr-defined]

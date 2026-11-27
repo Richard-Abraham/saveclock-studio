@@ -19,13 +19,9 @@ from saveclock.adapters.events import EventPublisher
 from saveclock.adapters.ffmpeg import Tools
 from saveclock.adapters.queue import DramatiqEnqueuer
 from saveclock.config import Settings
-from saveclock.models import JobQueue, JobStage, ProjectStatus
-from saveclock.repositories.jobs import JobRepository
-from saveclock.repositories.plans import PlanRepository
-from saveclock.services import project_state
+from saveclock.models import JobQueue
 from saveclock.services.context import WorkerContext
-from saveclock.services.plans import restore_keywords_override
-from saveclock.services.render_job import render_job_died
+from saveclock.services.pipeline_failure import job_died
 
 log = structlog.get_logger()
 
@@ -43,15 +39,20 @@ def actor_options(
     max_retries: int = MAX_RETRIES,
     min_backoff_ms: int = MIN_BACKOFF_MS,
     max_backoff_ms: int = MAX_BACKOFF_MS,
+    on_retry_exhausted: str | None = FAILED_ACTOR,
 ) -> dict[str, Any]:
-    return {
+    """`on_retry_exhausted=None` omits the hook: it unpacks `(job_id, user_id)`, which a
+    maintenance message does not carry."""
+    options: dict[str, Any] = {
         "queue_name": queue.value,
         "max_retries": max_retries,
         "min_backoff": min_backoff_ms,
         "max_backoff": max_backoff_ms,
         "time_limit": time_limit_ms,
-        "on_retry_exhausted": FAILED_ACTOR,
     }
+    if on_retry_exhausted is not None:
+        options["on_retry_exhausted"] = on_retry_exhausted
+    return options
 
 
 def run_with_context(
@@ -60,7 +61,7 @@ def run_with_context(
     blobs: FilesystemBlobStore,
     body: Any,  # noqa: ANN401
 ) -> None:
-    """One event loop and one NullPool engine per message (the stub's shortcut, kept)."""
+    """One event loop and one NullPool engine per message (a shortcut: no shared loop or pool)."""
 
     async def go() -> None:
         engine = create_async_engine(settings.database_url.get_secret_value(), poolclass=NullPool)
@@ -83,8 +84,7 @@ def run_with_context(
 
 
 def register_failure_hook(broker: dramatiq.Broker, settings: Settings) -> None:
-    """Retries exhausted: the job is dead and the project failed (`validating|analyzing` only).
-    A render or remux job also ends its render (`services.render_job.render_job_died`)."""
+    """Retries exhausted: `services.pipeline_failure.job_died` ends the job, fails the project."""
 
     def pipeline_failed(message_data: dict[str, Any], _exception_data: dict[str, Any]) -> None:
         job_id, user_id = (UUID(a) for a in message_data["args"])
@@ -96,44 +96,7 @@ def register_failure_hook(broker: dramatiq.Broker, settings: Settings) -> None:
             publisher = EventPublisher(sync=Redis.from_url(settings.redis_url.get_secret_value()))
             try:
                 async with async_sessionmaker(engine, expire_on_commit=False)() as session:
-                    jobs = JobRepository(session)
-                    job = await jobs.get(user_id=user_id, job_id=job_id)
-                    await jobs.mark_dead(user_id=user_id, job_id=job_id)
-                    if job is not None and job.project_id is not None:
-                        planned = (
-                            await PlanRepository(session).latest(
-                                user_id=user_id, project_id=job.project_id
-                            )
-                            is not None
-                        )
-                        # a replan that dies keeps the plan the owner had (and drops its keywords)
-                        planning_to = (
-                            ProjectStatus.DRAFT_READY if planned else ProjectStatus.FAILED_PLAN
-                        )
-                        for from_, to in (
-                            (ProjectStatus.VALIDATING, ProjectStatus.FAILED_ANALYSIS),
-                            (ProjectStatus.ANALYZING, ProjectStatus.FAILED_ANALYSIS),
-                            (ProjectStatus.PLANNING, planning_to),  # the draft job
-                        ):
-                            moved = await project_state.transition(
-                                session,
-                                publisher,
-                                user_id=user_id,
-                                project_id=job.project_id,
-                                from_=from_.value,
-                                to=to.value,
-                                reason="retries_exhausted",
-                                commit=False,
-                            )
-                            if moved and planned and to is ProjectStatus.DRAFT_READY:
-                                await restore_keywords_override(session, user_id, job.project_id)
-                    if job is not None and job.stage in {
-                        JobStage.RENDER.value,
-                        JobStage.REMUX.value,
-                    }:
-                        await render_job_died(session, publisher, user_id, job)  # plan 007
-                    await session.commit()
-                    await project_state.announce_pending(session, publisher)
+                    await job_died(session, publisher, user_id, job_id)
             finally:
                 publisher.close()
                 await engine.dispose()

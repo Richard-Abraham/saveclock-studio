@@ -80,7 +80,7 @@ class FilesystemBlobStore:
             raise NotFound from None
         if not statmod.S_ISREG(st.st_mode):
             raise NotFound
-        return BlobStat(size=st.st_size)
+        return BlobStat(size=st.st_size, mtime=st.st_mtime)
 
     def exists(self, key: str) -> bool:
         try:

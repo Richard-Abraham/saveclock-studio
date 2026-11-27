@@ -68,7 +68,7 @@ echo "running $name_r (version $(api_version))"
 [[ "$name_r" == *saveclock-api:$A ]] || { echo "FAIL: rollback left $name_r running, want $A"; exit 1; }
 [ "$id_r" = "$id_a" ] || { echo "FAIL: rollback image id differs from the original"; exit 1; }
 [ "$(api_version)" = "$A" ] || { echo "FAIL: worker logs show version $(api_version), want $A"; exit 1; }
-COMPOSE="$COMPOSE" python3 scripts/smoke_stub.py --web "http://localhost:${WEB_PORT:-3000}" \
+COMPOSE="$COMPOSE" python3 scripts/smoke_stack.py --web "http://localhost:${WEB_PORT:-3000}" \
   --api "http://127.0.0.1:$API_PORT" | tail -1
 
 DONE=1

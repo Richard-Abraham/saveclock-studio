@@ -21,6 +21,9 @@ PATHS = (
     # plan 007: the verification decisions and the download service
     "saveclock/domain/verify.py",
     "saveclock/services/downloads.py",
+    # plan 008: what is swept and what is fetched again
+    "saveclock/services/housekeeping.py",
+    "saveclock/services/rehydrate.py",
 )
 REPORT = Path(__file__).resolve().parent.parent / "services" / "api" / "coverage.json"
 

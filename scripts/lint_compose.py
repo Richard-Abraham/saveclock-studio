@@ -14,8 +14,9 @@ PORT_OK = (
     re.compile(r"\$\{BIND_ADDR:-127\.0\.0\.1\}:\$\{WEB_PORT:-3000\}:3000"),
     re.compile(r"127\.0\.0\.1:\d+:\d+"),
 )
-# empty thread counts reach libraries as a bad value (compose "Phase 2 adds ..." note): leave them out
-THREAD_VARS = {"FFMPEG_THREADS", "TORCH_THREADS", "OMP_NUM_THREADS"}
+# libraries read these directly and choke on an empty value: the launcher sets them, never compose
+THREAD_VARS = {"OMP_NUM_THREADS", "MKL_NUM_THREADS"}
+SHELLS = {"sh", "bash", "zsh", "dash"}
 EXPECTED = {
     "compose.yml": {"postgres", "redis", "migrate", "api", "web", "worker", "worker-maint"},
     "compose.test.yml": {"postgres", "redis"},
@@ -72,9 +73,11 @@ def lint(path: Path) -> list[str]:
             if keys and name != "worker":
                 problems.append(f"{name}: provider keys may only reach the worker ({keys})")
         for key in THREAD_VARS & set(svc.get("environment") or {}):
-            value = str(svc["environment"][key])
-            if value.strip() == "" or value.endswith(":-}"):
-                problems.append(f"{name}: {key} must not be passed as an empty string")
+            problems.append(f"{name}: {key} is set by the launcher, never by compose")
+        command = svc.get("command")
+        if name in {"worker", "worker-maint"} and isinstance(command, list):
+            if command and str(command[0]).split("/")[-1] in SHELLS:
+                problems.append(f"{name}: the command must be the launcher list, not a shell")
         for volume in svc.get("volumes", []) or []:
             source = volume if isinstance(volume, str) else str(volume.get("source", ""))
             if "docker.sock" in source or "podman.sock" in source:

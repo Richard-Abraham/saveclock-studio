@@ -9,38 +9,11 @@ from saveclock.adapters.db import create_engine, create_sessionmaker
 from saveclock.ids import new_id
 from saveclock.repositories.projects import ProjectRepository
 from saveclock.services.identity import OWNER_USER_ID
-from tests.integration.conftest import ApiEnv, Db
+from tests.integration.conftest import ApiEnv, Db, insert_project, insert_user
 
 pytestmark = pytest.mark.integration
 
 BASE = datetime(2026, 1, 1, tzinfo=UTC)
-
-
-async def insert_user(db: Db, user_id: UUID, email: str) -> None:
-    conn = await asyncpg.connect(db.raw("postgres"))
-    try:
-        await conn.execute("INSERT INTO users (id, email) VALUES ($1, $2)", user_id, email)
-    finally:
-        await conn.close()
-
-
-async def insert_project(
-    db: Db, user_id: UUID, title: str, created_at: datetime, status: str = "created"
-) -> UUID:
-    pid = new_id()
-    conn = await asyncpg.connect(db.raw("postgres"))
-    try:
-        await conn.execute(
-            "INSERT INTO projects (id, user_id, title, status, created_at) VALUES ($1,$2,$3,$4,$5)",
-            pid,
-            user_id,
-            title,
-            status,
-            created_at,
-        )
-    finally:
-        await conn.close()
-    return pid
 
 
 async def test_empty_list_body(api_client: httpx.AsyncClient) -> None:

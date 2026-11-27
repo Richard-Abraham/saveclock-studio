@@ -13,6 +13,7 @@ from saveclock.adapters.stock.port import StockClip, pick_file_width
 from saveclock.errors import StockUnavailable
 
 SEARCH_URL = "https://api.pexels.com/videos/search"
+VIDEO_URL = "https://api.pexels.com/videos/videos/"  # + id (rehydration, plan 008)
 LICENSE = "Pexels License"
 # The documented `size` is a MINIMUM: large = 4K, medium = Full HD, small = HD. The plan said
 # `large`, which would keep only 4K clips; `medium` matches the "closest to 1080" rule below.
@@ -89,6 +90,22 @@ class PexelsProvider:
             ) from None
         self._cache.set(params, clips)
         return clips
+
+    def video_by_id(self, provider_id: str) -> StockClip | None:
+        """`GET /videos/videos/{id}`; a 404 or a clip with no usable file is None (gone)."""
+        data = self._http.get_json(
+            f"{VIDEO_URL}{provider_id}",
+            params={},
+            headers={"Authorization": self._key},
+            not_found_ok=True,
+        )
+        try:
+            clips = parse_videos({"videos": [data]}) if data else []
+        except (KeyError, TypeError, ValueError, AttributeError):
+            raise StockUnavailable(
+                "stock provider sent a malformed answer", {"reason": "bad_body"}
+            ) from None
+        return clips[0] if clips and clips[0].provider_id == provider_id else None
 
     def download(
         self,

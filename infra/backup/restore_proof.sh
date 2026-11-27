@@ -97,8 +97,7 @@ while :; do  # follow the cursor: the list is paged (100 per page at most)
   page="$(curl -s -G --data-urlencode "cursor=$cursor" 'http://127.0.0.1:18000/api/v1/projects?limit=100')"
 done
 title="$(printf '%s' "$projects_json" | jq -r '.items[0].title // empty')"
-stub="$(grep -o 'renders/[0-9a-f-]*/stub.txt' "$STAGING_DIR/manifest.sha256" | head -1 || true)"
-stub_id="$(basename "$(dirname "${stub:-x/none/y}")")"
+first_id="$(printf '%s' "$projects_json" | jq -r '.items[0].id // empty')"
 owners="$($COMPOSE exec -T postgres psql -U postgres -d saveclock -Atc 'select count(*) from users' | tr -d '[:space:]')"
 
 ck "scratch api /health/ready is 200" test "$(http_code http://127.0.0.1:18000/api/v1/health/ready)" = 200
@@ -113,8 +112,8 @@ want_files="$(jq -r .blob_files "$counts")"
 ok_files="$(grep -c ': OK$' "$WORK/manifest.out" || true)"
 ck "counts.json blob_files ($want_files) is >= 1 and equals the OK lines of sha256sum -c ($ok_files)" \
   test "$want_files" -ge 1 -a "$want_files" = "$ok_files"
-ck "the stub download through the scratch API is the literal body" \
-  test "$(curl -s "http://127.0.0.1:18000/api/v1/_stub/jobs/$stub_id/download")" = "stub job $stub_id"
+ck "the first project's analysis through the scratch API is 200 (the database restore)" \
+  test "$(http_code "http://127.0.0.1:18000/api/v1/projects/${first_id:-none}/analysis")" = 200
 ck "exactly one owner row (users=$owners)" test "$owners" = 1
 ck "GET /settings is 200" test "$(http_code http://127.0.0.1:18000/api/v1/settings)" = 200
 

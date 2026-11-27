@@ -139,10 +139,7 @@ services:
 
   worker:
     image: saveclock-worker:${IMAGE_TAG:-local}
-    command:
-      - sh
-      - -c
-      - exec dramatiq saveclock.workers.main --processes 1 --threads "$${FETCH_CONCURRENCY:-4}" --queues analysis fetch render
+    command: ["python", "-m", "saveclock.workers.launch", "--queues", "analysis", "fetch", "render"]
     environment:
       APP_ENV: "${APP_ENV:-local}"
       APP_VERSION: "${IMAGE_TAG:-local}"
@@ -150,10 +147,12 @@ services:
       DATABASE_URL: "postgresql+asyncpg://app_rw:${POSTGRES_APP_PASSWORD}@postgres:5432/saveclock"
       REDIS_URL: "redis://:${REDIS_PASSWORD}@redis:6379/0"
       BLOB_ROOT: /data/blobs
-      # Phase 2 adds FFMPEG_THREADS / TORCH_THREADS / OMP_NUM_THREADS when something reads them; an
-      # empty OMP_NUM_THREADS would be passed to libraries as a bad value.
+      # only Settings reads these (empty means unset); OMP_NUM_THREADS / MKL_NUM_THREADS are set by
+      # the launcher, never here (an empty value would reach the libraries as a bad number)
       WORKER_HEAVY_CONCURRENCY: "${WORKER_HEAVY_CONCURRENCY:-}"
       FETCH_CONCURRENCY: "${FETCH_CONCURRENCY:-}"
+      FFMPEG_THREADS: "${FFMPEG_THREADS:-}"
+      TORCH_THREADS: "${TORCH_THREADS:-}"
       TUNING_PUBLISHER: "true"
       SCRATCH_ROOT: /scratch
       MODELS_DIR: /opt/models
@@ -195,15 +194,14 @@ services:
 
   worker-maint:
     image: saveclock-worker:${IMAGE_TAG:-local}
-    command:
-      - sh
-      - -c
-      - exec dramatiq saveclock.workers.main --processes 1 --threads 1 --queues maintenance
+    command: ["python", "-m", "saveclock.workers.launch", "--queues", "maintenance", "--threads", "2"]
     environment:
       APP_ENV: "${APP_ENV:-local}"
       APP_VERSION: "${IMAGE_TAG:-local}"
       APP_ORIGIN: "${APP_ORIGIN:-http://localhost:3000}"
       INTERMEDIATE_TTL_DAYS: "${INTERMEDIATE_TTL_DAYS:-}"
+      SWEEP_INTERVAL_MIN: "${SWEEP_INTERVAL_MIN:-}"
+      MAINTENANCE_SCHEDULER: "true"
       DATABASE_URL: "postgresql+asyncpg://app_rw:${POSTGRES_APP_PASSWORD}@postgres:5432/saveclock"
       REDIS_URL: "redis://:${REDIS_PASSWORD}@redis:6379/0"
       BLOB_ROOT: /data/blobs

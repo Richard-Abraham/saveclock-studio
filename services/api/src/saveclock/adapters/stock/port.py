@@ -34,6 +34,10 @@ class StockProvider(Protocol):
 
     def search(self, query: str, *, page: int = 1, per_page: int = 40) -> list[StockClip]: ...
 
+    def video_by_id(self, provider_id: str) -> StockClip | None:
+        """One clip by its provider id; None means it is gone at the provider."""
+        ...
+
     def download(
         self,
         clip: StockClip,

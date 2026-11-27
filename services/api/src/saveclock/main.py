@@ -15,22 +15,24 @@ from saveclock.api.middleware import (
 from saveclock.api.v1 import (
     analysis,
     credits,
+    dev_measure,
     events,
     health,
+    housekeeping,
     plan,
     projects,
     renders,
-    stub,
     upload,
 )
 from saveclock.api.v1 import settings as settings_router
 from saveclock.config import Settings
-from saveclock.container import STUB_ENVS, build_deps
+from saveclock.container import build_deps
 from saveclock.deps import Deps
 from saveclock.observability.logging import configure_logging
 from saveclock.services.events import StreamLimits
 
 API_PREFIX = "/api/v1"
+MEASURE_ENVS = frozenset({"local", "ci"})
 
 
 def create_app(settings: Settings | None = None, deps: Deps | None = None) -> FastAPI:
@@ -65,8 +67,9 @@ def create_app(settings: Settings | None = None, deps: Deps | None = None) -> Fa
     app.include_router(credits.router, prefix=API_PREFIX)
     app.include_router(events.router, prefix=API_PREFIX)
     app.include_router(settings_router.router, prefix=API_PREFIX)
-    if settings.app_env in STUB_ENVS:
-        app.include_router(stub.router, prefix=API_PREFIX)
+    app.include_router(housekeeping.router, prefix=API_PREFIX)
+    if settings.app_env in MEASURE_ENVS:  # the OQ-26 measurement routes: local and CI only
+        app.include_router(dev_measure.router, prefix=API_PREFIX)
     # add_middleware: the last one added is the outermost. CORS is innermost, so the access
     # guard has already refused a foreign Host or Origin before CORS sees the request.
     # Branch B of OQ-26: the browser at APP_ORIGIN calls this origin directly (upload, SSE).

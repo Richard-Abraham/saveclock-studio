@@ -11,8 +11,8 @@ from redis import Redis
 from redis.exceptions import RedisError
 
 from saveclock.config import Settings
-from saveclock.services.autotune import effective, host_facts
 from saveclock.services.settings import TUNING_KEY
+from saveclock.services.tuning import get_tuning
 
 log = structlog.get_logger()
 INTERVAL_S = 30
@@ -22,7 +22,7 @@ TTL_S = 90  # every non-broker key has a TTL (SEC-136)
 class TuningHeartbeat(Middleware):
     def __init__(self, settings: Settings) -> None:
         self.settings = settings
-        self.tuning = effective(settings, host_facts())
+        self.tuning = get_tuning(settings)
         self._stop = threading.Event()
         self._thread: threading.Thread | None = None
 

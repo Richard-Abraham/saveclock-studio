@@ -69,6 +69,8 @@ async def stream_events(
             project = await ProjectRepository(session).get(user_id=user.id, project_id=project_id)
             if project is None:
                 raise NotFound
+            await ProjectRepository(session).touch(user_id=user.id, project_id=project_id)
+            await session.commit()  # watching a project is activity (ARCH §4 retention)
             snapshot = ev.StateEvent(
                 project.status, ui_status(project.status).value, dict(project.flags)
             )

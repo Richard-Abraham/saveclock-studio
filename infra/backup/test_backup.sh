@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # make backup-test: the backup script's CLI against the REAL running stack and a throwaway restic
 # repository (mktemp, its own generated passphrase). Never touches the owner's repository.
-# NOTE: it creates one stub job (one project) in the live stack and removes only its work/ file.
+# NOTE: it seeds the click-track project (scripts/seed.sh) into the live stack when it is not there yet,
+# and removes only its own work/btest file.
 # Seam: the script's exit codes and output, last_run.json, and the repository it writes.
 # env: PROJECT, CONTAINER, COMPOSE (from make), WEB_PORT
 set -uo pipefail
@@ -58,19 +59,15 @@ out="$(backup BACKUP_INIT=1)"; rc=$?
 [ "$rc" = 0 ] && [ -e "$REPO/config" ] && ok "init on the empty folder creates the repository" || bad "init on the empty folder creates the repository"
 
 echo "== 2 happy path"
-resp="$(curl -s -X POST "http://localhost:$WEB_PORT/api/v1/_stub/jobs" -H "Origin: http://localhost:$WEB_PORT" \
-  -H 'Content-Type: application/json' -d '{"sleep_s":0}')"
-job="$(printf '%s' "$resp" | jq -r .job_id)"
-for _ in $(seq 1 40); do
-  n="$(curl -s "http://localhost:$WEB_PORT/api/v1/_stub/jobs/$job" | jq '[.hops[] | select(.state=="ok")] | length')"
-  [ "$n" = 4 ] && break; sleep 1
-done
+COMPOSE="$COMPOSE" PROJECT="$PROJECT" bash scripts/seed.sh | tail -1
+pid="$(curl -s "http://localhost:$WEB_PORT/api/v1/projects?limit=100" | jq -r '[.items[] | select(.title=="Seed: click track 128")][0].id')"
+[ -n "$pid" ] && [ "$pid" != null ] || { echo "FAIL: the seed project is not listed"; exit 1; }
 $COMPOSE exec -T api sh -c 'mkdir -p /data/blobs/work/btest/raw && echo x > /data/blobs/work/btest/raw/y.bin'
 out="$(backup)"; rc=$?
 [ "$rc" = 0 ] && ok "backup exits 0 ($(printf '%s' "$out" | tail -1 | cut -c1-20))" || { bad "backup exits 0 (rc=$rc)"; echo "$out" | tail -5; }
 [ "$(snaps)" = 1 ] && ok "exactly 1 snapshot" || bad "exactly 1 snapshot"
 listing="$(rs ls latest)"
-for want in ".dump" "manifest.sha256" "counts.json" "renders/$job/stub.txt"; do
+for want in ".dump" "manifest.sha256" "counts.json" "songs/$pid/source.wav"; do
   printf '%s\n' "$listing" | grep -qF -- "$want" && ok "snapshot contains $want" || bad "snapshot contains $want"
 done
 printf '%s\n' "$listing" | grep -q '/work' && bad "snapshot has no work/" || ok "snapshot has no work/"

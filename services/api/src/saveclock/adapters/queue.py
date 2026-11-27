@@ -12,7 +12,7 @@ from typing import Protocol
 
 import dramatiq
 
-from saveclock.models import JobQueue
+from saveclock.models import JobQueue, JobStage
 
 ACTORS: dict[str, JobQueue] = {
     "validate_audio": JobQueue.ANALYSIS,
@@ -21,6 +21,20 @@ ACTORS: dict[str, JobQueue] = {
     "replan": JobQueue.FETCH,
     "render_master": JobQueue.RENDER,
     "remux_with_song": JobQueue.RENDER,
+    "sweep_intermediates": JobQueue.MAINTENANCE,
+    "reap_orphans": JobQueue.MAINTENANCE,
+    "purge_project": JobQueue.MAINTENANCE,
+    "prune_jobs": JobQueue.MAINTENANCE,
+}
+
+# The actor a job stage runs (the stuck-job reaper re-sends through it, plan 008).
+STAGE_ACTOR: dict[JobStage, str] = {
+    JobStage.VALIDATE: "validate_audio",
+    JobStage.ANALYZE: "analyze_song",
+    JobStage.DRAFT: "build_draft",
+    JobStage.REPLAN: "replan",
+    JobStage.RENDER: "render_master",
+    JobStage.REMUX: "remux_with_song",
 }
 
 

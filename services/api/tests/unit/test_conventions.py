@@ -95,3 +95,14 @@ def test_ui_status_mapping_covers_all_states_except_deleted() -> None:
         assert ui_status(status) is UiStatus(expected)
     with pytest.raises(KeyError):
         ui_status("deleted")
+
+
+@pytest.mark.unit
+def test_the_app_serves_no_stub_path_and_no_module_is_named_for_one() -> None:
+    """Plan 008 removed the Phase 1 stub: its routes, actors and modules must not come back."""
+    from pathlib import Path
+
+    paths = {getattr(r, "path", "") for r in make_app(checks={}).routes}
+    assert [p for p in paths if "/_stub" in p] == []
+    root = Path(__file__).resolve().parents[2] / "src" / "saveclock"
+    assert [p for p in root.rglob("*.py") if "stub" in p.name] == []

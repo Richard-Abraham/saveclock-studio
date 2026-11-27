@@ -8,20 +8,26 @@ from saveclock.config import (
     DRAFT_LIMIT_S,
     FOOTAGE_WAIT_S,
     HEAVY_TTL_S,
+    MAINT_LIMIT_S,
     NORMALIZE_HOLD_S,
+    PURGE_LIMIT_S,
     REMUX_FFMPEG_S,
     REMUX_LIMIT_S,
     RENDER_FFMPEG_S,
     RENDER_HEAVY_WAIT_S,
     RENDER_LIMIT_S,
     RENDER_PUBLISH_S,
+    RENDER_REHYDRATE_S,
     RENDER_VERIFY_S,
+    STUCK_QUEUED_S,
+    STUCK_RUNNING_S,
     VET_HOLD_S,
     Settings,
 )
 from saveclock.workers import analysis as analysis_worker
 from saveclock.workers import draft as draft_worker
 from saveclock.workers import ingest as ingest_worker
+from saveclock.workers import maintenance as maintenance_worker
 from saveclock.workers import remux as remux_worker
 from saveclock.workers import render as render_worker
 
@@ -63,7 +69,13 @@ def test_the_render_slot_outlives_the_limit_which_outlives_the_ffmpeg_child() ->
 
 
 def test_the_slot_wait_the_encode_the_verification_and_the_publish_fit_the_render_limit() -> None:
-    spent = RENDER_HEAVY_WAIT_S + RENDER_FFMPEG_S + RENDER_VERIFY_S + RENDER_PUBLISH_S
+    spent = (
+        RENDER_HEAVY_WAIT_S
+        + RENDER_REHYDRATE_S
+        + RENDER_FFMPEG_S
+        + RENDER_VERIFY_S
+        + RENDER_PUBLISH_S
+    )
     assert spent <= RENDER_LIMIT_S
     assert HEAVY_TTL_S > RENDER_LIMIT_S
 
@@ -76,3 +88,14 @@ def test_a_remux_is_shorter_than_a_render_and_its_child_fits_its_limit() -> None
 def test_the_render_actors_use_those_numbers() -> None:
     assert render_worker.TIME_LIMIT_MS == RENDER_LIMIT_S * 1000
     assert remux_worker.TIME_LIMIT_MS == REMUX_LIMIT_S * 1000
+
+
+def test_a_purge_may_outlast_a_sweep_and_the_reaper_waits_longer_than_a_slot_lives() -> None:
+    assert PURGE_LIMIT_S > MAINT_LIMIT_S
+    assert STUCK_RUNNING_S > HEAVY_TTL_S  # no job outlives its slot TTL
+    assert STUCK_QUEUED_S > DRAFT_LIMIT_S
+
+
+def test_the_maintenance_actors_use_those_numbers() -> None:
+    assert maintenance_worker.TIME_LIMIT_MS == MAINT_LIMIT_S * 1000
+    assert maintenance_worker.PURGE_TIME_LIMIT_MS == PURGE_LIMIT_S * 1000

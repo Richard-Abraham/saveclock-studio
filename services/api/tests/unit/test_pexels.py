@@ -13,7 +13,7 @@ from saveclock.adapters.stock.limits import (
     ProviderHttp,
     SearchCache,
 )
-from saveclock.adapters.stock.pexels import SEARCH_URL, PexelsProvider, parse_videos
+from saveclock.adapters.stock.pexels import SEARCH_URL, VIDEO_URL, PexelsProvider, parse_videos
 from saveclock.adapters.stock.pixabay import SEARCH_URL as PIXABAY_URL
 from saveclock.adapters.stock.pixabay import PixabayProvider, parse_hits
 from saveclock.errors import StockUnavailable
@@ -334,3 +334,36 @@ def test_both_providers_download_through_the_shared_downloader(tmp_path: Path) -
     assert pexels.download(clip, store, "work/x/a.mp4", max_bytes=5, cancel=None) == 7
     assert pixabay.download(clip, store, "work/x/b.mp4", max_bytes=6, cancel=None) == 7
     assert calls == [("3001", 5), ("3001", 6)]
+
+
+@pytest.mark.respx(assert_all_mocked=True)
+def test_video_by_id_returns_the_clip_and_keeps_the_key_in_the_header(
+    respx_mock: respx.MockRouter,
+) -> None:
+    video = next(v for v in pexels_json()["videos"] if v["id"] == 3001)
+    route = respx_mock.get(VIDEO_URL + "3001").mock(return_value=httpx.Response(200, json=video))
+    provider, _, _, _ = build()
+    clip = provider.video_by_id("3001")
+    assert clip is not None
+    assert (clip.provider_id, clip.width) == ("3001", 1080)
+    request = route.calls.last.request
+    assert request.headers["authorization"] == KEY
+    assert KEY not in str(request.url)
+
+
+@pytest.mark.respx(assert_all_mocked=True)
+def test_video_by_id_404_and_unusable_clips_mean_gone(respx_mock: respx.MockRouter) -> None:
+    respx_mock.get(VIDEO_URL + "1").mock(return_value=httpx.Response(404))
+    landscape = next(v for v in pexels_json()["videos"] if v["id"] == 3002)
+    respx_mock.get(VIDEO_URL + "3002").mock(return_value=httpx.Response(200, json=landscape))
+    provider, _, _, _ = build()
+    assert provider.video_by_id("1") is None
+    assert provider.video_by_id("3002") is None
+
+
+@pytest.mark.respx(assert_all_mocked=True)
+def test_video_by_id_other_failures_still_raise(respx_mock: respx.MockRouter) -> None:
+    respx_mock.get(VIDEO_URL + "9").mock(return_value=httpx.Response(401))
+    provider, _, _, _ = build()
+    with pytest.raises(StockUnavailable):
+        provider.video_by_id("9")

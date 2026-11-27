@@ -150,15 +150,14 @@ def test_serve_refuses_every_intermediate_and_the_original_song(tmp_path: Path, 
         serve(store, key, None)
 
 
-def test_serve_does_reach_the_render_files_and_the_stub_and_proxies(tmp_path: Path) -> None:
-    # `is_servable` also allows `renders/{id}/stub.txt` and the preview proxies: say so here
+def test_serve_does_reach_the_render_files_and_proxies(tmp_path: Path) -> None:
+    # `is_servable` also allows the preview proxies: say so here
     store = FilesystemBlobStore(str(tmp_path), 0)
     for key in (
         f"renders/{PID}/master.mp4",
         f"renders/{PID}/cutlist.json",
         f"renders/{PID}/cutlist.csv",
         f"renders/{PID}/with_song.mp4",
-        f"renders/{PID}/stub.txt",
         f"work/{PID}/proxy/a.mp4",
         f"work/{PID}/audio_proxy.m4a",
     ):

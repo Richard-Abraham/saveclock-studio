@@ -122,15 +122,16 @@ async def test_low_disk_is_507_and_nothing_is_created(renderer: Renders) -> None
     assert await d.status(pid) == ("draft_ready", None)
 
 
-async def test_a_missing_mezzanine_is_409_intermediates_missing(renderer: Renders) -> None:
+async def test_a_missing_mezzanine_no_longer_blocks_the_request(renderer: Renders) -> None:
+    """Plan 008: the render job fetches swept clips again (tests/integration/test_rehydrate.py)."""
     d = renderer.draft
     pid = await d.drafted()
     plan = await d.plan(pid)
     (d.env.blob_root / plan.cuts[0].clip.mezzanine_key).unlink()
     r = await renderer.post(pid)
-    assert (r.status_code, r.json()["error"]["details"]["reason"]) == (409, "intermediates_missing")
-    assert await d.status(pid) == ("draft_ready", None)
-    assert await count(d, "SELECT count(*) FROM renders") == 0
+    assert r.status_code == 202, r.text
+    assert await d.status(pid) == ("rendering", None)
+    assert await count(d, "SELECT count(*) FROM renders") == 1
 
 
 async def test_a_render_job_already_active_is_409_job_active(renderer: Renders) -> None:
