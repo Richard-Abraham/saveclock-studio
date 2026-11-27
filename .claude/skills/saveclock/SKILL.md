@@ -22,7 +22,7 @@ there is no Pexels key).
 
 ## The flow
 
-1. `saveclock new song.mp3 --vibe "calm night drive"` creates the project, uploads the song and
+1. `saveclock new song.mp3 --vibe "calm night drive" --duration 30` (15, 30 or 60 seconds) creates the project, uploads the song and
    prints `project <id>`. It does not wait for the analysis.
 2. `saveclock status <id> --watch` follows the project until it stops at `draft` (a first draft
    exists), or fails. A timeout means it is still running, not failed.
@@ -36,8 +36,12 @@ there is no Pexels key).
 6. `saveclock render <id>` renders and waits until the video is ready, then prints the render id.
 7. `saveclock export <id> --mode a --out ./out` writes the video with the song; `--mode b` writes
    the silent video, the cut list (JSON and CSV) and prints the footage credits. The `--out`
-   directory must already exist.
+   directory must already exist: create it with `mkdir -p` first. The credits printed by mode b
+   are the required footage attribution; keep them with the video.
 8. `saveclock status` (no id) lists every project.
+
+Note: a song about as long as the requested length drafts a shorter video (15 s for a 30.0 s
+song); `plan.total_frames` shows the real length (30 frames per second).
 
 ## Commands
 
