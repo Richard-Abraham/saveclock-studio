@@ -110,7 +110,7 @@ def test_a_filesystem_without_hard_links_still_gets_the_file(
     def no_links(*_a: object) -> None:
         raise PermissionError(1, "Operation not permitted")  # what exFAT/FAT answer
 
-    monkeypatch.setattr(files.os, "link", no_links)
+    monkeypatch.setattr("saveclock.cli.files.os.link", no_links)
     dest = files.write_stream(iter([b"abc"]), tmp_path, "a.mp4", force=False)
     assert dest.read_bytes() == b"abc"
     assert sorted(p.name for p in tmp_path.iterdir()) == ["a.mp4"]  # no temp file left
