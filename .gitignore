@@ -43,3 +43,9 @@ coverage.json
 coverage/
 next-env.d.ts
 *.tsbuildinfo
+
+# plan 009: the eval tooling (the owner's own songs, run checkpoints, kept masters; results text files are committed)
+eval/manifests/local.json
+eval/results/*.partial.json
+eval/results/*.tmp
+eval/results/masters/

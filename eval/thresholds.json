@@ -1,0 +1,17 @@
+{
+  "_note": "Copies of numbers owned by docs/QUALITY.md (and PRD NFR-009). Never edit a number here alone: change the owner doc first; eval/tests/test_thresholds.py fails on any difference.",
+  "beat_f1": {"qm": "QM-001", "owner": "QUALITY.md", "floor": 0.85},
+  "cmlt": {"qm": "QM-003", "owner": "QUALITY.md", "floor": 0.75},
+  "amlt": {"qm": "QM-004", "owner": "QUALITY.md", "floor": 0.85},
+  "downbeat_f1": {"qm": "QM-010", "owner": "QUALITY.md", "floor": 0.75},
+  "octave_error_rate": {"qm": "QM-016", "owner": "QUALITY.md", "max": 0.05},
+  "alignment": {"qm": "QM-026", "owner": "QUALITY.md", "floor": 0.9},
+  "keyword_relevance_mean": {"qm": "QM-031", "owner": "QUALITY.md", "floor": 4.0},
+  "internal_cut_audit_share": {"qm": "QM-036", "owner": "QUALITY.md", "max": 0.01},
+  "analysis_p95_s": {"qm": "QM-080", "owner": "QUALITY.md", "target": 20, "hard": 40},
+  "render_p95_s": {"qm": "QM-081", "owner": "QUALITY.md", "target": 60, "hard": 90},
+  "verify_overhead_ratio": {"qm": "QM-082", "owner": "QUALITY.md", "max": 0.1},
+  "draft_p95_s": {"qm": "QM-085", "owner": "QUALITY.md", "target": 120, "hard": 180},
+  "mode_a_p95_s": {"qm": "QM-086", "owner": "QUALITY.md", "target": 5, "hard": 10},
+  "success_rate": {"qm": "NFR-009", "owner": "PRD.md", "floor": 0.98}
+}

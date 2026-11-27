@@ -1,0 +1,13 @@
+{
+ "_note": "Shape of eval/manifests/local.json (git-ignored): the owner's own songs, appended to the soak. `beats` is an optional annotation file (one beat time per line, optional second column 1 = downbeat); without it the beat metrics and QM-026 are not measured for that song. Paths are on the owner's machine; audio is never committed.",
+ "schema": "saveclock.eval-manifest/1",
+ "songs": [
+  {
+   "label": "my-song-1",
+   "path": "/path/to/song.mp3",
+   "beats": "/path/to/song.beats",
+   "title": "My song",
+   "vibe": "calm night drive"
+  }
+ ]
+}

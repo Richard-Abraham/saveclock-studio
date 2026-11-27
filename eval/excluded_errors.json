@@ -1,0 +1,4 @@
+{
+  "_note": "Input errors excluded from the NFR-009 render success rate (the owner's choice of song or file, not a pipeline fault). Everything else counts as a failure, insufficient_storage, stock_unavailable, verification_failed and a timeout included.",
+  "error_codes": ["file_rejected", "unsupported_media", "payload_too_large"]
+}

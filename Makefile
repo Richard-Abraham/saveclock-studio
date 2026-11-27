@@ -11,7 +11,7 @@ COMPOSE_BIN := $(shell command -v docker >/dev/null 2>&1 && echo "docker compose
 CONTAINER := $(shell command -v docker >/dev/null 2>&1 && echo docker || echo podman)
 COMPOSE = $(COMPOSE_BIN) -p $(PROJECT) --env-file .env -f infra/compose/compose.yml
 COMPOSE_FAKES = $(COMPOSE) -f infra/compose/compose.fakes.yml
-COMPOSE_TEST =$(COMPOSE_BIN) -p saveclock-test -f infra/compose/compose.test.yml
+COMPOSE_TEST = $(COMPOSE_BIN) -p saveclock-test -f infra/compose/compose.test.yml
 GIT_SHA := $(shell git rev-parse --short HEAD 2>/dev/null || echo unknown)
 # value of a variable in .env (empty when absent): the one source of the web image's public origins
 envval = $(shell sed -n 's/^$(1)=//p' .env 2>/dev/null | tail -1)
@@ -22,13 +22,13 @@ TRIVY := ghcr.io/aquasecurity/trivy@sha256:6e7f515a46af13a01d534734c666261de65c6
 
 # Stages, in order; the first failure stops the run and names the stage.
 FAST_STAGES := guard help-lint tooling-test secrets banned toolchain env-docs-check fmt-check lint types arch pins \
-  compose-lint test-deps-up ffmpeg-bin test security-pytest migrations web-install contracts-check audit \
+  skill-check eval-test compose-lint test-deps-up ffmpeg-bin test security-pytest migrations web-install contracts-check audit \
   web-env web-lint web-test web-build bundle-scan web-audit-prod
 CHECK_STAGES := $(FAST_STAGES) golden images image-guards security-container hadolint
 
 .PHONY: help help-lint tooling-test rollback toolchain doctor-dev guard secrets banned doctor fmt-check lint types arch pins compose-lint test golden \
   migrations audit env env-docs env-docs-check contracts contracts-check test-deps-up \
-  skill-check test-deps-down ffmpeg-cache ffmpeg-bin models-cache test-ml fake-stock images image-guards hadolint scan-images up dev dev-fakes dev-driver smoke-driver down \
+  skill-check eval-test test-deps-down ffmpeg-cache ffmpeg-bin models-cache test-ml fake-stock images image-guards hadolint scan-images up dev dev-fakes dev-driver smoke-driver eval-smoke eval-soak down \
   down-volumes sandbox check-fast check web-install web-env web-lint web-test web-build \
   bundle-scan web-audit-prod measure-rewrite smoke-web web-audit stack-up seed smoke-stack security-pytest security-container security-pass hostile-corpus \
   predeploy-scan backup backup-init backup-test restore-proof backup-install-timer backup-timer-uninstall rollback-demo fresh-clone-timing
@@ -133,6 +133,19 @@ migrations: ## check models match migrations and the downgrade round trip
 # plan 009: the skill's facts (commands, flags, keyword rule, error codes) against the code that owns them
 skill-check: ## fail if .claude/skills/saveclock/SKILL.md drifts from the CLI, the keyword rule or the error codes
 	$(UV) run python ../../scripts/check_skill.py
+
+# plan 009: the eval tooling's own tests (metric self-tests with injected faults, checks, report, sheets)
+eval-test: ## run the eval tooling's tests (needs the eval dependency group; uv syncs it)
+	$(UV) run --group eval pytest -q -c ../../eval/tests/pytest.ini ../../eval/tests
+
+# Both talk to a RUNNING stack (make dev-fakes, or make dev with a Pexels key) and never start one.
+eval-smoke: ffmpeg-bin ## run the eval tooling on 3 renders against the running stack (minutes; writes eval/results)
+	$(UV) run --group eval python ../../eval/run_eval.py --smoke --api-url http://127.0.0.1:$(API_PORT) \
+	  --ffprobe "$(CURDIR)/.data/ffmpeg/ffprobe" --out "$(CURDIR)/eval/results"
+
+eval-soak: ffmpeg-bin ## run 100 consecutive renders and keep the masters (hours: the owner's PC, resumable with --resume)
+	$(UV) run --group eval python ../../eval/run_eval.py --soak 100 --api-url http://127.0.0.1:$(API_PORT) \
+	  --ffprobe "$(CURDIR)/.data/ffmpeg/ffprobe" --out "$(CURDIR)/eval/results" --keep-masters "$(CURDIR)/eval/results/masters"
 
 # openapi.json from the Python models, then the TS types from openapi.json (T-1.4a)
 contracts: ## regenerate openapi.json and the TypeScript types

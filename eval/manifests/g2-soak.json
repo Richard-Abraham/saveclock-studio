@@ -1,0 +1,606 @@
+{
+ "_note": "The G2 soak song mix (plan 009, D-5): 100 generated click tracks cycling six tempo/length pairs, each with a distinct lead-in. Audio is generated into a temp dir by eval/scripts/make_click_track.py and never committed. eval/manifests/local.json (git-ignored) appends the owner's own songs.",
+ "schema": "saveclock.eval-manifest/1",
+ "tracks": [
+  {
+   "label": "click-120-30-000",
+   "bpm": 120.0,
+   "duration_s": 30,
+   "lead_s": 0.0
+  },
+  {
+   "label": "click-128-30-001",
+   "bpm": 128.0,
+   "duration_s": 30,
+   "lead_s": 0.01
+  },
+  {
+   "label": "click-133.3-30-002",
+   "bpm": 133.3,
+   "duration_s": 30,
+   "lead_s": 0.02
+  },
+  {
+   "label": "click-128-60-003",
+   "bpm": 128.0,
+   "duration_s": 60,
+   "lead_s": 0.03
+  },
+  {
+   "label": "click-133.3-60-004",
+   "bpm": 133.3,
+   "duration_s": 60,
+   "lead_s": 0.04
+  },
+  {
+   "label": "click-120-60-005",
+   "bpm": 120.0,
+   "duration_s": 60,
+   "lead_s": 0.05
+  },
+  {
+   "label": "click-120-30-006",
+   "bpm": 120.0,
+   "duration_s": 30,
+   "lead_s": 0.06
+  },
+  {
+   "label": "click-128-30-007",
+   "bpm": 128.0,
+   "duration_s": 30,
+   "lead_s": 0.07
+  },
+  {
+   "label": "click-133.3-30-008",
+   "bpm": 133.3,
+   "duration_s": 30,
+   "lead_s": 0.08
+  },
+  {
+   "label": "click-128-60-009",
+   "bpm": 128.0,
+   "duration_s": 60,
+   "lead_s": 0.09
+  },
+  {
+   "label": "click-133.3-60-010",
+   "bpm": 133.3,
+   "duration_s": 60,
+   "lead_s": 0.1
+  },
+  {
+   "label": "click-120-60-011",
+   "bpm": 120.0,
+   "duration_s": 60,
+   "lead_s": 0.11
+  },
+  {
+   "label": "click-120-30-012",
+   "bpm": 120.0,
+   "duration_s": 30,
+   "lead_s": 0.12
+  },
+  {
+   "label": "click-128-30-013",
+   "bpm": 128.0,
+   "duration_s": 30,
+   "lead_s": 0.13
+  },
+  {
+   "label": "click-133.3-30-014",
+   "bpm": 133.3,
+   "duration_s": 30,
+   "lead_s": 0.14
+  },
+  {
+   "label": "click-128-60-015",
+   "bpm": 128.0,
+   "duration_s": 60,
+   "lead_s": 0.15
+  },
+  {
+   "label": "click-133.3-60-016",
+   "bpm": 133.3,
+   "duration_s": 60,
+   "lead_s": 0.16
+  },
+  {
+   "label": "click-120-60-017",
+   "bpm": 120.0,
+   "duration_s": 60,
+   "lead_s": 0.17
+  },
+  {
+   "label": "click-120-30-018",
+   "bpm": 120.0,
+   "duration_s": 30,
+   "lead_s": 0.18
+  },
+  {
+   "label": "click-128-30-019",
+   "bpm": 128.0,
+   "duration_s": 30,
+   "lead_s": 0.19
+  },
+  {
+   "label": "click-133.3-30-020",
+   "bpm": 133.3,
+   "duration_s": 30,
+   "lead_s": 0.2
+  },
+  {
+   "label": "click-128-60-021",
+   "bpm": 128.0,
+   "duration_s": 60,
+   "lead_s": 0.21
+  },
+  {
+   "label": "click-133.3-60-022",
+   "bpm": 133.3,
+   "duration_s": 60,
+   "lead_s": 0.22
+  },
+  {
+   "label": "click-120-60-023",
+   "bpm": 120.0,
+   "duration_s": 60,
+   "lead_s": 0.23
+  },
+  {
+   "label": "click-120-30-024",
+   "bpm": 120.0,
+   "duration_s": 30,
+   "lead_s": 0.24
+  },
+  {
+   "label": "click-128-30-025",
+   "bpm": 128.0,
+   "duration_s": 30,
+   "lead_s": 0.25
+  },
+  {
+   "label": "click-133.3-30-026",
+   "bpm": 133.3,
+   "duration_s": 30,
+   "lead_s": 0.26
+  },
+  {
+   "label": "click-128-60-027",
+   "bpm": 128.0,
+   "duration_s": 60,
+   "lead_s": 0.27
+  },
+  {
+   "label": "click-133.3-60-028",
+   "bpm": 133.3,
+   "duration_s": 60,
+   "lead_s": 0.28
+  },
+  {
+   "label": "click-120-60-029",
+   "bpm": 120.0,
+   "duration_s": 60,
+   "lead_s": 0.29
+  },
+  {
+   "label": "click-120-30-030",
+   "bpm": 120.0,
+   "duration_s": 30,
+   "lead_s": 0.3
+  },
+  {
+   "label": "click-128-30-031",
+   "bpm": 128.0,
+   "duration_s": 30,
+   "lead_s": 0.31
+  },
+  {
+   "label": "click-133.3-30-032",
+   "bpm": 133.3,
+   "duration_s": 30,
+   "lead_s": 0.32
+  },
+  {
+   "label": "click-128-60-033",
+   "bpm": 128.0,
+   "duration_s": 60,
+   "lead_s": 0.33
+  },
+  {
+   "label": "click-133.3-60-034",
+   "bpm": 133.3,
+   "duration_s": 60,
+   "lead_s": 0.34
+  },
+  {
+   "label": "click-120-60-035",
+   "bpm": 120.0,
+   "duration_s": 60,
+   "lead_s": 0.35
+  },
+  {
+   "label": "click-120-30-036",
+   "bpm": 120.0,
+   "duration_s": 30,
+   "lead_s": 0.36
+  },
+  {
+   "label": "click-128-30-037",
+   "bpm": 128.0,
+   "duration_s": 30,
+   "lead_s": 0.37
+  },
+  {
+   "label": "click-133.3-30-038",
+   "bpm": 133.3,
+   "duration_s": 30,
+   "lead_s": 0.38
+  },
+  {
+   "label": "click-128-60-039",
+   "bpm": 128.0,
+   "duration_s": 60,
+   "lead_s": 0.39
+  },
+  {
+   "label": "click-133.3-60-040",
+   "bpm": 133.3,
+   "duration_s": 60,
+   "lead_s": 0.4
+  },
+  {
+   "label": "click-120-60-041",
+   "bpm": 120.0,
+   "duration_s": 60,
+   "lead_s": 0.41
+  },
+  {
+   "label": "click-120-30-042",
+   "bpm": 120.0,
+   "duration_s": 30,
+   "lead_s": 0.42
+  },
+  {
+   "label": "click-128-30-043",
+   "bpm": 128.0,
+   "duration_s": 30,
+   "lead_s": 0.43
+  },
+  {
+   "label": "click-133.3-30-044",
+   "bpm": 133.3,
+   "duration_s": 30,
+   "lead_s": 0.44
+  },
+  {
+   "label": "click-128-60-045",
+   "bpm": 128.0,
+   "duration_s": 60,
+   "lead_s": 0.45
+  },
+  {
+   "label": "click-133.3-60-046",
+   "bpm": 133.3,
+   "duration_s": 60,
+   "lead_s": 0.46
+  },
+  {
+   "label": "click-120-60-047",
+   "bpm": 120.0,
+   "duration_s": 60,
+   "lead_s": 0.47
+  },
+  {
+   "label": "click-120-30-048",
+   "bpm": 120.0,
+   "duration_s": 30,
+   "lead_s": 0.48
+  },
+  {
+   "label": "click-128-30-049",
+   "bpm": 128.0,
+   "duration_s": 30,
+   "lead_s": 0.49
+  },
+  {
+   "label": "click-133.3-30-050",
+   "bpm": 133.3,
+   "duration_s": 30,
+   "lead_s": 0.5
+  },
+  {
+   "label": "click-128-60-051",
+   "bpm": 128.0,
+   "duration_s": 60,
+   "lead_s": 0.51
+  },
+  {
+   "label": "click-133.3-60-052",
+   "bpm": 133.3,
+   "duration_s": 60,
+   "lead_s": 0.52
+  },
+  {
+   "label": "click-120-60-053",
+   "bpm": 120.0,
+   "duration_s": 60,
+   "lead_s": 0.53
+  },
+  {
+   "label": "click-120-30-054",
+   "bpm": 120.0,
+   "duration_s": 30,
+   "lead_s": 0.54
+  },
+  {
+   "label": "click-128-30-055",
+   "bpm": 128.0,
+   "duration_s": 30,
+   "lead_s": 0.55
+  },
+  {
+   "label": "click-133.3-30-056",
+   "bpm": 133.3,
+   "duration_s": 30,
+   "lead_s": 0.56
+  },
+  {
+   "label": "click-128-60-057",
+   "bpm": 128.0,
+   "duration_s": 60,
+   "lead_s": 0.57
+  },
+  {
+   "label": "click-133.3-60-058",
+   "bpm": 133.3,
+   "duration_s": 60,
+   "lead_s": 0.58
+  },
+  {
+   "label": "click-120-60-059",
+   "bpm": 120.0,
+   "duration_s": 60,
+   "lead_s": 0.59
+  },
+  {
+   "label": "click-120-30-060",
+   "bpm": 120.0,
+   "duration_s": 30,
+   "lead_s": 0.6
+  },
+  {
+   "label": "click-128-30-061",
+   "bpm": 128.0,
+   "duration_s": 30,
+   "lead_s": 0.61
+  },
+  {
+   "label": "click-133.3-30-062",
+   "bpm": 133.3,
+   "duration_s": 30,
+   "lead_s": 0.62
+  },
+  {
+   "label": "click-128-60-063",
+   "bpm": 128.0,
+   "duration_s": 60,
+   "lead_s": 0.63
+  },
+  {
+   "label": "click-133.3-60-064",
+   "bpm": 133.3,
+   "duration_s": 60,
+   "lead_s": 0.64
+  },
+  {
+   "label": "click-120-60-065",
+   "bpm": 120.0,
+   "duration_s": 60,
+   "lead_s": 0.65
+  },
+  {
+   "label": "click-120-30-066",
+   "bpm": 120.0,
+   "duration_s": 30,
+   "lead_s": 0.66
+  },
+  {
+   "label": "click-128-30-067",
+   "bpm": 128.0,
+   "duration_s": 30,
+   "lead_s": 0.67
+  },
+  {
+   "label": "click-133.3-30-068",
+   "bpm": 133.3,
+   "duration_s": 30,
+   "lead_s": 0.68
+  },
+  {
+   "label": "click-128-60-069",
+   "bpm": 128.0,
+   "duration_s": 60,
+   "lead_s": 0.69
+  },
+  {
+   "label": "click-133.3-60-070",
+   "bpm": 133.3,
+   "duration_s": 60,
+   "lead_s": 0.7
+  },
+  {
+   "label": "click-120-60-071",
+   "bpm": 120.0,
+   "duration_s": 60,
+   "lead_s": 0.71
+  },
+  {
+   "label": "click-120-30-072",
+   "bpm": 120.0,
+   "duration_s": 30,
+   "lead_s": 0.72
+  },
+  {
+   "label": "click-128-30-073",
+   "bpm": 128.0,
+   "duration_s": 30,
+   "lead_s": 0.73
+  },
+  {
+   "label": "click-133.3-30-074",
+   "bpm": 133.3,
+   "duration_s": 30,
+   "lead_s": 0.74
+  },
+  {
+   "label": "click-128-60-075",
+   "bpm": 128.0,
+   "duration_s": 60,
+   "lead_s": 0.75
+  },
+  {
+   "label": "click-133.3-60-076",
+   "bpm": 133.3,
+   "duration_s": 60,
+   "lead_s": 0.76
+  },
+  {
+   "label": "click-120-60-077",
+   "bpm": 120.0,
+   "duration_s": 60,
+   "lead_s": 0.77
+  },
+  {
+   "label": "click-120-30-078",
+   "bpm": 120.0,
+   "duration_s": 30,
+   "lead_s": 0.78
+  },
+  {
+   "label": "click-128-30-079",
+   "bpm": 128.0,
+   "duration_s": 30,
+   "lead_s": 0.79
+  },
+  {
+   "label": "click-133.3-30-080",
+   "bpm": 133.3,
+   "duration_s": 30,
+   "lead_s": 0.8
+  },
+  {
+   "label": "click-128-60-081",
+   "bpm": 128.0,
+   "duration_s": 60,
+   "lead_s": 0.81
+  },
+  {
+   "label": "click-133.3-60-082",
+   "bpm": 133.3,
+   "duration_s": 60,
+   "lead_s": 0.82
+  },
+  {
+   "label": "click-120-60-083",
+   "bpm": 120.0,
+   "duration_s": 60,
+   "lead_s": 0.83
+  },
+  {
+   "label": "click-120-30-084",
+   "bpm": 120.0,
+   "duration_s": 30,
+   "lead_s": 0.84
+  },
+  {
+   "label": "click-128-30-085",
+   "bpm": 128.0,
+   "duration_s": 30,
+   "lead_s": 0.85
+  },
+  {
+   "label": "click-133.3-30-086",
+   "bpm": 133.3,
+   "duration_s": 30,
+   "lead_s": 0.86
+  },
+  {
+   "label": "click-128-60-087",
+   "bpm": 128.0,
+   "duration_s": 60,
+   "lead_s": 0.87
+  },
+  {
+   "label": "click-133.3-60-088",
+   "bpm": 133.3,
+   "duration_s": 60,
+   "lead_s": 0.88
+  },
+  {
+   "label": "click-120-60-089",
+   "bpm": 120.0,
+   "duration_s": 60,
+   "lead_s": 0.89
+  },
+  {
+   "label": "click-120-30-090",
+   "bpm": 120.0,
+   "duration_s": 30,
+   "lead_s": 0.9
+  },
+  {
+   "label": "click-128-30-091",
+   "bpm": 128.0,
+   "duration_s": 30,
+   "lead_s": 0.91
+  },
+  {
+   "label": "click-133.3-30-092",
+   "bpm": 133.3,
+   "duration_s": 30,
+   "lead_s": 0.92
+  },
+  {
+   "label": "click-128-60-093",
+   "bpm": 128.0,
+   "duration_s": 60,
+   "lead_s": 0.93
+  },
+  {
+   "label": "click-133.3-60-094",
+   "bpm": 133.3,
+   "duration_s": 60,
+   "lead_s": 0.94
+  },
+  {
+   "label": "click-120-60-095",
+   "bpm": 120.0,
+   "duration_s": 60,
+   "lead_s": 0.95
+  },
+  {
+   "label": "click-120-30-096",
+   "bpm": 120.0,
+   "duration_s": 30,
+   "lead_s": 0.96
+  },
+  {
+   "label": "click-128-30-097",
+   "bpm": 128.0,
+   "duration_s": 30,
+   "lead_s": 0.97
+  },
+  {
+   "label": "click-133.3-30-098",
+   "bpm": 133.3,
+   "duration_s": 30,
+   "lead_s": 0.98
+  },
+  {
+   "label": "click-128-60-099",
+   "bpm": 128.0,
+   "duration_s": 60,
+   "lead_s": 0.99
+  }
+ ]
+}
