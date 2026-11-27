@@ -115,14 +115,21 @@ def main() -> int:
         call(web, "GET", "/api/v1/health/live", {"Host": "evil.example"})[0] != 200,
     )
 
+    status, dhdrs, _ = call(web, "DELETE", f"/api/v1/projects/{project_id}", {"Origin": origin})
+    delete_request_id = dhdrs.get("x-request-id", "")
+    check("DELETE /projects/{id} is 202", status == 202, str(status))
+    status, _, body = call(web, "GET", "/api/v1/projects")
+    items = json.loads(body)["items"] if status == 200 else []
+    check("the deleted project is gone from the list", all(p["id"] != project_id for p in items))
+
     compose = os.environ.get("COMPOSE")
     if compose:
         logs = {svc: service_logs(compose, svc) for svc in SERVICES}
         lines = {svc: json_lines(text) for svc, text in logs.items()}
         check("every JSON-looking log line parses", all(bad == 0 for _, bad in lines.values()))
-        # SEC-123: the request id of the POST is in the api log
-        api_hit = any(rec.get("request_id") == request_id for rec in lines["api"][0])
-        check("the request id is in the api log", api_hit)
+        # SEC-123: the request id of the DELETE (it enqueues the purge, so the api logs `job.enqueued`)
+        api_hit = any(rec.get("request_id") == delete_request_id for rec in lines["api"][0])
+        check("the DELETE request id is in the api log", api_hit)
         secrets = [
             ln.split("=", 1)[1] for ln in open(".env").read().splitlines()  # noqa: SIM115
             if ln.split("=", 1)[0].endswith(("PASSWORD", "_KEY")) and "=" in ln and len(ln.split("=", 1)[1]) >= 8
@@ -131,12 +138,6 @@ def main() -> int:
         check(f"no .env secret value appears in the logs ({leaked} matches)", leaked == 0)
     else:
         print("SKIPPED log checks (COMPOSE not set)")
-
-    status, _, _ = call(web, "DELETE", f"/api/v1/projects/{project_id}", {"Origin": origin})
-    check("DELETE /projects/{id} is 202", status == 202, str(status))
-    status, _, body = call(web, "GET", "/api/v1/projects")
-    items = json.loads(body)["items"] if status == 200 else []
-    check("the deleted project is gone from the list", all(p["id"] != project_id for p in items))
 
     if failures:
         print(f"STACK SMOKE FAILED ({len(failures)}): " + "; ".join(failures))

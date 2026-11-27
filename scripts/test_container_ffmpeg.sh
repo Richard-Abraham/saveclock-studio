@@ -59,8 +59,9 @@ if ! printf '%s' "$controllers" | grep -qw memory; then
   echo "NOT MEASURED: cgroup memory controller not delegated (the two memory-limit checks are skipped)"
 else
   code="$(in_image python3 -c '
+import sys
 from saveclock.adapters.ffmpeg import run
-r = run(["python3", "-c", "import sys\ntry:\n  bytearray(5 << 30)\nexcept MemoryError:\n  sys.exit(42)"], 30, check=False)
+r = run([sys.executable, "-c", "import sys\ntry:\n  bytearray(5 << 30)\nexcept MemoryError:\n  sys.exit(42)"], 30, check=False)
 print("EXIT", r.returncode)
 ' | sed -n 's/^EXIT //p')"
   [ "$code" = 42 ] && ok "the address-space limit stops a 5 GiB allocation (exit 42)" \
