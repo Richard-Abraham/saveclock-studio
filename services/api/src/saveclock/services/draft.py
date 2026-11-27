@@ -360,9 +360,7 @@ async def _persist(
         if latest is None:  # a first draft: say so when the song forced a shorter video
             requested = int(basis.project.options.get("duration", plans.DEFAULT_DURATION_S))
             notice = plans.length_notice(requested, plan.total_frames // FPS)
-            if notice is None:
-                flags.pop(LENGTH_REDUCED, None)
-            else:
+            if notice:
                 flags[LENGTH_REDUCED] = notice
         await ProjectRepository(session).update_fields(
             user_id=user_id, project_id=project_id, values={"flags": flags}

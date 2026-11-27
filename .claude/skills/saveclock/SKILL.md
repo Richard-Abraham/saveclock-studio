@@ -43,7 +43,9 @@ there is no Pexels key).
 Note: a song whose first downbeat is within one beat and 0.5 s of its start drafts the full
 length from 0.0 s. A shorter song drafts the next length down, and `show` prints a `notice:` line
 (`flags.length_reduced` in `show --json`): tell the user the video is shorter than requested.
-`plan.total_frames` shows the real length (30 frames per second).
+`plan.total_frames` shows the real length (30 frames per second). The notice holds only while
+`plan.total_frames == flags.length_reduced.drafted_s * 30`: the flag is written on the first draft
+only, so it can go stale after a length edit.
 
 ## Commands
 
@@ -138,6 +140,8 @@ or written).
   - `stock_unavailable`: stock search failed; retry later with a new `saveclock new`.
   - `plan_failed`: the planner could not lay out the video. The usual cause is a song shorter than
     15 s (or little more, with a late first downbeat), so no bar start leaves room for a video. Start again with a
-    longer song. The server log line `draft.plan_failed` has the exact reason.
+    longer song. An octave or tempo change on a song drafted from 0 s can also make the same length
+    no longer fit (`segment_out_of_range`); recover with a shorter length. The server log line
+    `draft.plan_failed` has the exact reason.
     The CLI has no `retry` command: the API's retry
     operation is not part of this tool, and a new `saveclock new` is the recovery.

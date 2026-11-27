@@ -73,7 +73,8 @@ def align_leading_beat(grid: GridView, start_s: float) -> GridView:
     d0 = _lead(grid)
     if d0 is None or abs(start_s) > EPS:
         return grid
-    beats = (0.0, *(b for b in grid.beats_s if b > d0 + EPS))  # d0 itself becomes 0.0
+    # by design the first beat interval becomes P + d0 (up to 2P): d0 itself moves to 0.0
+    beats = (0.0, *(b for b in grid.beats_s if b > d0 + EPS))
     return replace(grid, beats_s=beats, downbeats_s=(0.0, *grid.downbeats_s[1:]))
 
 
