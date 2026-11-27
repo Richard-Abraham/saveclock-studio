@@ -138,14 +138,15 @@ skill-check: ## fail if .claude/skills/saveclock/SKILL.md drifts from the CLI, t
 eval-test: ## run the eval tooling's tests (needs the eval dependency group; uv syncs it)
 	$(UV) run --group eval pytest -q -c ../../eval/tests/pytest.ini ../../eval/tests
 
+# EVAL_ARGS=--live adds the owner's songs from eval/manifests/local.json; EVAL_ARGS='--stock pexels' is for a stack with a key.
 # Both talk to a RUNNING stack (make dev-fakes, or make dev with a Pexels key) and never start one.
 eval-smoke: ffmpeg-bin ## run the eval tooling on 3 renders against the running stack (minutes; writes eval/results)
 	$(UV) run --group eval python ../../eval/run_eval.py --smoke --api-url http://127.0.0.1:$(API_PORT) \
-	  --ffprobe "$(CURDIR)/.data/ffmpeg/ffprobe" --out "$(CURDIR)/eval/results"
+	  --ffprobe "$(CURDIR)/.data/ffmpeg/ffprobe" --out "$(CURDIR)/eval/results" $(EVAL_ARGS)
 
 eval-soak: ffmpeg-bin ## run 100 consecutive renders and keep the masters (hours: the owner's PC, resumable with --resume)
 	$(UV) run --group eval python ../../eval/run_eval.py --soak 100 --api-url http://127.0.0.1:$(API_PORT) \
-	  --ffprobe "$(CURDIR)/.data/ffmpeg/ffprobe" --out "$(CURDIR)/eval/results" --keep-masters "$(CURDIR)/eval/results/masters"
+	  --ffprobe "$(CURDIR)/.data/ffmpeg/ffprobe" --out "$(CURDIR)/eval/results" --keep-masters "$(CURDIR)/eval/results/masters" $(EVAL_ARGS)
 
 # openapi.json from the Python models, then the TS types from openapi.json (T-1.4a)
 contracts: ## regenerate openapi.json and the TypeScript types

@@ -2,7 +2,7 @@
 
 This guide takes a fresh PC from `git clone` to a running, tested app. Every command here comes from the repo's own files (`Makefile`, `scripts/`, `infra/`). If a command and this guide disagree, the repo wins; fix the guide.
 
-**Status of the app.** Phase 1 (the walking skeleton) is built: web shell, API, workers, Postgres, Redis, backups. Phase 2 has started: song upload, validation, beat analysis (plan 004) and stock-clip search, ranking and normalizing (plan 005) are built, and so are the planner (plan 006) and the render with its verification (plan 007). The CLI and the Claude Code skill (plan 009) are **not built yet (Phase 2)**. Plan 008 adds the operate side: retention sweeps, auto-tuning, the Settings API (tuning, disk usage, stock provider) and the security checks. Today `make smoke-stack` checks the running stack. Sections marked "not built yet (Phase 2)" will be completed as Phase 2 lands.
+**Status of the app.** Phase 1 (the walking skeleton) is built: web shell, API, workers, Postgres, Redis, backups. Phase 2 has started: song upload, validation, beat analysis (plan 004) and stock-clip search, ranking and normalizing (plan 005) are built, and so are the planner (plan 006) and the render with its verification (plan 007). Plan 008 adds the operate side: retention sweeps, auto-tuning, the Settings API (tuning, disk usage, stock provider) and the security checks. Plan 009 adds the `saveclock` command-line tool, the Claude Code skill (`.claude/skills/saveclock/SKILL.md`), a throwaway developer page (`/dev`, off by default) and the eval tooling that produces the G2 evidence (sections 10 and 11). Today `make smoke-stack` checks the running stack. Sections marked "not built yet (Phase 2)" will be completed as Phase 2 lands.
 
 ## 1. What you need on the PC
 
@@ -19,12 +19,14 @@ This guide takes a fresh PC from `git clone` to a running, tested app. Every com
 | `make`, `git`, `curl`, `python3` | any recent | Makefile, clone, readiness checks, `smoke-*` scripts |
 | `podman` + `podman-compose` (or `docker` + compose v2) | Podman 5.8, podman-compose 1.6 tested | builds and runs the containers |
 | `openssl` | any | `make env` makes the random secrets |
-| `uv` | **0.11.24** exactly | developers only (`make doctor-dev`, `make check`) |
-| Python 3.12 | installed by `uv` | developers only; `uv` fetches it on first use |
+| `uv` | **0.11.24** exactly | also needed to run the `saveclock` CLI and the eval tooling (sections 10 and 11), not only for developers; `make doctor-dev` checks it |
+| Python 3.12 | installed by `uv` | the CLI, the eval tooling and developers; `uv` fetches it on first use |
 | `node` | **v22.23.1** exactly (`.nvmrc`) | developers only (`make doctor-dev`, `make check`) |
 | `pnpm` | **10.30.3** exactly | developers only (`make doctor-dev`, `make check`) |
 
-Note: the images are built inside containers, so `uv`, `node` and `pnpm` are not needed to run the app. `make doctor` checks only what running needs: container runtime and compose, `make`, `git`, `curl`, `openssl`, `python3`, free ports, disk, and the cached FFmpeg tarball and model weights. `make doctor-dev` adds the pinned uv, Python, node and pnpm (`scripts/check_toolchain.sh`), which `make check` needs.
+The first `uv run` (for example the first `scripts/saveclock`) needs the network once: it installs the locked Python dependencies into `services/api/.venv`. The `ml` extra is not needed for the CLI or the eval tooling. `ffprobe` for the eval comes from `make ffmpeg-bin`, which extracts the pinned FFmpeg into `.data/ffmpeg`.
+
+Note: the images are built inside containers, so `uv`, `node` and `pnpm` are not needed to run the app itself (the app, not the CLI or the eval). `make doctor` checks only what running needs: container runtime and compose, `make`, `git`, `curl`, `openssl`, `python3`, free ports, disk, and the cached FFmpeg tarball and model weights. `make doctor-dev` adds the pinned uv, Python, node and pnpm (`scripts/check_toolchain.sh`), which `make check` needs.
 
 To install node and pnpm (developers), do it the way you like. One way: install node 22.23.1 (nvm, fnm, or your distro), then `corepack enable` (`package.json` pins `pnpm@10.30.3`).
 
@@ -188,6 +190,8 @@ Never commit `.env`. `make secrets` fails if a `.env*` file is tracked.
 
    Expected: `ready: 200`, then `web ready: 200`. If it prints `api did not become ready`, see section 8.
 
+   **No Pexels key?** Use `make dev-fakes` instead of `make dev`. It starts the same stack, but the two workers serve generated stock clips and fake keywords (`infra/compose/compose.fakes.yml`; it also runs `make fake-stock`, which needs `make ffmpeg-bin`). That is how the CLI flow, `make eval-smoke` and `make eval-soak` can finish a render without a key. `make dev` never reads that file, and the app refuses fake stock when `APP_ENV=prod`. With a key, use `make dev`.
+
 8. Open **http://localhost:3000** in the browser.
 
    Use `localhost`, **not** `127.0.0.1`. The web layer checks the `Host` header and answers `403 Host not allowed` for anything else, and the browser calls the API at `http://localhost:8000` with CORS allowing only `APP_ORIGIN=http://localhost:3000`. `127.0.0.1:3000` is a different origin.
@@ -203,7 +207,9 @@ Never commit `.env`. `make secrets` fails if a `.env*` file is tracked.
 
    `make smoke-stack` smoke-tests the running stack: it creates a project, lists it, checks the guards and logs, and deletes the project again. It uses the default ports 3000 and 8000. The old stub project and `make smoke-stub` are gone.
 
-   `make seed` adds one analysed click-track project (30 s at 128 BPM) to the running stack. It needs `make images` first. It prints `created <project id>` the first time and `exists` when you run it again. It is handy to see something in the UI.
+   `make seed` adds one analysed click-track project (30 s at 128 BPM) to the running stack. It needs `make images` first. It prints `created <project id>` the first time and `exists` when you run it again. It is handy to see something in the UI, and it leaves `.data/seed/click.wav` for the CLI dry run (section 10).
+
+   `make dev-driver` turns on the throwaway developer page at `http://localhost:3000/dev` (upload a song, watch the progress, render, download); `make smoke-driver` checks that the page is 404 with the flag off and 200 with it on, and puts the flag back off. It needs the stack up and a web image built after plan 009 (`make images`).
 
 ## 4. Verify it is healthy
 
@@ -326,6 +332,7 @@ After a `git pull` or checkout, run `make guard` (the config-malware check) befo
   5. Why: the API compares the `Origin` of every state-changing request (POST, PUT, PATCH, DELETE) with `APP_ORIGIN`, port included (`403` otherwise), and CORS allows exactly that origin. The Host allowlist (`ALLOWED_HOSTS`) ignores the port, so a port change needs no `ALLOWED_HOSTS` change.
   6. A different host name (for example a LAN IP) is not supported without editing the `ALLOWED_HOSTS` of the api and the web in the compose file, and the browser must use the same name as `APP_ORIGIN`. The web also reads `ALLOWED_HOSTS` when its image is built (`apps/web/next.config.ts`, which bakes the rewrites), so after any change to it edit `.env`, run `make images`, then `make stack-up` (or `make dev`).
   7. `make restore-proof` uses 18000/13000 on purpose and its scratch stack does not rebuild images.
+- **The `saveclock` CLI.** `error: network_error` means the stack is not running (`make dev`). `403 forbidden` with `host_not_allowed` means the API URL used `::1` or another name: the CLI accepts `::1` as loopback but the API's Host list does not, so use `localhost` or `127.0.0.1`. A timeout (exit 3, "still running") means the job is still going, not that it failed: check `scripts/saveclock status <id>`.
 - **Rootless Podman cannot publish ports under 1024.** None are used.
 
 ## 9. Variables you can set on the make command line
@@ -334,4 +341,48 @@ After a `git pull` or checkout, run `make guard` (the config-malware check) befo
 
 ## 10. Using it with Claude Code
 
-Not built yet (Phase 2, plan 009). The `saveclock` command-line tool and the `.claude/skills/saveclock` skill arrive in Phase 2. Neither exists in the repo today. This section is completed then.
+The `saveclock` command-line tool is a thin client of the local API. It adds no rules of its own and talks only to this machine.
+
+1. **Install it (optional).** Run it from the repo root as `scripts/saveclock`, or link it once:
+
+   ```bash
+   ln -s "$PWD/scripts/saveclock" ~/.local/bin/saveclock
+   ```
+
+   The wrapper keeps the folder you run it from, so a relative song path or `--out ./out` means what you meant.
+
+2. **See what it does:** `scripts/saveclock --help` lists the eight commands (`new`, `show`, `keywords`, `plan`, `render`, `export`, `status`, `open`).
+
+3. **Environment.** `SAVECLOCK_API_URL` (default `http://127.0.0.1:8000`; if you changed `API_PORT`, change it too, or pass `--api-url`) must stay on this machine: only `localhost`, `127.0.0.1` and `::1` are accepted. `APP_ORIGIN` (default `http://localhost:3000`) is used only by `open`.
+
+4. **The skill.** `.claude/skills/saveclock/SKILL.md` is committed. Claude Code finds it when started inside the repo, so start it from the repo root. It tells Claude Code the flow, the commands, the keyword rules, that only the analysis summary is visible (never audio), that the app never calls `claude`, and how to read errors. `make skill-check` keeps it in sync with the code.
+
+5. **The dry run.** With the stack up (`make dev-fakes` or `make dev`) and `make seed` done, start Claude Code in the repo root and give it this one line:
+
+   > Make a 30-second video for `.data/seed/click.wav` with the vibe "calm night drive" and put the files in `./out`.
+
+   It should run `new`, `status --watch`, `show --json`, `keywords set`, `render` and `export` without any hand fix. Create `./out` first (the CLI never creates the folder).
+
+6. **What the CLI refuses.** A non-loopback URL (before any request), a redirect, an id that is not a UUID, an `--out` folder that does not exist, and overwriting a file without `--force`. It sends no `Origin`, no cookie and no secret, and holds none.
+
+## 11. Running the G2 evidence on the real PC
+
+G2 needs hours of real rendering that only your PC can do. The tooling is built and proven on a short run (3 renders); you run the long one, fill two review sheets and write the decision. Do this on the PC that will really be used, not a laptop. Commands, in order:
+
+```bash
+make dev                       # or: make dev-fakes (no Pexels key); real stock needs the key
+make ffmpeg-bin                # extracts the pinned FFmpeg (ffprobe for the eval) into .data/ffmpeg
+uv --directory services/api sync --locked --group eval
+cp eval/manifests/local.example.json eval/manifests/local.json   # optional: your own songs; edit it
+make eval-smoke                # 3 renders first: minutes; proves the tooling and measures the time per render
+make eval-soak                 # 100 consecutive renders: hours; keeps the masters for the audit
+```
+
+- **Songs.** The soak uses 100 generated click tracks (six tempo and length pairs). `eval/manifests/local.json` (git-ignored) appends your own songs: the file shape is in `eval/manifests/local.example.json`. Add `EVAL_ARGS=--live` to the make command to use them (`make eval-soak EVAL_ARGS=--live`). Audio is never committed.
+- **Resume.** `make eval-soak` prints the run id and writes `eval/results/<run-id>.partial.json` after every render. If it stops, continue with `uv --directory services/api run --group eval python ../../eval/run_eval.py --resume <run-id> --soak 100 --api-url http://127.0.0.1:8000 --ffprobe "$PWD/.data/ffmpeg/ffprobe" --out "$PWD/eval/results" --keep-masters "$PWD/eval/results/masters"`. A failure resets the "consecutive completed renders" counter and is reported, never hidden: the goal is 100 in a row.
+- **Where the results land.** `eval/results/<run-id>.csv` and `.md` (the table; the machine facts and the stack's tuning are at the top), `<run-id>-audit.csv` and `<run-id>-keywords.csv` (the two blank sheets), `eval/results/masters/<run-id>/` (the kept silent masters, git-ignored). The statuses are `PASS`, `FAIL`, `NOT MEASURED`, `PENDING` or `OWNER-BLOCKED`; a row that was not measured is never a pass.
+- **Fill the audit sheet** (`<run-id>-audit.csv`, QM-036(b)): each row names a render, a cut and its start and end in seconds. Open that master (`master_path`; `NOT KEPT` means the master was not kept) at those times. Write `yes` in `hard_cut_seen` when you see a hard cut *inside* that segment (a cut that is not the planned beat cut). Leave it empty otherwise. QM-036 passes at no more than 1 % yes. Real footage is what matters here: if you have a Pexels key, run a few real-stock renders first and build the sheet from them.
+- **Fill the keyword sheet** (`<run-id>-keywords.csv`, QM-031): for each song, read the keywords and score 1 to 5 in `relevance_1_to_5` ("the keywords fit the song's vibe"). QM-031 passes at a mean of 4.0 or more.
+- **Commit the results** (text files only): `eval/results/<run-id>.csv`, `.md` and the two sheets. Never commit audio, the masters, `local.json` or a `.partial.json` (all git-ignored).
+- **Time and disk.** `make eval-smoke` prints the measured mean time per render and "a 100-render soak is about N h (smoke mean x 100)". The masters are about 40 MB each (a stated estimate; the smoke run measures it), so 100 masters need about 4 GB free; the script refuses to start when the stack reports low disk.
+- **The decision.** The last section of `reports/g2-evidence.md` is yours: write `G2 decision: GO` or `G2 decision: NO-GO` and the date. A NO-GO means "fix pipeline; no UI polish". Decide first whether to build a small golden set (RQ-5): until then the golden-set rows say `NOT MEASURED`.
