@@ -32,6 +32,7 @@ from saveclock.workers import remux as remux_worker
 from saveclock.workers import render as render_worker
 
 MAX_SONG_S = 600
+RENDER_SLACK_S = 30  # a late rehydrate slot wait or retry never makes the sum the limit
 SLOWEST_BEAT_THIS_PER_AUDIO_S = 22 / 30  # measured: 22 s for a 30 s clip, model load included
 
 
@@ -76,7 +77,7 @@ def test_the_slot_wait_the_encode_the_verification_and_the_publish_fit_the_rende
         + RENDER_VERIFY_S
         + RENDER_PUBLISH_S
     )
-    assert spent <= RENDER_LIMIT_S
+    assert spent + RENDER_SLACK_S <= RENDER_LIMIT_S  # the parts plus 30 s of slack
     assert HEAVY_TTL_S > RENDER_LIMIT_S
 
 

@@ -11,7 +11,7 @@ from tests.unit.test_registry import registered
 
 @pytest.mark.unit
 def test_the_reap_targets_are_the_documented_ones() -> None:
-    assert {"uploads", "stuck_jobs", "orphans", "all"} == WHAT
+    assert {"uploads", "stuck_jobs", "orphans"} == WHAT
 
 
 @pytest.mark.unit

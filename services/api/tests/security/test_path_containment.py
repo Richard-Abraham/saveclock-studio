@@ -135,9 +135,8 @@ async def test_a_hostile_download_kind_is_422_and_a_symlinked_file_is_not_served
         f"/api/v1/renders/{rid}/download", params={"kind": "silent_video"}
     )
     assert CANARY_TEXT not in response.content
-    # never the canary. A planted link is refused; today `serve` lets the store's InvalidKey
-    # surface as a 500 instead of a 404 (a finding, reported: services/files.py is out of scope)
-    assert response.status_code in {404, 409, 500}
+    # never the canary: a planted link is refused like a missing key
+    assert response.status_code == 404
     ok = await api.client.get(f"/api/v1/renders/{rid}/download", params={"kind": "with_song"})
     assert ok.status_code == 200  # the untouched file of the same render still serves
 

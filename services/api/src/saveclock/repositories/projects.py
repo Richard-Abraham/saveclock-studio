@@ -83,6 +83,8 @@ class ProjectRepository:
         }
         if to == ProjectStatus.DELETED.value:
             values["deleted_at"] = func.now()
+        else:  # replan, redraft and the like rebuild `work/`: the project is sweepable again
+            values["intermediates_purged_at"] = None
         stmt = (
             update(Project)
             .where(
@@ -214,9 +216,10 @@ class ProjectRepository:
         )
         return list((await self.session.scalars(stmt)).all())
 
-    async def list_ids(self, *, user_id: UUID) -> set[UUID]:
-        """Every project id of the user, deleted included (the orphan reconcile)."""
-        stmt = select(Project.id).where(Project.user_id == user_id)
+    async def list_all_ids(self) -> set[UUID]:
+        """Every project id of every user, deleted included (the orphan reconcile: the blob root
+        is shared, so another user's directory is never an orphan)."""
+        stmt = select(Project.id)
         return set((await self.session.scalars(stmt)).all())
 
     async def list_with_status(

@@ -15,7 +15,7 @@ from saveclock.workers.analysis import register_analyze_actor
 from saveclock.workers.broker import build_broker
 from saveclock.workers.draft import register_draft_actors
 from saveclock.workers.ingest import register_validate_actor
-from saveclock.workers.maintenance import register_maintenance_actors
+from saveclock.workers.maintenance import PURGE_RETRIES, register_maintenance_actors
 from saveclock.workers.pipeline import FAILED_ACTOR, register_failure_hook
 from saveclock.workers.remux import register_remux_actor
 from saveclock.workers.render import register_render_actors
@@ -56,7 +56,8 @@ def test_every_actor_has_explicit_limits(tmp_path: Path) -> None:
     for actor in broker.actors.values():
         maintenance = ACTORS.get(actor.actor_name) is JobQueue.MAINTENANCE
         fetch = actor.actor_name in {"build_draft", "replan"}
-        limit = 5 if maintenance else 3 if fetch else 2  # ARCH §8; a purge retries while a job ends
+        limit = 5 if maintenance else 3 if fetch else 2  # ARCH §8
+        limit = PURGE_RETRIES if actor.actor_name == "purge_project" else limit  # outlasts a render
         assert actor.options["max_retries"] <= limit
         assert actor.options["time_limit"] > 0
         assert "min_backoff" in actor.options
@@ -64,7 +65,8 @@ def test_every_actor_has_explicit_limits(tmp_path: Path) -> None:
     for name, queue in ACTORS.items():
         options = broker.actors[name].options
         if queue is JobQueue.MAINTENANCE:  # its messages carry no (job_id, user_id) for the hook
-            assert options["max_retries"] == 5
+            expected = PURGE_RETRIES if name == "purge_project" else 5
+            assert options["max_retries"] == expected
             assert "on_retry_exhausted" not in options
         else:
             assert options["on_retry_exhausted"] == FAILED_ACTOR

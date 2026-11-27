@@ -14,6 +14,8 @@ from uuid import UUID
 import structlog
 
 from saveclock.adapters.blobstore.blob_keys import raw_key
+from saveclock.adapters.heavy_lock import HeavyLockTimeout
+from saveclock.config import FOOTAGE_WAIT_S
 from saveclock.domain.edit_plan import EditPlan
 from saveclock.domain.stock_rules import MAX_DOWNLOAD_BYTES
 from saveclock.errors import ClipUnavailable, StockUnavailable
@@ -25,6 +27,10 @@ from saveclock.services.normalize import normalize_one
 
 log = structlog.get_logger()
 FLAG = "clip_unavailable"
+
+
+def _out_of_time() -> StockUnavailable:
+    return StockUnavailable("rehydration ran out of time", {"reason": "rehydrate_deadline"})
 
 
 async def rehydrate_plan(
@@ -58,10 +64,9 @@ async def rehydrate_plan(
             clip = cut.clip
             if ctx.blobs.exists(clip.mezzanine_key):  # the same clip served an earlier cut
                 continue
-            if time.monotonic() - started > deadline_s:
-                raise StockUnavailable(
-                    "rehydration ran out of time", {"reason": "rehydrate_deadline"}
-                )
+            remaining = deadline_s - (time.monotonic() - started)
+            if remaining <= 0:
+                raise _out_of_time()
             await emitter.aemit("restoring_clips", n / len(todo), force=True)
             raw = raw_key(project_id, clip.provider, clip.provider_id)
             if not ctx.blobs.exists(raw):
@@ -91,13 +96,17 @@ async def rehydrate_plan(
                     provider_id=clip.provider_id,
                 )
             stored = row.mezz_frames if row is not None else None
-            done = await normalize_one(
-                deps,
-                user_id=user_id,
-                project_id=project_id,
-                provider=clip.provider,
-                provider_id=clip.provider_id,
-            )
+            try:  # the slot wait spends what is left of the budget, never more than FOOTAGE_WAIT_S
+                done = await normalize_one(
+                    deps,
+                    user_id=user_id,
+                    project_id=project_id,
+                    provider=clip.provider,
+                    provider_id=clip.provider_id,
+                    wait_s=min(FOOTAGE_WAIT_S, deadline_s - (time.monotonic() - started)),
+                )
+            except HeavyLockTimeout as exc:
+                raise _out_of_time() from exc
             if done.mezz_frames != stored:
                 msg = "the rebuilt clip differs from the planned one"
                 raise ClipUnavailable(msg, {"cut": cut.index})

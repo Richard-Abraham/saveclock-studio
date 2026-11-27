@@ -46,7 +46,7 @@ DRAFT_LIMIT_S = 180
 # outlives it, so a live worker never loses a slot it holds. A remux is far shorter; it shares the
 # worker threads with the render. Plan 008: a render whose intermediates were swept first fetches
 # its clips again (RENDER_REHYDRATE_S, before the slot is taken), inside the same limit.
-RENDER_LIMIT_S = 810
+RENDER_LIMIT_S = 840  # 30 s of slack over the sum of the parts below
 # hypothesis: up to 20 clips, one download plus one normalize each, unmeasured (plan 008 Step 4)
 RENDER_REHYDRATE_S = 150
 RENDER_FFMPEG_S = 270

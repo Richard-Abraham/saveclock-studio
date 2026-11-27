@@ -35,9 +35,9 @@ class RenderRepository:
             out.setdefault(project_id, []).append(render_id)
         return out
 
-    async def list_ids(self, *, user_id: UUID) -> set[UUID]:
-        """Every render id of the user (the orphan reconcile)."""
-        stmt = select(Render.id).where(Render.user_id == user_id)
+    async def list_all_ids(self) -> set[UUID]:
+        """Every render id of every user (the orphan reconcile: the blob root is shared)."""
+        stmt = select(Render.id)
         return set((await self.session.scalars(stmt)).all())
 
     async def for_job(self, *, user_id: UUID, job_id: UUID) -> Render | None:

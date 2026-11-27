@@ -2,9 +2,10 @@
 
 Messages carry ids and literals only and every body re-checks ownership through the repositories.
 `sweep_intermediates` and `reap_orphans` take the Redis lock `housekeeping:lock` (a second
-concurrent run returns without work); `purge_project` and `prune_jobs` do not. These actors have
-no `on_retry_exhausted` hook: that hook unpacks `(job_id, user_id)`, which these messages lack, and
-the sweeper picks up whatever a purge left behind.
+concurrent run that cannot get it in time raises `LockBusy`, so the broker retries it);
+`purge_project` and `prune_jobs` do not. These actors have no `on_retry_exhausted` hook: that hook
+unpacks `(job_id, user_id)`, which these messages lack, and the sweeper picks up whatever a purge
+left behind.
 """
 
 import asyncio
@@ -21,7 +22,12 @@ from saveclock.adapters.queue import ACTORS
 from saveclock.config import MAINT_LIMIT_S, PURGE_LIMIT_S, Settings
 from saveclock.services import housekeeping
 from saveclock.services.context import WorkerContext
-from saveclock.workers.pipeline import actor_options, run_with_context
+from saveclock.workers.pipeline import (
+    MAX_BACKOFF_MS,
+    MIN_BACKOFF_MS,
+    actor_options,
+    run_with_context,
+)
 
 log = structlog.get_logger()
 
@@ -30,13 +36,21 @@ PURGE_TIME_LIMIT_MS = PURGE_LIMIT_S * 1000
 MAINT_RETRIES = 5
 LOCK_WAIT_S = 8  # shortcut: a fixed wait, upgrade to a queue of waiters if sweeps ever run long
 LOCK_POLL_S = 0.25
-WHAT = frozenset({"uploads", "stuck_jobs", "orphans", "all"})
+# a purge waits for a running render (up to RENDER_LIMIT_S): the retry window must outlast it
+PURGE_RETRIES = 15
+PURGE_MIN_BACKOFF_MS = 60_000
+PURGE_MAX_BACKOFF_MS = 120_000
+WHAT = frozenset({"uploads", "stuck_jobs", "orphans"})
+
+
+class LockBusy(Exception):
+    """Another sweep still holds `housekeeping:lock`: the actor retries (no work was done)."""
 
 
 async def _locked(redis: Redis, name: str, work: Callable[[], Awaitable[None]]) -> None:
     """Run `work()` under `housekeeping:lock`. Another sweep that is still running makes this one
-    return without work, but a lock that is only briefly held (the periodic sender fires several
-    actors at once) is waited for: LOCK_WAIT_S."""
+    raise `LockBusy` without work (the broker retries it), but a lock that is only briefly held
+    (the periodic sender fires several actors at once) is waited for: LOCK_WAIT_S."""
     deadline = time.monotonic() + LOCK_WAIT_S
     while True:
         got = await asyncio.to_thread(
@@ -46,7 +60,7 @@ async def _locked(redis: Redis, name: str, work: Callable[[], Awaitable[None]]) 
             break
         if time.monotonic() >= deadline:
             log.info("housekeeping.locked", actor=name)
-            return
+            raise LockBusy(name)
         await asyncio.sleep(LOCK_POLL_S)
     try:
         await work()
@@ -87,11 +101,11 @@ def register_maintenance_actors(broker: dramatiq.Broker, settings: Settings) -> 
             try:
 
                 async def work() -> None:
-                    if what in {"uploads", "all"}:
+                    if what == "uploads":
                         await housekeeping.reap_abandoned_uploads(ctx, uid)
-                    if what in {"stuck_jobs", "all"}:
+                    if what == "stuck_jobs":
                         await housekeeping.reap_stuck_jobs(ctx, uid, r)
-                    if what in {"orphans", "all"}:
+                    if what == "orphans":
                         await housekeeping.reconcile_orphans(ctx, uid, r)
 
                 await _locked(r, f"reap_orphans:{what}", work)
@@ -112,16 +126,42 @@ def register_maintenance_actors(broker: dramatiq.Broker, settings: Settings) -> 
 
         run_with_context(settings, broker, blobs, body)
 
-    for name, fn, limit in (
-        ("sweep_intermediates", sweep_intermediates, TIME_LIMIT_MS),
-        ("reap_orphans", reap_orphans, TIME_LIMIT_MS),
-        ("purge_project", purge_project, PURGE_TIME_LIMIT_MS),
-        ("prune_jobs", prune_jobs, TIME_LIMIT_MS),
+    for name, fn, limit, retries, min_backoff_ms, max_backoff_ms in (
+        (
+            "sweep_intermediates",
+            sweep_intermediates,
+            TIME_LIMIT_MS,
+            MAINT_RETRIES,
+            MIN_BACKOFF_MS,
+            MAX_BACKOFF_MS,
+        ),
+        (
+            "reap_orphans",
+            reap_orphans,
+            TIME_LIMIT_MS,
+            MAINT_RETRIES,
+            MIN_BACKOFF_MS,
+            MAX_BACKOFF_MS,
+        ),
+        (
+            "purge_project",
+            purge_project,
+            PURGE_TIME_LIMIT_MS,
+            PURGE_RETRIES,
+            PURGE_MIN_BACKOFF_MS,
+            PURGE_MAX_BACKOFF_MS,
+        ),
+        ("prune_jobs", prune_jobs, TIME_LIMIT_MS, MAINT_RETRIES, MIN_BACKOFF_MS, MAX_BACKOFF_MS),
     ):
         dramatiq.actor(
             broker=broker,
             actor_name=name,
             **actor_options(
-                ACTORS[name], limit, max_retries=MAINT_RETRIES, on_retry_exhausted=None
+                ACTORS[name],
+                limit,
+                max_retries=retries,
+                min_backoff_ms=min_backoff_ms,
+                max_backoff_ms=max_backoff_ms,
+                on_retry_exhausted=None,
             ),
         )(fn)

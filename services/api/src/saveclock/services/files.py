@@ -6,7 +6,7 @@ from dataclasses import dataclass, field
 from http import HTTPStatus
 from urllib.parse import quote
 
-from saveclock.adapters.blobstore.blob_keys import is_servable
+from saveclock.adapters.blobstore.blob_keys import InvalidKey, is_servable
 from saveclock.adapters.blobstore.port import BlobStore
 from saveclock.errors import NotFound, RangeNotSatisfiable
 
@@ -61,7 +61,10 @@ def serve(
     # 404, not 403: a key we do not serve must not reveal whether it exists.
     if not is_servable(key):
         raise NotFound
-    size = blobs.stat(key).size
+    try:
+        size = blobs.stat(key).size
+    except InvalidKey as exc:  # a planted link or an escaping path: same answer as a missing key
+        raise NotFound from exc
     name = key.rsplit("/", 1)[-1]
     ext = "." + name.rsplit(".", 1)[-1] if "." in name else ""
     headers = {

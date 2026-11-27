@@ -10,6 +10,7 @@ from saveclock.adapters.queue import DramatiqEnqueuer
 from saveclock.config import Settings
 from saveclock.housekeeping_cli import main as cli_main
 from saveclock.services import housekeeping as hkp
+from saveclock.workers import maintenance
 from saveclock.workers.broker import build_broker
 from tests.conftest import ENV
 from tests.integration.conftest import REDIS_URL, Harness
@@ -54,7 +55,9 @@ async def test_a_sent_sweep_removes_intermediates_and_keeps_the_song(
     assert hk.redis.get(hkp.LOCK_KEY) is None  # the lock is released
 
 
-async def test_a_held_lock_makes_the_actor_return_without_work(hk: Hk, harness: Harness) -> None:
+async def test_a_held_lock_makes_the_actor_wait_then_retry_without_losing_the_work(
+    hk: Hk, harness: Harness
+) -> None:
     old = await hk.project(idle=8 * DAY)
     hk.redis.set(hkp.LOCK_KEY, "someone else", ex=60)
     proc = harness.start_worker(["maintenance"])
@@ -65,8 +68,24 @@ async def test_a_held_lock_makes_the_actor_return_without_work(hk: Hk, harness: 
     assert len(hk.blobs.list(f"work/{old}")) == 4
     assert proc.poll() is None
     hk.redis.delete(hkp.LOCK_KEY)
-    sender(harness).send("sweep_intermediates", str(hk.user))
+    # no second send: the broker retries the first message once the lock is free
     await eventually(lambda: not hk.has(f"work/{old}"))
+
+
+async def test_a_lock_still_held_after_the_wait_raises_so_the_broker_retries(
+    hk: Hk, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(maintenance, "LOCK_WAIT_S", 0.3)
+    hk.redis.set(hkp.LOCK_KEY, "someone else", ex=60)
+    ran: list[bool] = []
+
+    async def work() -> None:
+        ran.append(True)
+
+    with pytest.raises(maintenance.LockBusy):
+        await maintenance._locked(hk.redis, "sweep_intermediates", work)
+    assert ran == []
+    assert hk.redis.get(hkp.LOCK_KEY) == b"someone else"  # not ours: left alone
 
 
 async def test_a_purge_message_removes_files_and_rows(hk: Hk, harness: Harness) -> None:

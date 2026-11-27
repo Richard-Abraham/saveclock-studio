@@ -47,11 +47,14 @@ class NormalizedClip:
     mezz_frames: int  # the probed frame count: the truth for planner invariant 3
 
 
-def _encode_and_check(deps: FootageDeps, project_id: UUID, clip: RankedClip) -> int | RejectReason:
-    """Encode the window, probe the result, and store it. The probed frame count, or why not."""
+def _encode_and_check(
+    deps: FootageDeps, project_id: UUID, clip: RankedClip, wait_s: float = FOOTAGE_WAIT_S
+) -> int | RejectReason:
+    """Encode the window, probe the result, and store it. The probed frame count, or why not.
+    Waits up to `wait_s` for a heavy slot."""
     ctx = deps.ctx
     src = ctx.blobs.local_path(raw_key(project_id, clip.provider, clip.provider_id))
-    with deps.heavy.hold(FOOTAGE_WAIT_S), scratch_dir(ctx.settings.scratch_root, new_id()) as tmp:
+    with deps.heavy.hold(wait_s), scratch_dir(ctx.settings.scratch_root, new_id()) as tmp:
         out = tmp / "mezz.mp4"
         try:
             build_mezz(ctx.tools, src, clip.window, out, cancel=deps.cancel)
@@ -76,7 +79,13 @@ def _encode_and_check(deps: FootageDeps, project_id: UUID, clip: RankedClip) -> 
 
 
 async def _normalize(
-    deps: FootageDeps, user_id: UUID, project_id: UUID, clip: RankedClip
+    deps: FootageDeps,
+    user_id: UUID,
+    project_id: UUID,
+    clip: RankedClip,
+    *,
+    wait_s: float = FOOTAGE_WAIT_S,
+    raise_busy: bool = False,
 ) -> NormalizedClip | None:
     async with deps.ctx.sessionmaker() as session:
         row = await CandidateRepository(session).get_by_provider_id(
@@ -95,10 +104,14 @@ async def _normalize(
             clip.provider, clip.provider_id, clip.query, clip.score, row.mezz_frames
         )
     try:
-        outcome = await asyncio.to_thread(_encode_and_check, deps, project_id, clip)
+        outcome = await asyncio.to_thread(_encode_and_check, deps, project_id, clip, wait_s)
     except FfCanceled as exc:
         raise JobCanceled from exc
-    except (FfTimeout, HeavyLockTimeout):
+    except HeavyLockTimeout:
+        if raise_busy:  # the caller has its own budget and decides what a busy slot means
+            raise
+        return None  # transient: stays `ranked`, the next clip takes its place
+    except FfTimeout:
         return None  # transient: stays `ranked`, the next clip takes its place
     if isinstance(outcome, RejectReason):
         await mark_candidate(
@@ -152,9 +165,17 @@ async def normalize_topk(
 
 
 async def normalize_one(
-    deps: FootageDeps, *, user_id: UUID, project_id: UUID, provider: str, provider_id: str
+    deps: FootageDeps,
+    *,
+    user_id: UUID,
+    project_id: UUID,
+    provider: str,
+    provider_id: str,
+    wait_s: float | None = None,
 ) -> NormalizedClip:
-    """Lazy normalize of one ranked candidate (a swap): from the stored window and the raw file."""
+    """Lazy normalize of one ranked candidate (a swap): from the stored window and the raw file.
+    `wait_s` caps the wait for a heavy slot and makes a busy slot raise `HeavyLockTimeout`
+    (rehydration spends a budget); without it the wait is FOOTAGE_WAIT_S and busy means None."""
     async with deps.ctx.sessionmaker() as session:
         row = await CandidateRepository(session).get_by_provider_id(
             user_id=user_id, project_id=project_id, provider=provider, provider_id=provider_id
@@ -172,7 +193,14 @@ async def normalize_one(
         float(row.score or 0.0),
         Window(float(Decimal(row.window_start_s)), row.mezz_frames / FPS),
     )
-    normalized = await _normalize(deps, user_id, project_id, clip)
+    normalized = await _normalize(
+        deps,
+        user_id,
+        project_id,
+        clip,
+        wait_s=FOOTAGE_WAIT_S if wait_s is None else wait_s,
+        raise_busy=wait_s is not None,
+    )
     if normalized is None:
         msg = "the clip could not be normalized"
         raise ClipUnavailable(msg)

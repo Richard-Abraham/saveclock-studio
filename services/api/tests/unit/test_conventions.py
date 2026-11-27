@@ -29,12 +29,16 @@ def repository_methods() -> Iterator[tuple[str, str, inspect.Signature]]:
                     yield cls_name, name, inspect.signature(fn)
 
 
+# The documented exceptions: the orphan reconcile compares the shared blob root with all ids.
+ALL_USERS = {"ProjectRepository.list_all_ids", "RenderRepository.list_all_ids"}
+
+
 @pytest.mark.unit
 def test_every_repository_method_takes_user_id() -> None:
     seen = list(repository_methods())
     assert seen, "no repository methods found: the introspection is broken"
     missing = [f"{c}.{m}" for c, m, sig in seen if "user_id" not in sig.parameters]
-    assert missing == []  # the documented exception list is empty
+    assert missing == sorted(ALL_USERS)
 
 
 def _depends_on_current_user(dependant: Dependant) -> bool:

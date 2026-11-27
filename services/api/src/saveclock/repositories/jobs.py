@@ -171,7 +171,8 @@ class JobRepository:
         return list((await self.session.scalars(stmt)).all())
 
     async def touch_resent(self, *, user_id: UUID, job_id: UUID) -> None:
-        """The reaper re-sent the job: restart its clock (a core UPDATE skips `onupdate`)."""
+        """The reaper re-sent the job: restart its clock (set
+        explicitly, not left to `onupdate`)."""
         stmt = (
             update(Job)
             .where(

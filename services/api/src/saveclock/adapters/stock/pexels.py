@@ -5,6 +5,7 @@ The key goes only in the `Authorization` header. Nothing here logs a URL.
 
 from collections.abc import Callable
 from typing import Any
+from urllib.parse import quote
 
 from saveclock.adapters.blobstore.port import BlobStore
 from saveclock.adapters.stock.download import Downloader
@@ -94,7 +95,7 @@ class PexelsProvider:
     def video_by_id(self, provider_id: str) -> StockClip | None:
         """`GET /videos/videos/{id}`; a 404 or a clip with no usable file is None (gone)."""
         data = self._http.get_json(
-            f"{VIDEO_URL}{provider_id}",
+            f"{VIDEO_URL}{quote(provider_id, safe='')}",
             params={},
             headers={"Authorization": self._key},
             not_found_ok=True,

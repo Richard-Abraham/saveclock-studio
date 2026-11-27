@@ -164,8 +164,11 @@ async def test_layer_a_every_file_reaches_a_documented_outcome(  # noqa: PLR0917
     worker = harness.start_worker(["analysis", "render"])
     scratch = harness.tmp_path / "scratch"
     top_before = await asyncio.to_thread(listdir_names, tmp_path)  # canary: nothing else appears
-    await asyncio.sleep(3)  # the worker boots and registers
+    boot_deadline = time.monotonic() + 30  # the worker boots and registers: poll, never guess
     before = descendants(worker.pid)
+    while not before and time.monotonic() < boot_deadline:
+        await asyncio.sleep(0.5)
+        before = descendants(worker.pid)
     assert before, "the worker has no child processes: is it running?"
 
     accepted: list[tuple[str, str]] = []

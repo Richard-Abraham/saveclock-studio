@@ -1,5 +1,8 @@
 """The ticker sends each schedule once per interval, and the Redis guard stops a second sender."""
 
+import threading
+import time
+
 import pytest
 
 from saveclock.adapters.queue import ACTORS, FakeEnqueuer
@@ -67,3 +70,36 @@ def test_a_second_process_with_the_same_redis_never_double_sends() -> None:
 def test_the_sweep_interval_setting_is_used() -> None:
     ticker = PeriodicEnqueue(make_settings(SWEEP_INTERVAL_MIN="15"))
     assert {s.name: s.every_s for s in ticker.schedules}["sweep"] == 900
+
+
+class FlakyEnqueuer:
+    """Raises a ValueError on the first send, then records the sends."""
+
+    def __init__(self) -> None:
+        self.calls = 0
+        self.sent: list[str] = []
+
+    def send(self, actor: str, *args: str) -> None:
+        self.calls += 1
+        if self.calls == 1:
+            msg = "broker hiccup"
+            raise ValueError(msg)
+        self.sent.append(actor)
+
+
+@pytest.mark.unit
+def test_the_loop_survives_any_exception_and_sends_on_the_next_tick() -> None:
+    redis, flaky = GuardRedis(), FlakyEnqueuer()
+    ticker = PeriodicEnqueue(make_settings(), tick_s=0.01)
+    thread = threading.Thread(target=ticker._loop, args=(redis, flaky))
+    thread.start()
+    try:
+        deadline = time.monotonic() + 5
+        while not flaky.sent and time.monotonic() < deadline:
+            time.sleep(0.01)
+    finally:
+        ticker._stop.set()
+        thread.join(timeout=5)
+    assert flaky.calls >= 2
+    assert flaky.sent
+    assert not thread.is_alive()

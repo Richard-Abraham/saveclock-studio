@@ -13,7 +13,10 @@ from uuid import UUID
 import pytest
 
 from saveclock.config import STUCK_QUEUED_S
+from saveclock.ids import new_id
+from saveclock.repositories.projects import ProjectRepository
 from saveclock.services import housekeeping as hkp
+from saveclock.services.context import WorkerContext
 from saveclock.services.housekeeping import MAX_RESENDS, PurgeBusy
 from tests.integration.conftest import insert_user
 from tests.integration.housekeeping_harness import DAY, NOW, Hk, clock
@@ -191,6 +194,86 @@ async def test_an_orphan_directory_goes_only_on_the_second_sighting(hk: Hk) -> N
         assert not hk.has(f"{top}/{ghost}")
     assert hk.has(f"songs/{real}")  # a real project is never an orphan
     assert hk.has(f"work/{real}")
+
+
+async def test_another_users_directories_are_not_orphans(hk: Hk) -> None:
+    other = UUID("00000000-0000-4000-8000-0000000000cc")
+    await insert_user(hk.db, other, "c@example.test")
+    theirs = await hk.project(user=other)
+    their_render = new_id()
+    await hk.sql(
+        "INSERT INTO edit_plans (id, project_id, version, schema_version, plan, content_hash,"
+        " created_by) VALUES ($1,$2,1,'1','{}',$3,'planner')",
+        new_id(),
+        theirs,
+        b"h" * 32,
+    )
+    plan = (await hk.sql("SELECT id FROM edit_plans WHERE project_id=$1", theirs))[0][0]
+    await hk.sql(
+        "INSERT INTO renders (id, project_id, edit_plan_id, user_id, job_hash, state)"
+        " VALUES ($1,$2,$3,$4,$5,'ready')",
+        their_render,
+        theirs,
+        plan,
+        other,
+        b"r" * 32,
+    )
+    hk.put(f"renders/{their_render}/master.mp4")
+    ghost = "00000000-0000-4000-8000-00000000dead"
+    hk.put(f"songs/{ghost}/source.wav")
+
+    for _ in range(2):  # two consecutive passes: the second is the one that deletes
+        await hkp.reconcile_orphans(hk.ctx, hk.user, hk.redis)
+
+    assert not hk.has(f"songs/{ghost}")  # a true orphan is gone
+    assert hk.has(f"songs/{theirs}")
+    assert hk.has(f"work/{theirs}")
+    assert hk.has(f"renders/{their_render}")
+
+
+async def test_a_transition_makes_a_swept_project_sweepable_again(hk: Hk) -> None:
+    pid = await hk.project(idle=8 * DAY)
+    await hkp.sweep_intermediates(hk.ctx, hk.user, clock=clock)
+    assert not hk.has(f"work/{pid}")
+    async with hk.ctx.sessionmaker() as session:  # a replan rebuilds `work/`
+        moved = await ProjectRepository(session).transition(
+            user_id=hk.user, project_id=pid, from_="draft_ready", to="planning"
+        )
+        await session.commit()
+    assert moved
+    hk.put(f"work/{pid}/mezz/pexels_2.mp4")
+    await hk.sql("UPDATE projects SET last_activity_at=$2 WHERE id=$1", pid, NOW - 8 * DAY)
+
+    report = await hkp.sweep_intermediates(hk.ctx, hk.user, clock=clock)
+
+    assert report.projects == [pid]
+    assert not hk.has(f"work/{pid}")
+
+
+async def test_one_failing_purge_does_not_stop_the_next_one(
+    hk: Hk, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    first = await hk.project(status="deleted")
+    second = await hk.project(status="deleted")
+    real = hkp.purge_project
+    calls: list[UUID] = []
+
+    async def flaky(ctx: WorkerContext, user_id: UUID, project_id: UUID) -> None:
+        calls.append(project_id)
+        if len(calls) == 1:
+            msg = "disk went away"
+            raise OSError(msg)
+        await real(ctx, user_id, project_id)
+
+    monkeypatch.setattr(hkp, "purge_project", flaky)
+
+    report = await hkp.sweep_intermediates(hk.ctx, hk.user, clock=clock)
+
+    assert set(calls) == {first, second}
+    survivor, failed = calls[1], calls[0]
+    assert report.purged == [survivor]
+    assert not hk.has(f"songs/{survivor}")
+    assert hk.has(f"songs/{failed}")
 
 
 async def test_prune_jobs_keeps_young_and_unfinished_jobs(hk: Hk) -> None:

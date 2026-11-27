@@ -72,6 +72,8 @@ class PeriodicEnqueue(Middleware):
                     log.info("periodic.sent", schedules=sent)
             except RedisError:
                 log.warning("periodic.tick_failed")  # the next tick retries
+            except Exception:  # the thread must never die: a dead ticker stops all maintenance
+                log.exception("periodic.tick_failed")
             self._stop.wait(self.tick_s)
 
     def after_worker_boot(self, broker: dramatiq.Broker, worker: dramatiq.Worker) -> None:

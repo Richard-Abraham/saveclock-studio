@@ -103,12 +103,17 @@ async def sweep_intermediates(
             report.projects.append(project.id)
         deleted = await projects.list_deleted(user_id=user_id)
     for project in deleted:
-        report.purged.append(project.id)
-        if not dry_run:
-            try:
-                await purge_project(ctx, user_id, project.id)
-            except PurgeBusy:
-                log.info("purge.waiting", project_id=str(project.id))
+        if dry_run:
+            report.purged.append(project.id)
+            continue
+        try:
+            await purge_project(ctx, user_id, project.id)
+        except PurgeBusy:
+            log.info("purge.waiting", project_id=str(project.id))
+        except Exception:
+            log.exception("housekeeping.purge_failed", project_id=str(project.id))
+        else:
+            report.purged.append(project.id)
     log.info(
         "housekeeping.swept",
         freed_bytes=report.freed_bytes,
@@ -214,10 +219,11 @@ async def reconcile_orphans(
     ctx: WorkerContext, user_id: UUID, redis: Redis, *, dry_run: bool = False
 ) -> dict[str, list[str]]:
     """Blob directories whose project (or render) row does not exist. Found, reported, and
-    removed only on the second consecutive sighting (Redis set, 10 days)."""
+    removed only on the second consecutive sighting (Redis set, 10 days). Ids of every user count
+    as known: the blob root is shared, so `user_id` only names who asked."""
     async with ctx.sessionmaker() as session:
-        project_ids = {str(i) for i in await ProjectRepository(session).list_ids(user_id=user_id)}
-        render_ids = {str(i) for i in await RenderRepository(session).list_ids(user_id=user_id)}
+        project_ids = {str(i) for i in await ProjectRepository(session).list_all_ids()}
+        render_ids = {str(i) for i in await RenderRepository(session).list_all_ids()}
     known = {"songs": project_ids, "work": project_ids, "renders": render_ids}
     report: dict[str, list[str]] = {"seen": [], "removed": []}
     for top, ids in known.items():
