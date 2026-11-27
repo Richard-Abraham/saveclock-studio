@@ -19,12 +19,13 @@ from saveclock.adapters.events import EventPublisher
 from saveclock.adapters.ffmpeg import Tools
 from saveclock.adapters.queue import DramatiqEnqueuer
 from saveclock.config import Settings
-from saveclock.models import JobQueue, ProjectStatus
+from saveclock.models import JobQueue, JobStage, ProjectStatus
 from saveclock.repositories.jobs import JobRepository
 from saveclock.repositories.plans import PlanRepository
 from saveclock.services import project_state
 from saveclock.services.context import WorkerContext
 from saveclock.services.plans import restore_keywords_override
+from saveclock.services.render_job import render_job_died
 
 log = structlog.get_logger()
 
@@ -82,7 +83,8 @@ def run_with_context(
 
 
 def register_failure_hook(broker: dramatiq.Broker, settings: Settings) -> None:
-    """Retries exhausted: the job is dead and the project failed (`validating|analyzing` only)."""
+    """Retries exhausted: the job is dead and the project failed (`validating|analyzing` only).
+    A render or remux job also ends its render (`services.render_job.render_job_died`)."""
 
     def pipeline_failed(message_data: dict[str, Any], _exception_data: dict[str, Any]) -> None:
         job_id, user_id = (UUID(a) for a in message_data["args"])
@@ -125,6 +127,11 @@ def register_failure_hook(broker: dramatiq.Broker, settings: Settings) -> None:
                             )
                             if moved and planned and to is ProjectStatus.DRAFT_READY:
                                 await restore_keywords_override(session, user_id, job.project_id)
+                    if job is not None and job.stage in {
+                        JobStage.RENDER.value,
+                        JobStage.REMUX.value,
+                    }:
+                        await render_job_died(session, publisher, user_id, job)  # plan 007
                     await session.commit()
                     await project_state.announce_pending(session, publisher)
             finally:

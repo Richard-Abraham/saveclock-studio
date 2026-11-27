@@ -4,7 +4,8 @@ from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from saveclock.models import Analysis, Fallback, Project, Song
+from saveclock.api.schemas.renders import RenderSummary
+from saveclock.models import Analysis, Fallback, Project, Render, Song
 from saveclock.services.plans import PlanSummary
 from saveclock.services.projects import UiStatus, ui_status
 
@@ -116,7 +117,7 @@ class PlanSummaryOut(BaseModel):
 
 
 class ProjectDetail(BaseModel):
-    """`render` stays empty until plan 007 adds it, additively."""
+    """`render` is the latest render (none before the first one)."""
 
     model_config = ConfigDict(extra="forbid", frozen=True)
 
@@ -129,7 +130,7 @@ class ProjectDetail(BaseModel):
     song: SongMeta | None
     analysis: AnalysisSummary | None
     plan: PlanSummaryOut | None = None
-    render: None = None
+    render: RenderSummary | None = None
     last_activity_at: datetime
     created_at: datetime
 
@@ -140,6 +141,7 @@ class ProjectDetail(BaseModel):
         song: Song | None,
         analysis: Analysis | None,
         plan: PlanSummary | None = None,
+        render: Render | None = None,
     ) -> "ProjectDetail":
         return cls(
             id=p.id,
@@ -151,6 +153,7 @@ class ProjectDetail(BaseModel):
             song=SongMeta.of(song) if song else None,
             analysis=AnalysisSummary.of(analysis) if analysis else None,
             plan=PlanSummaryOut.of(plan) if plan else None,
+            render=RenderSummary.of(render) if render else None,
             last_activity_at=p.last_activity_at,
             created_at=p.created_at,
         )

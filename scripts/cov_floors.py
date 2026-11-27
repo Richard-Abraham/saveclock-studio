@@ -18,6 +18,9 @@ PATHS = (
     "saveclock/adapters/scenedetect.py",
     "saveclock/adapters/vision.py",
     "saveclock/services/keywords.py",
+    # plan 007: the verification decisions and the download service
+    "saveclock/domain/verify.py",
+    "saveclock/services/downloads.py",
 )
 REPORT = Path(__file__).resolve().parent.parent / "services" / "api" / "coverage.json"
 

@@ -77,6 +77,7 @@ class ConflictReason(StrEnum):
     NO_PLAN_YET = "no_plan_yet"
     TOO_MANY_STREAMS = "too_many_streams"
     RENDER_ACTIVE = "render_active"  # a replan-fetch while a render runs (P6-11)
+    INTERMEDIATES_MISSING = "intermediates_missing"  # a mezzanine of the plan is gone (plan 008)
 
 
 # ARCH §7: which codes a client (or the job runner) may retry; derived from the code, no column.

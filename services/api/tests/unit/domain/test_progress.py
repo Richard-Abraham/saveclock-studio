@@ -1,4 +1,5 @@
 import json
+from itertools import pairwise
 
 import pytest
 
@@ -11,6 +12,9 @@ ARCH_STEPS = [
     ("finding_beat", "analyzing"),
     ("choosing_clips", "planning"),
     ("building_draft", "planning"),
+    ("rendering", "rendering"),  # plan 007: a render and a remux restart the bar
+    ("verifying", "rendering"),
+    ("remuxing", "ready"),
 ]
 
 
@@ -25,13 +29,32 @@ def test_message_keys_are_i18n_keys_not_text() -> None:
         "progress.finding_beat",
         "progress.choosing_clips",
         "progress.building_draft",
+        "progress.rendering",
+        "progress.verifying",
+        "progress.remuxing",
     ]
 
 
-def test_ranges_are_contiguous_from_zero_to_a_hundred() -> None:
-    assert progress.STEPS[0].lo == 0
-    assert progress.STEPS[-1].hi == 100
-    assert all(a.hi == b.lo for a, b in zip(progress.STEPS, progress.STEPS[1:], strict=False))
+def pipelines() -> list[list[progress.Step]]:
+    """The steps split where a bar restarts at 0: draft, render, remux."""
+    out: list[list[progress.Step]] = []
+    for s in progress.STEPS:
+        if s.lo == 0:
+            out.append([])
+        out[-1].append(s)
+    return out
+
+
+def test_ranges_are_contiguous_from_zero_to_a_hundred_in_every_pipeline() -> None:
+    assert [[s.key for s in p] for p in pipelines()] == [
+        ["checking_file", "finding_beat", "choosing_clips", "building_draft"],
+        ["rendering", "verifying"],
+        ["remuxing"],
+    ]
+    for p in pipelines():
+        assert p[0].lo == 0
+        assert p[-1].hi == 100
+        assert all(a.hi == b.lo for a, b in pairwise(p))
 
 
 @pytest.mark.parametrize("step", [s.key for s in progress.STEPS])
@@ -43,9 +66,10 @@ def test_percent_is_monotonic_and_clamped_to_the_step(step: str) -> None:
     assert max(values) == s.hi
 
 
-def test_percent_never_goes_backwards_across_steps() -> None:
-    walk = [progress.percent(s.key, f / 10) for s in progress.STEPS for f in range(11)]
-    assert walk == sorted(walk)
+def test_percent_never_goes_backwards_across_steps_of_a_pipeline() -> None:
+    for p in pipelines():
+        walk = [progress.percent(s.key, f / 10) for s in p for f in range(11)]
+        assert walk == sorted(walk)
 
 
 def test_a_time_based_percent_stays_below_the_ceiling() -> None:

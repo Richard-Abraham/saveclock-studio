@@ -18,6 +18,7 @@ from saveclock.deps import Deps
 from saveclock.services import projects as svc
 from saveclock.services.identity import CurrentUser
 from saveclock.services.projects import DEFAULT_LIMIT, MAX_LIMIT, list_projects, ui_status
+from saveclock.services.renders import latest_render
 
 router = APIRouter(prefix="/projects", tags=["projects"], responses=ERROR_RESPONSES)
 
@@ -28,7 +29,8 @@ DepsDep = Annotated[Deps, Depends(get_deps)]
 
 async def _detail(session: AsyncSession, user: CurrentUser, project_id: UUID) -> ProjectDetail:
     project, song, analysis, plan = await svc.get_detail(session, user.id, project_id)
-    return ProjectDetail.of(project, song, analysis, plan)
+    render = await latest_render(session, user.id, project_id)
+    return ProjectDetail.of(project, song, analysis, plan, render)
 
 
 @router.get("", operation_id="list_projects")

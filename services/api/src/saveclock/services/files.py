@@ -4,6 +4,7 @@ import re
 from collections.abc import Iterator
 from dataclasses import dataclass, field
 from http import HTTPStatus
+from urllib.parse import quote
 
 from saveclock.adapters.blobstore.blob_keys import is_servable
 from saveclock.adapters.blobstore.port import BlobStore
@@ -44,7 +45,19 @@ def _parse_range(header: str, size: int) -> tuple[int, int]:
     return start, end
 
 
-def serve(blobs: BlobStore, key: str, range_header: str | None) -> Served:
+_ASCII_KEEP = re.compile(r"[^A-Za-z0-9._-]")
+
+
+def attachment(name: str) -> str:
+    """RFC 6266: an ASCII fallback (`[A-Za-z0-9._-]` only, so no quote or CR/LF can get in) and
+    `filename*` with the full name percent-encoded."""
+    fallback = _ASCII_KEEP.sub("", name) or "download"
+    return f"attachment; filename=\"{fallback}\"; filename*=UTF-8''{quote(name, safe='')}"
+
+
+def serve(
+    blobs: BlobStore, key: str, range_header: str | None, *, download_name: str | None = None
+) -> Served:
     # 404, not 403: a key we do not serve must not reveal whether it exists.
     if not is_servable(key):
         raise NotFound
@@ -53,7 +66,9 @@ def serve(blobs: BlobStore, key: str, range_header: str | None) -> Served:
     ext = "." + name.rsplit(".", 1)[-1] if "." in name else ""
     headers = {
         "content-type": CONTENT_TYPES.get(ext, "application/octet-stream"),
-        "content-disposition": f'attachment; filename="{name}"',
+        "content-disposition": attachment(download_name)
+        if download_name is not None
+        else f'attachment; filename="{name}"',
         "accept-ranges": "bytes",
     }
     if range_header is None:

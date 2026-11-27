@@ -29,6 +29,8 @@ _STOCK_REASONS = frozenset({"no_usable_clips", "stock_unavailable"})
 def failure_code(to: str, reason: str | None) -> ErrorCode:
     if to == "rejected":
         return ErrorCode.FILE_REJECTED
+    if to == "failed_render" and reason == "verification_failed":
+        return ErrorCode.VERIFICATION_FAILED
     if reason in _STOCK_REASONS:
         return ErrorCode.STOCK_UNAVAILABLE
     return ErrorCode.INTERNAL_ERROR
