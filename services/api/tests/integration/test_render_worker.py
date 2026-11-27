@@ -9,6 +9,7 @@ import signal
 import time
 from collections.abc import AsyncIterator
 from pathlib import Path
+from typing import Any
 from uuid import UUID
 
 import httpx
@@ -16,6 +17,7 @@ import pytest
 
 from saveclock.adapters.ffmpeg import Tools, build_mezz
 from saveclock.domain.windows import Window
+from saveclock.services import render_job
 from saveclock.services.render_job import VerificationFailed, render_master
 from tests.conftest import client_for, make_app
 from tests.factories.audio import click_track
@@ -244,7 +246,7 @@ async def test_a_failed_block_check_raises_stores_the_results_and_publishes_noth
     with pytest.raises(VerificationFailed, match="QM-062"):
         await renderer.run_render(job)
     row = await renderer.render_row(rid)
-    assert row["state"] == "running"  # back to running: the retry can begin it
+    assert row["state"] == "verifying"  # `begin` takes a verifying render: the retry can begin it
     blocks = {
         c["id"] for c in json.loads(row["v"])["checks"] if not c["ok"] and c["level"] == "block"
     }
@@ -252,3 +254,54 @@ async def test_a_failed_block_check_raises_stores_the_results_and_publishes_noth
     assert not renderer.path(rid, "master.mp4").exists()
     assert await d.status(pid) == ("rendering", None)
     assert scratch_left(d.ctx.settings.scratch_root) == []
+
+
+async def test_a_render_that_died_after_verification_began_is_retried_to_ready(
+    renderer: Renders, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    d = renderer.draft
+    pid = await d.drafted()
+    rid, job = await renderer.start(pid)
+    real_publish = render_job._publish
+    calls: list[int] = []
+
+    def flaky(*a: Any, **kw: Any) -> int:
+        calls.append(1)
+        if len(calls) == 1:
+            raise OSError("the disk went away")
+        return real_publish(*a, **kw)
+
+    monkeypatch.setattr(render_job, "_publish", flaky)
+    with pytest.raises(OSError, match="disk went away"):
+        await renderer.run_render(job)
+    assert (await renderer.render_row(rid))["state"] == "verifying"
+    await renderer.run_render(job)  # the redelivery
+    row = await renderer.render_row(rid)
+    assert (row["state"], row["attempt"]) == ("ready", 2)
+    assert await d.status(pid) == ("ready", None)
+    assert (await d.job(job))[0] == "ok"
+
+
+async def test_the_results_of_an_earlier_attempt_do_not_name_a_later_death(
+    renderer: Renders, ffmpeg_tools: Tools, fake_clips: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    d = renderer.draft
+    pid = await d.drafted()
+    plan = await d.plan(pid)
+    victim = d.env.blob_root / plan.cuts[1].clip.mezzanine_key
+    build_mezz(ffmpeg_tools, fake_clips / "red_portrait.mp4", Window(0.2, 0.667), victim)
+    rid, job = await renderer.start(pid)
+    with pytest.raises(VerificationFailed):
+        await renderer.run_render(job)  # attempt 1 stores a Block
+    assert json.loads((await renderer.render_row(rid))["v"])["checks"]
+
+    def dies(*a: Any, **kw: Any) -> dict[str, Any]:
+        raise OSError("not a verification verdict")
+
+    monkeypatch.setattr(render_job, "verify_master", dies)
+    with pytest.raises(OSError, match="not a verification verdict"):
+        await renderer.run_render(job)  # attempt 2 dies for another reason
+    assert json.loads((await renderer.render_row(rid))["v"]) == {}
+    await renderer.kill_job(job)
+    assert (await renderer.render_row(rid))["error_code"] == "internal_error"
+    assert await d.status(pid) == ("failed_render", "retries_exhausted")

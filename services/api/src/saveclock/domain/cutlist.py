@@ -16,7 +16,15 @@ COLUMNS = (
     "index", "start_frame", "end_frame", "start_s", "end_s", "beat_index", "kind", "provider",
     "provider_id", "attribution",
 )  # fmt: skip
-INJECTION_LEAD = ("=", "+", "-", "@", "\t", "\r")  # a spreadsheet would run a cell starting so
+INJECTION_LEAD = (
+    "=",
+    "+",
+    "-",
+    "@",
+    "\t",
+    "\r",
+    "\n",
+)  # a spreadsheet would run a cell starting so
 SCHEMA = "saveclock.cutlist/1"
 
 

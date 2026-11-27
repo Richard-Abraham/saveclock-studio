@@ -40,6 +40,8 @@ LIMIT_AS_BYTES = 4 * 1024**3
 # the render opens up to 60 decoders next to x264's threads: that is more address space than a probe
 # needs (a 30-input render failed to open the encoder at 4 GB); the container's memory limit still
 # bounds what is resident. shortcut: one fixed number, upgrade if a 60-input render ever nears it.
+# The worker container's 4 GB mem_limit (a cgroup OOM kill takes the whole worker) fires before
+# this address-space limit does: upgrade both together.
 RENDER_AS_BYTES = 16 * 1024**3
 LIMIT_CPU_S = 600
 POLL_S = 0.5

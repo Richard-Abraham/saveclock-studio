@@ -69,7 +69,7 @@ def test_a_cell_that_starts_like_a_formula_is_neutralised() -> None:
     )
     rows = list(csv.DictReader(io.StringIO(cutlist.to_csv(p))))
     assert rows[0]["attribution"].startswith("'=cmd")
-    for lead in "+-@":
+    for lead in "+-@\t\r\n":
         q = with_attribution(
             sample(), 0, ep.Attribution(author=lead + "x", author_url=None, page_url="https://p/0")
         )

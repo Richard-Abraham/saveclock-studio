@@ -161,3 +161,21 @@ async def test_a_remux_that_re_encodes_the_video_is_a_block_and_ends_mode_a(
     assert (row["state"], row["mode_a_state"]) == ("ready", "failed")  # the silent master stays
     assert await d.status(pid) == ("ready", None)
     assert renderer.path(rid, "master.mp4").is_file()
+
+
+async def test_an_enqueue_failure_fails_mode_a_and_a_repeat_queues_it_again(
+    renderer: Renders, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _, rid = await ready_render(renderer)
+    enqueuer = renderer.draft.env.enqueuer
+    real_send = enqueuer.send
+
+    def broken(*a: str) -> None:
+        raise ConnectionError("redis is down")
+
+    monkeypatch.setattr(enqueuer, "send", broken)
+    assert (await renderer.mode_a(rid)).status_code == 500
+    assert (await renderer.render_row(rid))["mode_a_state"] == "failed"
+    monkeypatch.setattr(enqueuer, "send", real_send)
+    again = await renderer.mode_a(rid)
+    assert (again.status_code, again.json()["mode_a_state"]) == (202, "queued")

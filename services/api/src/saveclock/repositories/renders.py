@@ -10,6 +10,7 @@ from saveclock.models import EditPlan, Job, ModeAState, Project, Render, RenderS
 ACTIVE = (RenderState.QUEUED.value, RenderState.RUNNING.value, RenderState.VERIFYING.value)
 # the partial unique index of `uq_renders_job_hash`
 LIVE_HASH_STATES = (*ACTIVE, RenderState.READY.value)
+_LIVE_HASH_WHERE = "state IN (" + ",".join(f"'{s}'" for s in LIVE_HASH_STATES) + ")"
 
 
 class RenderRepository:
@@ -87,24 +88,26 @@ class RenderRepository:
             )
             .on_conflict_do_nothing(
                 index_elements=["job_hash"],
-                index_where=text("state IN ('queued','running','verifying','ready')"),
+                index_where=text(_LIVE_HASH_WHERE),
             )
             .returning(Render.id)
         )
         return (await self.session.scalar(stmt)) is not None
 
     async def begin(self, *, user_id: UUID, render_id: UUID) -> Render | None:
-        """`queued|running -> running`, attempt + 1 (the idempotent start, ARCH §8). None: not the
-        user's, or already finished."""
+        """`queued|running|verifying -> running`, attempt + 1 (the idempotent start, ARCH §8). A
+        render left in `verifying` (a crash, a kill, a time limit) is retried like a running one,
+        and the results of the previous attempt are cleared. None: not the user's, or finished."""
         stmt = (
             update(Render)
             .where(
                 Render.id == render_id,
                 Render.user_id == user_id,
-                Render.state.in_([RenderState.QUEUED.value, RenderState.RUNNING.value]),
+                Render.state.in_(ACTIVE),
             )
             .values(
                 state=RenderState.RUNNING.value,
+                verify={},  # the column default: an earlier attempt's results are not this one's
                 attempt=Render.attempt + 1,
                 started_at=func.coalesce(Render.started_at, func.now()),
             )

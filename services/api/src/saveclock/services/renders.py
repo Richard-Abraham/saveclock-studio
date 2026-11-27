@@ -17,7 +17,8 @@ from saveclock.adapters.queue import Enqueuer
 from saveclock.domain.edit_plan import FPS, EditPlan
 from saveclock.domain.plan_hash import content_hash
 from saveclock.domain.render_job import DownloadKind, job_hash
-from saveclock.errors import Conflict, ConflictReason, NotFound
+from saveclock.domain.verify import Level
+from saveclock.errors import Conflict, ConflictReason, ErrorCode, NotFound
 from saveclock.ids import new_id
 from saveclock.models import JobQueue, JobStage, ModeAState, Render, RenderState
 from saveclock.repositories.jobs import JobRepository
@@ -255,7 +256,20 @@ async def request_mode_a(
                 render_id=render_id,
             )
             await session.commit()
-            await asyncio.to_thread(enqueuer.send, "remux_with_song", str(job_id), str(user_id))
+            try:
+                await asyncio.to_thread(enqueuer.send, "remux_with_song", str(job_id), str(user_id))
+            except Exception:  # committed `queued` but never sent: fail it so a repeat can retry
+                await renders.set_mode_a(
+                    user_id=user_id,
+                    render_id=render_id,
+                    from_=(ModeAState.QUEUED.value,),
+                    to=ModeAState.FAILED,
+                )
+                await JobRepository(session).fail(
+                    user_id=user_id, job_id=job_id, error_code=ErrorCode.INTERNAL_ERROR.value
+                )
+                await session.commit()
+                raise
         else:  # somebody queued it between our read and our write
             await session.rollback()
     except IntegrityError:  # uq_jobs_active: a render-stage job of this project is active
@@ -271,7 +285,7 @@ def verify_summary(render: Render) -> dict[str, Any] | None:
     if not verify.get("checks"):
         return None
     failed = [c for c in verify["checks"] if not c["ok"]]
-    blocks = [c for c in failed if c["level"] == "block"]
+    blocks = [c for c in failed if c["level"] == Level.BLOCK]
     return {
         "passed": not blocks,
         "blocks": len(blocks),

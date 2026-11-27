@@ -14,6 +14,8 @@ from saveclock.config import (
     RENDER_FFMPEG_S,
     RENDER_HEAVY_WAIT_S,
     RENDER_LIMIT_S,
+    RENDER_PUBLISH_S,
+    RENDER_VERIFY_S,
     VET_HOLD_S,
     Settings,
 )
@@ -60,8 +62,10 @@ def test_the_render_slot_outlives_the_limit_which_outlives_the_ffmpeg_child() ->
     assert HEAVY_TTL_S > RENDER_LIMIT_S > RENDER_FFMPEG_S
 
 
-def test_the_slot_wait_plus_the_encode_fit_the_render_limit() -> None:
-    assert RENDER_LIMIT_S >= RENDER_HEAVY_WAIT_S + RENDER_FFMPEG_S
+def test_the_slot_wait_the_encode_the_verification_and_the_publish_fit_the_render_limit() -> None:
+    spent = RENDER_HEAVY_WAIT_S + RENDER_FFMPEG_S + RENDER_VERIFY_S + RENDER_PUBLISH_S
+    assert spent <= RENDER_LIMIT_S
+    assert HEAVY_TTL_S > RENDER_LIMIT_S
 
 
 def test_a_remux_is_shorter_than_a_render_and_its_child_fits_its_limit() -> None:

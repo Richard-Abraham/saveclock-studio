@@ -129,13 +129,30 @@ async def render_master(ctx: WorkerContext, user_id: UUID, job_id: UUID) -> None
         beats_s=plan.beat_grid.beats_s,
     )
     if blocking(found):  # never render an invalid plan
-        await _end_failed(ctx, ids, ErrorCode.INTERNAL_ERROR, "plan_invalid")
+        await _end(
+            ctx,
+            ids,
+            render_to=RenderState.FAILED,
+            project_to="failed_render",
+            code=ErrorCode.INTERNAL_ERROR.value,
+            reason="plan_invalid",
+            retryable=False,
+        )
         return
     missing = sorted(
         {c.clip.mezzanine_key for c in plan.cuts if not ctx.blobs.exists(c.clip.mezzanine_key)}
     )
     if missing:  # plan 008 adds rehydration
-        await _end_missing(ctx, ids)
+        await _end(  # plan 008 adds rehydration; the owner keeps the plan and renders again
+            ctx,
+            ids,
+            render_to=RenderState.FAILED,
+            project_to="draft_ready",
+            code=ErrorCode.CONFLICT.value,
+            reason="intermediates_missing",
+            detail="intermediates_missing",
+            retryable=True,
+        )
         return
     try:
         await _render_and_verify(ctx, ids, plan)
@@ -166,11 +183,7 @@ async def _render_and_verify(ctx: WorkerContext, ids: _Ids, plan: EditPlan) -> N
             await session.commit()
         await emitter.aemit("verifying", 0.0, force=True)
         verified = time.monotonic()
-        try:
-            outcome = await asyncio.to_thread(verify_master, ctx.tools, plan, master)
-        except Exception:  # a crash while verifying: back to `running` so the retry can begin
-            await _back_to_running(ctx, ids)
-            raise
+        outcome = await asyncio.to_thread(verify_master, ctx.tools, plan, master)
         verify_ms = _ms(verified)
         verify = {**outcome, "timing": {"render_ms": render_ms, "verify_ms": verify_ms}}
         async with ctx.sessionmaker() as session:  # stored before a Block raises: the hook reads it
@@ -180,11 +193,9 @@ async def _render_and_verify(ctx: WorkerContext, ids: _Ids, plan: EditPlan) -> N
             await session.commit()
         if _blocked(verify):
             names = sorted(
-                {c["id"] for c in verify["checks"] if not c["ok"] and c["level"] == "block"}
+                {c["id"] for c in verify["checks"] if not c["ok"] and c["level"] == v.Level.BLOCK}
             )
-            msg = f"verification failed: {', '.join(names)}"
-            await _back_to_running(ctx, ids)  # `begin` only starts queued or running renders
-            raise VerificationFailed(msg)
+            raise VerificationFailed(f"verification failed: {', '.join(names)}")
         if await _cancelled(ctx, ids):
             raise JobCanceled
         await emitter.aemit("verifying", 0.9, force=True)
@@ -220,7 +231,8 @@ def _encode(
 
 
 def _scene_frames(master: Path, total_s: float) -> list[int]:
-    """Cuts PySceneDetect sees in the master (frames); `None` when it could not finish."""
+    """Cuts PySceneDetect sees in the master (frames). Raises `DetectionStopped` when it could not
+    finish (timeout or cancel); it never returns a partial list."""
     seconds = scenedetect.detect_cuts(master, max_s=total_s + 1.0)
     return [round(s * FPS) for s in seconds]
 
@@ -310,17 +322,6 @@ async def _finish(
     log.info("render.done", render_id=str(ids.render_id), **verify["timing"])
 
 
-async def _back_to_running(ctx: WorkerContext, ids: _Ids) -> None:
-    async with ctx.sessionmaker() as session:
-        await RenderRepository(session).set_state(
-            user_id=ids.user_id,
-            render_id=ids.render_id,
-            from_=(RenderState.VERIFYING.value,),
-            to=RenderState.RUNNING.value,
-        )
-        await session.commit()
-
-
 async def _cancelled(ctx: WorkerContext, ids: _Ids) -> bool:
     async with ctx.sessionmaker() as session:
         return await JobRepository(session).cancel_requested(user_id=ids.user_id, job_id=ids.job_id)
@@ -330,82 +331,50 @@ async def _delete_outputs(ctx: WorkerContext, ids: _Ids) -> None:
     await asyncio.to_thread(ctx.blobs.delete_prefix, f"renders/{ids.render_id}")
 
 
-async def _end_failed(ctx: WorkerContext, ids: _Ids, code: ErrorCode, reason: str) -> None:
-    """A permanent failure: render `failed`, project `failed_render`, job `error`."""
+async def _end(
+    ctx: WorkerContext,
+    ids: _Ids,
+    *,
+    render_to: RenderState,
+    project_to: str,
+    code: str,
+    reason: str | None = None,
+    detail: str | None = None,
+    retryable: bool | None = None,
+) -> None:
+    """The one way a render job ends without a master: the render goes to `render_to` (`failed`
+    with `code`, or `canceled`), the project leaves `rendering` for `project_to`, the job fails
+    with `code`. A `retryable` flag also publishes the `failed` event."""
     async with ctx.sessionmaker() as session:
-        await RenderRepository(session).fail(
-            user_id=ids.user_id, render_id=ids.render_id, error_code=code.value
-        )
+        renders = RenderRepository(session)
+        if render_to == RenderState.FAILED:
+            await renders.fail(user_id=ids.user_id, render_id=ids.render_id, error_code=code)
+        else:
+            await renders.set_state(
+                user_id=ids.user_id, render_id=ids.render_id, from_=ACTIVE, to=render_to.value
+            )
         await project_state.transition(
             session,
             ctx.publisher,
             user_id=ids.user_id,
             project_id=ids.project_id,
             from_="rendering",
-            to="failed_render",
+            to=project_to,
             reason=reason,
             commit=False,
         )
         await JobRepository(session).fail(
-            user_id=ids.user_id, job_id=ids.job_id, error_code=code.value
+            user_id=ids.user_id, job_id=ids.job_id, error_code=code, detail=detail
         )
         await session.commit()
         await project_state.announce_pending(session, ctx.publisher)
+    if retryable is not None and ctx.publisher is not None:
+        await ctx.publisher.publish(ids.project_id, FailedEvent("render", code, retryable))
 
 
 async def _end_canceled(ctx: WorkerContext, ids: _Ids) -> None:
     """Canceled (or the project is gone): the render ends `canceled`, the owner keeps the plan."""
-    async with ctx.sessionmaker() as session:
-        await RenderRepository(session).set_state(
-            user_id=ids.user_id,
-            render_id=ids.render_id,
-            from_=ACTIVE,
-            to=RenderState.CANCELED.value,
-        )
-        await project_state.transition(
-            session,
-            ctx.publisher,
-            user_id=ids.user_id,
-            project_id=ids.project_id,
-            from_="rendering",
-            to="draft_ready",
-            commit=False,
-        )
-        await JobRepository(session).fail(
-            user_id=ids.user_id, job_id=ids.job_id, error_code="canceled"
-        )
-        await session.commit()
-        await project_state.announce_pending(session, ctx.publisher)
-
-
-async def _end_missing(ctx: WorkerContext, ids: _Ids) -> None:
-    """A mezzanine is gone: the owner keeps the plan; plan 008 rehydrates and they render again."""
-    async with ctx.sessionmaker() as session:
-        await RenderRepository(session).fail(
-            user_id=ids.user_id, render_id=ids.render_id, error_code=ErrorCode.CONFLICT.value
-        )
-        await project_state.transition(
-            session,
-            ctx.publisher,
-            user_id=ids.user_id,
-            project_id=ids.project_id,
-            from_="rendering",
-            to="draft_ready",
-            reason="intermediates_missing",
-            commit=False,
-        )
-        await JobRepository(session).fail(
-            user_id=ids.user_id,
-            job_id=ids.job_id,
-            error_code=ErrorCode.CONFLICT.value,
-            detail="intermediates_missing",
-        )
-        await session.commit()
-        await project_state.announce_pending(session, ctx.publisher)
-    if ctx.publisher is not None:
-        await ctx.publisher.publish(
-            ids.project_id, FailedEvent("render", ErrorCode.CONFLICT.value, True)
-        )
+    await _end(ctx, ids, render_to=RenderState.CANCELED, project_to="draft_ready", code="canceled")
 
 
 # --- remux_with_song -----------------------------------------------------------------------------
