@@ -17,6 +17,7 @@ from typing import Any
 from saveclock.cli import files, schema, sse, waits
 from saveclock.cli.client import ApiError, Client, CliError, NetworkError, Refused, valid_id
 from saveclock.cli.output import emit, note
+from saveclock.config import LENGTH_REDUCED
 
 RENDER_STOP = {"ready", "failed", "canceled"}
 UI_STOP = {"draft", "ready", "failed", "canceled"}  # where `status --watch` stops
@@ -170,6 +171,12 @@ def _show_text(o: schema.ShowOut) -> str:
     if o.plan:
         lines.append(
             f"  plan v{o.plan.version}: {o.plan.n_cuts} cuts, {o.plan.total_frames} frames"
+        )
+    cut = o.project.flags.get(LENGTH_REDUCED)
+    if o.plan and cut and cut["drafted_s"] * 30 == o.plan.total_frames:  # a later edit silences it
+        lines.append(
+            f"  notice: drafted {cut['drafted_s']} s, not the {cut['requested_s']} s requested: "
+            f"the song is too short for {cut['requested_s']} s from its first downbeat"
         )
     if o.render:
         lines.append(f"  render {o.render.id}: {o.render.state}")

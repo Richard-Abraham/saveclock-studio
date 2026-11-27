@@ -246,3 +246,35 @@ async def test_a_planner_error_in_a_replan_keeps_the_stored_plan(
     await run_draft(draft.ctx, UUID(r.json()["job_id"]), OWNER, mode="replan")
     assert await draft.status(pid) == ("draft_ready", "plan_failed")
     assert len(await draft.sql("SELECT 1 FROM edit_plans")) == 1
+
+
+async def _flags(draft: Draft, pid: UUID) -> dict[str, object]:
+    flags: dict[str, object] = json.loads(
+        (await draft.sql("SELECT flags FROM projects WHERE id = $1", pid))[0][0]
+    )
+    return flags
+
+
+async def test_a_song_too_short_for_the_length_flags_the_shorter_draft(draft: Draft) -> None:
+    pid = await draft.drafted(seconds=20.0, duration=30)
+    plan = await draft.plan(pid)
+    flags = await _flags(draft, pid)
+    assert flags["length_reduced"] == {"requested_s": 30, "drafted_s": plan.total_frames // 30}
+    assert plan.total_frames < 900
+    assert {"pool_exhausted", "degraded_keywords"} <= flags.keys()  # written with it, not instead
+
+
+async def test_a_song_that_fits_the_length_writes_no_notice(draft: Draft) -> None:
+    pid = await draft.drafted()  # 30 s asked, 30 s song: the plan is 900 frames
+    assert "length_reduced" not in await _flags(draft, pid)
+
+
+async def test_a_replan_leaves_the_length_notice_as_it_was(draft: Draft) -> None:
+    pid = await draft.drafted(seconds=20.0, duration=30)
+    before = (await _flags(draft, pid))["length_reduced"]
+    r = await draft.client.patch(
+        f"/api/v1/projects/{pid}/plan",
+        json={"base_version": 1, "ops": [{"op": "set_keywords", "keywords": ["red"]}]},
+    )
+    await run_draft(draft.ctx, UUID(r.json()["job_id"]), OWNER, mode="replan")
+    assert (await _flags(draft, pid))["length_reduced"] == before
