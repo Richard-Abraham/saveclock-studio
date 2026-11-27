@@ -13,8 +13,9 @@ never silently start a second repository. `make backup-init` itself refuses a fo
 but no repository. Only one backup runs at a time (`.data/backup/lock`; a second one fails with
 `backup already running`). The dump, manifest and `last_run.json` are mode 600, the staging folder 700.
 
-`make backup-test` runs against the live stack and a throwaway repository, and adds one stub project
-(one stub job) to the live database; it removes only its own `work/` file.
+`make backup-test` runs against the live stack and a throwaway repository, and seeds the click-track
+project (`scripts/seed.sh`) into the live database when it is not there yet; it removes only its own
+`work/` file.
 
 Timer: `make backup-install-timer` (writes `~/.config/systemd/user/`, enables it), `make backup-timer-uninstall`.
 A laptop asleep at 02:30 runs the job at the next wake (`Persistent=true`).

@@ -32,9 +32,9 @@ from saveclock.repositories.analyses import AnalysisRepository
 from saveclock.repositories.jobs import JobRepository
 from saveclock.repositories.projects import ProjectRepository
 from saveclock.services import project_state
-from saveclock.services.autotune import effective, host_facts
 from saveclock.services.context import WorkerContext, cancel_probe, end_unwanted, hand_off
 from saveclock.services.events import ProgressEmitter, ProgressTicker
+from saveclock.services.tuning import get_tuning
 
 log = structlog.get_logger()
 
@@ -153,7 +153,7 @@ def get_model(settings: Settings) -> BeatModel:
         else:
             name = f"beat_this-{settings.beat_this_checkpoint}"
             checkpoint = verified_path(settings.models_dir, name)  # ModelIntegrityError: no retry
-            tuning = effective(settings, host_facts())
+            tuning = get_tuning(settings)
             _MODELS[key] = BeatThisModel(checkpoint, tuning.torch_threads)
     return _MODELS[key]
 
@@ -165,7 +165,7 @@ def _compute_blocking(
     model = get_model(settings)
     redis: Redis = Redis.from_url(settings.redis_url.get_secret_value())
     try:
-        lock = HeavyLock(redis, effective(settings, host_facts()).heavy, settings.heavy_ttl_s)
+        lock = HeavyLock(redis, get_tuning(settings).heavy, settings.heavy_ttl_s)
         with lock.hold(ANALYZE_WAIT_S):  # HeavyLockTimeout is retryable, inside the actor limit
             t = time.monotonic()
             signal, sr = dsp.decode_mono(ctx.blobs.local_path(canonical_key(project_id)))

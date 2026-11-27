@@ -30,8 +30,8 @@ cd "$TMP/saveclock-fresh"
 export PROJECT="$FRESH" API_PORT=18000 WEB_PORT=13000 APP_ORIGIN=http://localhost:13000 NEXT_PUBLIC_API_ORIGIN=http://localhost:18000
 start=$SECONDS
 make dev >/dev/null
-python3 scripts/smoke_stub.py --seed --web http://localhost:13000 --api http://127.0.0.1:18000
-python3 scripts/smoke_stub.py --web http://localhost:13000 --api http://127.0.0.1:18000 | tail -1
+make seed
+python3 scripts/smoke_stack.py --web http://localhost:13000 --api http://127.0.0.1:18000 | tail -1
 elapsed=$((SECONDS - start))
 echo "FRESH CLONE elapsed=${elapsed}s (limit 900 s, base images already local)"
 [ "$elapsed" -le 900 ]

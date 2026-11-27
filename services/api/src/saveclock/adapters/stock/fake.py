@@ -47,6 +47,9 @@ class FakeStockProvider:
         shift = int(hashlib.sha256(query.encode()).hexdigest(), 16) % len(self._clips)
         return (self._clips[shift:] + self._clips[:shift])[:per_page]
 
+    def video_by_id(self, provider_id: str) -> StockClip | None:
+        return next((c for c in self._clips if c.provider_id == provider_id), None)
+
     def download(
         self,
         clip: StockClip,

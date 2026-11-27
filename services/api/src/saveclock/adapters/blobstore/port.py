@@ -9,6 +9,7 @@ from typing import Protocol
 @dataclass(frozen=True)
 class BlobStat:
     size: int
+    mtime: float  # seconds since the epoch
 
 
 class BlobStore(Protocol):

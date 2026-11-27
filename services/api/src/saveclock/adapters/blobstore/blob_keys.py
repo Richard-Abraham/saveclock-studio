@@ -10,8 +10,8 @@ MAX_SEGMENT_LEN = 128
 _SEGMENT = re.compile(r"[A-Za-z0-9._-]+")
 _UUID = r"[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}"
 _NAME = r"[A-Za-z0-9._-]{1,100}"
-_RENDER_FILES = frozenset(RENDER_FILES.values())  # the render's own files; `stub.txt` is the stub's
-_RENDER_ALT = "|".join(re.escape(n) for n in (*sorted(_RENDER_FILES), "stub.txt"))
+_RENDER_FILES = frozenset(RENDER_FILES.values())  # the render's own files
+_RENDER_ALT = "|".join(re.escape(n) for n in sorted(_RENDER_FILES))
 _SERVABLE = re.compile(
     rf"renders/{_UUID}/({_RENDER_ALT})"
     rf"|work/{_UUID}/proxy/{_NAME}\.mp4"
@@ -86,11 +86,6 @@ def mezz_key(project_id: UUID, provider: str, provider_id: str) -> str:
 
 def emb_key(project_id: UUID, provider: str, provider_id: str) -> str:
     return work_key(project_id, "emb", _candidate_name(provider, provider_id, "npy"))
-
-
-def stub_key(job_id: UUID) -> str:
-    # shortcut: stub only, removed with the stub in Phase 2
-    return f"renders/{job_id}/stub.txt"
 
 
 def is_servable(key: str) -> bool:

@@ -1,4 +1,4 @@
-"""The OQ-26 measurement routes (stub only); the DB owner lookup is replaced by an override."""
+"""The OQ-26 measurement routes (dev only); the DB owner lookup is replaced by an override."""
 
 import asyncio
 import hashlib
@@ -26,7 +26,7 @@ async def fake_owner() -> CurrentUser:
     return CurrentUser(id=OWNER_USER_ID, display_name="Test")
 
 
-def stub_app() -> FastAPI:
+def measure_app() -> FastAPI:
     Calls.owner_lookups = 0
     app = make_app(checks={})
     app.dependency_overrides[current_user] = fake_owner
@@ -62,7 +62,7 @@ async def drive_get(app: FastAPI, path: str, query: str) -> list[tuple[float, by
 
 @pytest.mark.unit
 async def test_sse_emits_the_requested_events_at_the_requested_spacing() -> None:
-    chunks = await drive_get(stub_app(), "/api/v1/_stub/sse", "events=4&interval_ms=200")
+    chunks = await drive_get(measure_app(), "/api/v1/_measure/sse", "events=4&interval_ms=200")
     assert len(chunks) == 4
     events = [json.loads(body.decode().removeprefix("data: ")) for _, body in chunks]
     assert [e["i"] for e in events] == [0, 1, 2, 3]
@@ -73,16 +73,16 @@ async def test_sse_emits_the_requested_events_at_the_requested_spacing() -> None
 @pytest.mark.unit
 @pytest.mark.parametrize("query", ["events=0", "events=121", "interval_ms=99", "interval_ms=5001"])
 async def test_sse_rejects_out_of_range_parameters(query: str) -> None:
-    async with client_for(stub_app()) as c:
-        r = await c.get(f"/api/v1/_stub/sse?{query}")
+    async with client_for(measure_app()) as c:
+        r = await c.get(f"/api/v1/_measure/sse?{query}")
     assert r.status_code == 422
 
 
 @pytest.mark.unit
 async def test_upload_sink_counts_and_hashes_the_stream() -> None:
     body = (bytes(range(256)) * 4096) * 5  # 5 MiB, a known pattern
-    async with client_for(stub_app()) as c:
-        r = await c.post("/api/v1/_stub/upload-sink", content=body)
+    async with client_for(measure_app()) as c:
+        r = await c.post("/api/v1/_measure/upload-sink", content=body)
     assert r.status_code == 200
     out = r.json()
     assert out["bytes"] == 5 * 1024 * 1024
@@ -96,17 +96,17 @@ async def test_upload_sink_requires_content_length() -> None:
     async def chunks() -> AsyncIterator[bytes]:
         yield b"abc"
 
-    async with client_for(stub_app()) as c:
-        r = await c.post("/api/v1/_stub/upload-sink", content=chunks())
+    async with client_for(measure_app()) as c:
+        r = await c.post("/api/v1/_measure/upload-sink", content=chunks())
     assert r.status_code == 400
     assert r.json()["error"]["code"] == "bad_request"
 
 
 @pytest.mark.unit
 async def test_foreign_origin_is_refused_before_the_sink_runs() -> None:
-    async with client_for(stub_app()) as c:
+    async with client_for(measure_app()) as c:
         r = await c.post(
-            "/api/v1/_stub/upload-sink", content=b"x", headers={"origin": "http://evil.example"}
+            "/api/v1/_measure/upload-sink", content=b"x", headers={"origin": "http://evil.example"}
         )
     assert r.status_code == 403
     assert r.json()["error"]["details"]["reason"] == "origin_mismatch"

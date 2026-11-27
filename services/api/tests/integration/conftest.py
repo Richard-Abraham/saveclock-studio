@@ -8,18 +8,22 @@ import uuid
 from collections.abc import AsyncIterator, Iterator
 from contextlib import asynccontextmanager
 from dataclasses import dataclass, replace
+from datetime import datetime
 from pathlib import Path
 from typing import TYPE_CHECKING
+from uuid import UUID
 
 import asyncpg
 import httpx
 import pytest
+from fastapi import FastAPI
 from redis.asyncio import Redis
 
 from saveclock.adapters.ffmpeg import Tools
 from saveclock.adapters.queue import FakeEnqueuer
 from saveclock.config import Settings
 from saveclock.container import build_deps
+from saveclock.ids import new_id
 from saveclock.main import create_app
 from tests.conftest import ENV, FFMPEG_DIR, client_for, make_app
 from tests.factories.stock import fake_stock
@@ -27,6 +31,7 @@ from tests.factories.stock import fake_stock
 if TYPE_CHECKING:
     from tests.integration.draft_harness import Draft
     from tests.integration.footage_harness import Footage
+    from tests.integration.housekeeping_harness import Hk
     from tests.integration.render_harness import Renders
 
 API_DIR = Path(__file__).resolve().parents[2]
@@ -70,6 +75,33 @@ class Db:
             check=False,
             timeout=120,
         )
+
+
+async def insert_user(db: Db, user_id: UUID, email: str) -> None:
+    conn = await asyncpg.connect(db.raw("postgres"))
+    try:
+        await conn.execute("INSERT INTO users (id, email) VALUES ($1, $2)", user_id, email)
+    finally:
+        await conn.close()
+
+
+async def insert_project(
+    db: Db, user_id: UUID, title: str, created_at: datetime, status: str = "created"
+) -> UUID:
+    pid = new_id()
+    conn = await asyncpg.connect(db.raw("postgres"))
+    try:
+        await conn.execute(
+            "INSERT INTO projects (id, user_id, title, status, created_at) VALUES ($1,$2,$3,$4,$5)",
+            pid,
+            user_id,
+            title,
+            status,
+            created_at,
+        )
+    finally:
+        await conn.close()
+    return pid
 
 
 async def _admin() -> asyncpg.Connection:
@@ -132,6 +164,7 @@ class ApiEnv:
     enqueuer: FakeEnqueuer
     db: Db
     blob_root: Path
+    app: FastAPI | None = None  # the app behind `client`, for dependency overrides
 
 
 @asynccontextmanager
@@ -149,7 +182,7 @@ async def build_api(db: Db, blob_root: Path, **overrides: object) -> AsyncIterat
     deps = replace(build_deps(settings), enqueuer=enqueuer)
     app = create_app(settings, deps)
     async with client_for(app) as client:
-        yield ApiEnv(client, enqueuer, db, blob_root)
+        yield ApiEnv(client, enqueuer, db, blob_root, app)
     await deps.close()
 
 
@@ -268,3 +301,14 @@ async def renderer(draft: "Draft") -> "Renders":
     from tests.integration.render_harness import Renders
 
     return Renders(draft)
+
+
+@pytest.fixture
+async def hk(migrated_db: Db, blob_root: Path, redis_client: Redis) -> AsyncIterator["Hk"]:
+    """Hand-made projects and files for the retention tests (plan 008)."""
+    from tests.integration.housekeeping_harness import build_hk
+
+    h = await build_hk(migrated_db, blob_root)
+    yield h
+    h.redis.close()
+    await h.engine.dispose()

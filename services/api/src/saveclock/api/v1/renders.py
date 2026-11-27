@@ -48,7 +48,8 @@ async def create(
 ) -> RenderAccepted:
     """Freeze the plan (`plan_version`, default the latest) and render it: the silent master plus
     the cut lists. An identical active or ready render is returned instead. 409 `conflict`
-    (`wrong_state`, `job_active`, `intermediates_missing`, `no_plan_yet`), 507 low disk."""
+    (`wrong_state`, `job_active`, `no_plan_yet`), 507 low disk. Swept clips are fetched again by
+    the job itself."""
     render_id = await renders.create_render(
         session,
         user.id,

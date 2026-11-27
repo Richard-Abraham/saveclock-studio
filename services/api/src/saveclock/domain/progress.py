@@ -23,6 +23,8 @@ STEPS: tuple[Step, ...] = (
     Step("choosing_clips", "planning", "progress.choosing_clips", 40, 70),
     Step("building_draft", "planning", "progress.building_draft", 70, 100),
     # a render restarts the bar: its own two steps, then the Mode A remux on its own
+    # plan 008: clips of a swept project are fetched again first; the monotonic bar waits at 20
+    Step("restoring_clips", "rendering", "progress.restoring_clips", 0, 20),
     Step("rendering", "rendering", "progress.rendering", 0, 85),  # hypothesis: the split
     Step("verifying", "rendering", "progress.verifying", 85, 100),
     Step("remuxing", "ready", "progress.remuxing", 0, 100),

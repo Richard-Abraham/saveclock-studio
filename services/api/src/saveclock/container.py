@@ -2,7 +2,6 @@
 
 import asyncio
 from functools import partial
-from typing import TYPE_CHECKING
 
 from redis.asyncio import Redis
 
@@ -13,12 +12,6 @@ from saveclock.adapters.queue import DramatiqEnqueuer
 from saveclock.config import Settings
 from saveclock.deps import Deps
 from saveclock.workers.broker import build_broker
-from saveclock.workers.stub import register_stub_actors
-
-if TYPE_CHECKING:
-    from saveclock.services.stub import Enqueue
-
-STUB_ENVS = frozenset({"local", "ci"})
 
 
 def build_deps(settings: Settings) -> Deps:
@@ -35,17 +28,12 @@ def build_deps(settings: Settings) -> Deps:
         await asyncio.to_thread(blobs.probe)
 
     broker = build_broker(settings)  # no connection until the first send
-    enqueue_stub: Enqueue | None = None
-    if settings.app_env in STUB_ENVS:
-        enqueue_stub = register_stub_actors(broker, settings).send_first
-
     return Deps(
         engine=engine,
         sessionmaker=sessionmaker,
         redis=redis,
         blobs=blobs,
         enqueuer=DramatiqEnqueuer(broker),
-        enqueue_stub=enqueue_stub,
         publisher=EventPublisher(aio=redis),
         checks={
             "postgres": partial(ping_db, sessionmaker),

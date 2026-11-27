@@ -13,7 +13,9 @@ PREFLIGHT = {
 
 async def preflight(origin: str) -> httpx.Response:
     async with client_for(make_app(checks={})) as c:
-        return await c.options("/api/v1/_stub/upload-sink", headers={"origin": origin, **PREFLIGHT})
+        return await c.options(
+            "/api/v1/_measure/upload-sink", headers={"origin": origin, **PREFLIGHT}
+        )
 
 
 @pytest.mark.unit
@@ -51,7 +53,7 @@ async def test_simple_response_carries_allow_origin_only_for_the_app_origin() ->
 async def test_the_guard_still_rejects_a_foreign_origin_post() -> None:
     async with client_for(make_app(checks={})) as c:
         r = await c.post(
-            "/api/v1/_stub/upload-sink", content=b"x", headers={"origin": "http://evil.example"}
+            "/api/v1/_measure/upload-sink", content=b"x", headers={"origin": "http://evil.example"}
         )
     assert r.status_code == 403
     assert r.json()["error"]["details"]["reason"] == "origin_mismatch"

@@ -81,6 +81,19 @@ class PixabayProvider:
         self._cache.set(params, clips)
         return clips
 
+    def video_by_id(self, provider_id: str) -> StockClip | None:
+        """`GET /api/videos/?id=`; an empty `hits` is None (gone)."""
+        data = self._http.get_json(
+            SEARCH_URL, params={"id": provider_id, "key": self._key}, not_found_ok=True
+        )
+        try:
+            clips = parse_hits(data)
+        except (KeyError, TypeError, ValueError, AttributeError):
+            raise StockUnavailable(
+                "stock provider sent a malformed answer", {"reason": "bad_body"}
+            ) from None
+        return next((c for c in clips if c.provider_id == provider_id), None)
+
     def download(
         self,
         clip: StockClip,

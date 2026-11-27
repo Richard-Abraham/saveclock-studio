@@ -152,8 +152,14 @@ class ProviderHttp:
         self._sleep = sleep
 
     def get_json(
-        self, url: str, *, params: dict[str, Any], headers: dict[str, str] | None = None
+        self,
+        url: str,
+        *,
+        params: dict[str, Any],
+        headers: dict[str, str] | None = None,
+        not_found_ok: bool = False,
     ) -> dict[str, Any]:
+        """`not_found_ok`: a 404 answers `{}` (the clip is gone) instead of raising."""
         if not self.breaker.allow():
             raise StockUnavailable("stock provider circuit is open", {"reason": "circuit_open"})
         if not self.limiter.acquire():
@@ -178,6 +184,9 @@ class ProviderHttp:
             if response is not None and status == httpx.codes.OK:
                 self.breaker.record_success()
                 return _json_object(response)
+            if status == httpx.codes.NOT_FOUND and not_found_ok:
+                self.breaker.record_success()
+                return {}
             if status in KEY_REJECTED:
                 self.breaker.release_probe()
                 raise StockUnavailable("stock provider key rejected", {"reason": "key_rejected"})

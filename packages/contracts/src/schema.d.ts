@@ -4,57 +4,6 @@
  */
 
 export interface paths {
-    "/api/v1/_stub/jobs": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** Create */
-        post: operations["stub_create_job"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/_stub/jobs/{job_id}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Read */
-        get: operations["stub_get_job"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/_stub/jobs/{job_id}/download": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Download */
-        get: operations["stub_download"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/api/v1/health/live": {
         parameters: {
             query?: never;
@@ -83,6 +32,29 @@ export interface paths {
         get: operations["health_ready"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/housekeeping/run": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Run
+         * @description Sweep now. `intermediates` removes what is past the retention period (with `project_id`:
+         *     that project's intermediates, now); `abandoned_uploads` reaps leftover upload files; `all` is
+         *     both. 409 `job_active` while a sweep runs or the project has a job; 404 for a foreign
+         *     project.
+         */
+        post: operations["run_housekeeping"];
         delete?: never;
         options?: never;
         head?: never;
@@ -118,7 +90,12 @@ export interface paths {
         get: operations["get_project"];
         put?: never;
         post?: never;
-        delete?: never;
+        /**
+         * Delete
+         * @description Delete the project now: jobs are cancelled, it leaves the list at once and every file and
+         *     row is removed within minutes. A second delete is 404.
+         */
+        delete: operations["delete_project"];
         options?: never;
         head?: never;
         /** Patch */
@@ -246,7 +223,8 @@ export interface paths {
          * Create
          * @description Freeze the plan (`plan_version`, default the latest) and render it: the silent master plus
          *     the cut lists. An identical active or ready render is returned instead. 409 `conflict`
-         *     (`wrong_state`, `job_active`, `intermediates_missing`, `no_plan_yet`), 507 low disk.
+         *     (`wrong_state`, `job_active`, `no_plan_yet`), 507 low disk. Swept clips are fetched again by
+         *     the job itself.
          */
         post: operations["create_render"];
         delete?: never;
@@ -386,7 +364,11 @@ export interface paths {
         };
         /** Get */
         get: operations["get_settings"];
-        put?: never;
+        /**
+         * Put
+         * @description Switch Pixabay on or off. 409 `pixabay_not_configured` when enabling without a key.
+         */
+        put: operations["put_settings"];
         post?: never;
         delete?: never;
         options?: never;
@@ -576,11 +558,21 @@ export interface components {
             out_start_frame: number;
             section: components["schemas"]["SectionRef"];
         };
+        /** DeleteAccepted */
+        DeleteAccepted: {
+            /**
+             * Project Id
+             * Format: uuid
+             */
+            project_id: string;
+        };
         /** Disk */
         Disk: {
             by_area: components["schemas"]["ByArea"];
+            /** Low */
+            low: boolean;
             /** Projects */
-            projects: string[];
+            projects: components["schemas"]["ProjectDisk"][];
             volume: components["schemas"]["Volume"];
         };
         /**
@@ -644,6 +636,26 @@ export interface components {
              * @constant
              */
             status: "ok";
+        };
+        /** HousekeepingAccepted */
+        HousekeepingAccepted: {
+            /** Project Id */
+            project_id: string | null;
+            /**
+             * Scope
+             * @enum {string}
+             */
+            scope: "intermediates" | "abandoned_uploads" | "all";
+        };
+        /** HousekeepingRun */
+        HousekeepingRun: {
+            /** Project Id */
+            project_id?: string | null;
+            /**
+             * Scope
+             * @enum {string}
+             */
+            scope: "intermediates" | "abandoned_uploads" | "all";
         };
         /** Keys */
         Keys: {
@@ -813,6 +825,25 @@ export interface components {
             /** Title */
             title: string | null;
             ui_status: components["schemas"]["UiStatus"];
+        };
+        /** ProjectDisk */
+        ProjectDisk: {
+            /** Bytes */
+            bytes: number;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Intermediate Bytes */
+            intermediate_bytes: number;
+            /**
+             * Last Activity At
+             * Format: date-time
+             */
+            last_activity_at: string;
+            /** Title */
+            title: string | null;
         };
         /** ProjectItem */
         ProjectItem: {
@@ -1091,6 +1122,11 @@ export interface components {
             stock: components["schemas"]["Stock"];
             tuning: components["schemas"]["Tuning"] | null;
         };
+        /** SettingsPut */
+        SettingsPut: {
+            /** Pixabay Enabled */
+            pixabay_enabled: boolean;
+        };
         /** Song */
         Song: {
             /** Duration S */
@@ -1119,60 +1155,6 @@ export interface components {
         Stock: {
             /** Pixabay Enabled */
             pixabay_enabled: boolean;
-        };
-        /** StubChain */
-        StubChain: {
-            /** Hops */
-            hops: components["schemas"]["StubHop"][];
-            /**
-             * Job Id
-             * Format: uuid
-             */
-            job_id: string;
-            /**
-             * Project Id
-             * Format: uuid
-             */
-            project_id: string;
-        };
-        /** StubHop */
-        StubHop: {
-            /** Attempt */
-            attempt: number;
-            /**
-             * Job Id
-             * Format: uuid
-             */
-            job_id: string;
-            /** Queue */
-            queue: string;
-            /** Run Ms */
-            run_ms: number | null;
-            /** Stage */
-            stage: string;
-            /** State */
-            state: string;
-        };
-        /** StubJobIn */
-        StubJobIn: {
-            /**
-             * Sleep S
-             * @default 0
-             */
-            sleep_s: number;
-        };
-        /** StubJobOut */
-        StubJobOut: {
-            /**
-             * Job Id
-             * Format: uuid
-             */
-            job_id: string;
-            /**
-             * Project Id
-             * Format: uuid
-             */
-            project_id: string;
         };
         /** Tuning */
         Tuning: {
@@ -1258,184 +1240,6 @@ export interface components {
 }
 export type $defs = Record<string, never>;
 export interface operations {
-    stub_create_job: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["StubJobIn"];
-            };
-        };
-        responses: {
-            /** @description Successful Response */
-            202: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["StubJobOut"];
-                };
-            };
-            /** @description forbidden; details.reason is one of host_not_allowed, origin_mismatch, cross_site */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse"];
-                };
-            };
-            /** @description not found */
-            404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse"];
-                };
-            };
-            /** @description validation_error (details.fields) */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse"];
-                };
-            };
-            /** @description internal_error */
-            500: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse"];
-                };
-            };
-        };
-    };
-    stub_get_job: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                job_id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["StubChain"];
-                };
-            };
-            /** @description forbidden; details.reason is one of host_not_allowed, origin_mismatch, cross_site */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse"];
-                };
-            };
-            /** @description not found */
-            404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse"];
-                };
-            };
-            /** @description validation_error (details.fields) */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse"];
-                };
-            };
-            /** @description internal_error */
-            500: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse"];
-                };
-            };
-        };
-    };
-    stub_download: {
-        parameters: {
-            query?: never;
-            header?: {
-                range?: string | null;
-            };
-            path: {
-                job_id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-            /** @description forbidden; details.reason is one of host_not_allowed, origin_mismatch, cross_site */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse"];
-                };
-            };
-            /** @description not found */
-            404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse"];
-                };
-            };
-            /** @description validation_error (details.fields) */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse"];
-                };
-            };
-            /** @description internal_error */
-            500: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse"];
-                };
-            };
-        };
-    };
     health_live: {
         parameters: {
             query?: never;
@@ -1548,6 +1352,75 @@ export interface operations {
             };
             /** @description upstream_unavailable; details.checks maps each dependency to ok or error */
             503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    run_housekeeping: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["HousekeepingRun"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HousekeepingAccepted"];
+                };
+            };
+            /** @description forbidden; details.reason is one of host_not_allowed, origin_mismatch, cross_site */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description conflict; details.reason is one of not_ready, wrong_state, upload_in_progress, retry_limit, job_active, no_plan_yet, too_many_streams, render_active */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description validation_error (details.fields) */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description internal_error */
+            500: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -1734,6 +1607,64 @@ export interface operations {
             };
         };
     };
+    delete_project: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                project_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DeleteAccepted"];
+                };
+            };
+            /** @description forbidden; details.reason is one of host_not_allowed, origin_mismatch, cross_site */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description validation_error (details.fields) */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description internal_error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
     patch_project: {
         parameters: {
             query?: never;
@@ -1776,7 +1707,7 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorResponse"];
                 };
             };
-            /** @description conflict; details.reason is one of not_ready, wrong_state, upload_in_progress, retry_limit, job_active, no_plan_yet, too_many_streams, render_active, intermediates_missing */
+            /** @description conflict; details.reason is one of not_ready, wrong_state, upload_in_progress, retry_limit, job_active, no_plan_yet, too_many_streams, render_active */
             409: {
                 headers: {
                     [name: string]: unknown;
@@ -1843,7 +1774,7 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorResponse"];
                 };
             };
-            /** @description conflict; details.reason is one of not_ready, wrong_state, upload_in_progress, retry_limit, job_active, no_plan_yet, too_many_streams, render_active, intermediates_missing */
+            /** @description conflict; details.reason is one of not_ready, wrong_state, upload_in_progress, retry_limit, job_active, no_plan_yet, too_many_streams, render_active */
             409: {
                 headers: {
                     [name: string]: unknown;
@@ -1910,7 +1841,7 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorResponse"];
                 };
             };
-            /** @description conflict; details.reason is one of not_ready, wrong_state, upload_in_progress, retry_limit, job_active, no_plan_yet, too_many_streams, render_active, intermediates_missing */
+            /** @description conflict; details.reason is one of not_ready, wrong_state, upload_in_progress, retry_limit, job_active, no_plan_yet, too_many_streams, render_active */
             409: {
                 headers: {
                     [name: string]: unknown;
@@ -1977,7 +1908,7 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorResponse"];
                 };
             };
-            /** @description conflict; details.reason is one of not_ready, wrong_state, upload_in_progress, retry_limit, job_active, no_plan_yet, too_many_streams, render_active, intermediates_missing */
+            /** @description conflict; details.reason is one of not_ready, wrong_state, upload_in_progress, retry_limit, job_active, no_plan_yet, too_many_streams, render_active */
             409: {
                 headers: {
                     [name: string]: unknown;
@@ -2044,7 +1975,7 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorResponse"];
                 };
             };
-            /** @description conflict; details.reason is one of not_ready, wrong_state, upload_in_progress, retry_limit, job_active, no_plan_yet, too_many_streams, render_active, intermediates_missing */
+            /** @description conflict; details.reason is one of not_ready, wrong_state, upload_in_progress, retry_limit, job_active, no_plan_yet, too_many_streams, render_active */
             409: {
                 headers: {
                     [name: string]: unknown;
@@ -2113,7 +2044,7 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorResponse"];
                 };
             };
-            /** @description conflict; details.reason is one of not_ready, wrong_state, upload_in_progress, retry_limit, job_active, no_plan_yet, too_many_streams, render_active, intermediates_missing */
+            /** @description conflict; details.reason is one of not_ready, wrong_state, upload_in_progress, retry_limit, job_active, no_plan_yet, too_many_streams, render_active */
             409: {
                 headers: {
                     [name: string]: unknown;
@@ -2264,7 +2195,7 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorResponse"];
                 };
             };
-            /** @description conflict; details.reason is one of not_ready, wrong_state, upload_in_progress, retry_limit, job_active, no_plan_yet, too_many_streams, render_active, intermediates_missing */
+            /** @description conflict; details.reason is one of not_ready, wrong_state, upload_in_progress, retry_limit, job_active, no_plan_yet, too_many_streams, render_active */
             409: {
                 headers: {
                     [name: string]: unknown;
@@ -2340,7 +2271,7 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorResponse"];
                 };
             };
-            /** @description conflict; details.reason is one of not_ready, wrong_state, upload_in_progress, retry_limit, job_active, no_plan_yet, too_many_streams, render_active, intermediates_missing */
+            /** @description conflict; details.reason is one of not_ready, wrong_state, upload_in_progress, retry_limit, job_active, no_plan_yet, too_many_streams, render_active */
             409: {
                 headers: {
                     [name: string]: unknown;
@@ -2424,7 +2355,7 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorResponse"];
                 };
             };
-            /** @description conflict; details.reason is one of not_ready, wrong_state, upload_in_progress, retry_limit, job_active, no_plan_yet, too_many_streams, render_active, intermediates_missing */
+            /** @description conflict; details.reason is one of not_ready, wrong_state, upload_in_progress, retry_limit, job_active, no_plan_yet, too_many_streams, render_active */
             409: {
                 headers: {
                     [name: string]: unknown;
@@ -2574,7 +2505,7 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorResponse"];
                 };
             };
-            /** @description conflict; details.reason is one of not_ready, wrong_state, upload_in_progress, retry_limit, job_active, no_plan_yet, too_many_streams, render_active, intermediates_missing */
+            /** @description conflict; details.reason is one of not_ready, wrong_state, upload_in_progress, retry_limit, job_active, no_plan_yet, too_many_streams, render_active */
             409: {
                 headers: {
                     [name: string]: unknown;
@@ -2641,7 +2572,7 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorResponse"];
                 };
             };
-            /** @description conflict; details.reason is one of not_ready, wrong_state, upload_in_progress, retry_limit, job_active, no_plan_yet, too_many_streams, render_active, intermediates_missing */
+            /** @description conflict; details.reason is one of not_ready, wrong_state, upload_in_progress, retry_limit, job_active, no_plan_yet, too_many_streams, render_active */
             409: {
                 headers: {
                     [name: string]: unknown;
@@ -2710,7 +2641,7 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorResponse"];
                 };
             };
-            /** @description conflict; details.reason is one of not_ready, wrong_state, upload_in_progress, retry_limit, job_active, no_plan_yet, too_many_streams, render_active, intermediates_missing */
+            /** @description conflict; details.reason is one of not_ready, wrong_state, upload_in_progress, retry_limit, job_active, no_plan_yet, too_many_streams, render_active */
             409: {
                 headers: {
                     [name: string]: unknown;
@@ -2777,7 +2708,7 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorResponse"];
                 };
             };
-            /** @description conflict; details.reason is one of not_ready, wrong_state, upload_in_progress, retry_limit, job_active, no_plan_yet, too_many_streams, render_active, intermediates_missing */
+            /** @description conflict; details.reason is one of not_ready, wrong_state, upload_in_progress, retry_limit, job_active, no_plan_yet, too_many_streams, render_active */
             409: {
                 headers: {
                     [name: string]: unknown;
@@ -2835,6 +2766,75 @@ export interface operations {
             };
             /** @description not found */
             404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description validation_error (details.fields) */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description internal_error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    put_settings: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SettingsPut"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SettingsOut"];
+                };
+            };
+            /** @description forbidden; details.reason is one of host_not_allowed, origin_mismatch, cross_site */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description conflict; details.reason is one of not_ready, wrong_state, upload_in_progress, retry_limit, job_active, no_plan_yet, too_many_streams, render_active */
+            409: {
                 headers: {
                     [name: string]: unknown;
                 };

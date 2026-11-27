@@ -41,18 +41,18 @@ def served(tmp_path: Path) -> tuple[FilesystemBlobStore, FastAPI]:
 
 
 @pytest.mark.unit
-async def test_stub_download_has_attachment_and_security_headers(
+async def test_a_render_file_download_has_attachment_and_security_headers(
     served: tuple[FilesystemBlobStore, FastAPI],
 ) -> None:
     store, app = served
-    key = f"renders/{PID}/stub.txt"
-    store.put(key, iter([b"stub job x\n"]), max_bytes=100)
+    key = f"renders/{PID}/cutlist.csv"
+    store.put(key, iter([b"cut,start\n"]), max_bytes=100)
     async with client_for(app) as c:
         r = await c.get(f"/blob/{key}")
     assert r.status_code == 200
-    assert r.content == b"stub job x\n"
-    assert r.headers["content-disposition"] == 'attachment; filename="stub.txt"'
-    assert r.headers["content-type"].startswith("text/plain")
+    assert r.content == b"cut,start\n"
+    assert r.headers["content-disposition"] == 'attachment; filename="cutlist.csv"'
+    assert r.headers["content-type"].startswith("text/csv")
     assert r.headers["x-content-type-options"] == "nosniff"
     assert r.headers["cache-control"] == "private, no-store"
     assert r.headers["accept-ranges"] == "bytes"

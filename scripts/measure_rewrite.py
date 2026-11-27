@@ -58,7 +58,7 @@ class Sse:
 
 def measure_sse(base: str) -> Sse:
     conn = connect(base)
-    path = f"/api/v1/_stub/sse?events={SSE_EVENTS}&interval_ms={SSE_INTERVAL_MS}"
+    path = f"/api/v1/_measure/sse?events={SSE_EVENTS}&interval_ms={SSE_INTERVAL_MS}"
     t0 = time.monotonic()
     conn.request("GET", path, headers={"Accept": "text/event-stream", "Origin": APP_ORIGIN})
     response = conn.getresponse()
@@ -142,7 +142,7 @@ def measure_upload(base: str, container: str, cid: str | None) -> Upload:
     if cid:
         threading.Thread(target=sampler, daemon=True).start()
     conn = connect(base)
-    conn.putrequest("POST", "/api/v1/_stub/upload-sink")
+    conn.putrequest("POST", "/api/v1/_measure/upload-sink")
     conn.putheader("Content-Type", "application/octet-stream")
     conn.putheader("Content-Length", str(UPLOAD_BYTES))
     conn.putheader("Origin", APP_ORIGIN)

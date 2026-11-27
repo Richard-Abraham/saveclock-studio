@@ -7,13 +7,15 @@ import dramatiq
 import pytest
 from dramatiq.brokers.stub import StubBroker
 
-from saveclock.adapters.queue import ACTORS, DramatiqEnqueuer, FakeEnqueuer
+from saveclock.adapters.queue import ACTORS, STAGE_ACTOR, DramatiqEnqueuer, FakeEnqueuer
 from saveclock.config import Settings
 from saveclock.errors import RETRYABLE, ErrorCode
+from saveclock.models import JobQueue, JobStage
 from saveclock.workers.analysis import register_analyze_actor
 from saveclock.workers.broker import build_broker
 from saveclock.workers.draft import register_draft_actors
 from saveclock.workers.ingest import register_validate_actor
+from saveclock.workers.maintenance import PURGE_RETRIES, register_maintenance_actors
 from saveclock.workers.pipeline import FAILED_ACTOR, register_failure_hook
 from saveclock.workers.remux import register_remux_actor
 from saveclock.workers.render import register_render_actors
@@ -39,6 +41,7 @@ def registered(tmp_path: Path) -> dramatiq.Broker:
     register_draft_actors(broker, settings)
     register_render_actors(broker, settings)
     register_remux_actor(broker, settings)
+    register_maintenance_actors(broker, settings)
     return broker
 
 
@@ -49,15 +52,39 @@ def test_the_worker_registers_exactly_the_registry(tmp_path: Path) -> None:
 
 
 def test_every_actor_has_explicit_limits(tmp_path: Path) -> None:
-    for actor in registered(tmp_path).actors.values():
-        limit = 3 if actor.actor_name in {"build_draft", "replan"} else 2  # ARCH §8 fetch queue
+    broker = registered(tmp_path)
+    for actor in broker.actors.values():
+        maintenance = ACTORS.get(actor.actor_name) is JobQueue.MAINTENANCE
+        fetch = actor.actor_name in {"build_draft", "replan"}
+        limit = 5 if maintenance else 3 if fetch else 2  # ARCH §8
+        limit = PURGE_RETRIES if actor.actor_name == "purge_project" else limit  # outlasts a render
         assert actor.options["max_retries"] <= limit
         assert actor.options["time_limit"] > 0
         assert "min_backoff" in actor.options
         assert "max_backoff" in actor.options
-    broker = registered(tmp_path)
-    for name in ACTORS:
-        assert broker.actors[name].options["on_retry_exhausted"] == FAILED_ACTOR
+    for name, queue in ACTORS.items():
+        options = broker.actors[name].options
+        if queue is JobQueue.MAINTENANCE:  # its messages carry no (job_id, user_id) for the hook
+            expected = PURGE_RETRIES if name == "purge_project" else 5
+            assert options["max_retries"] == expected
+            assert "on_retry_exhausted" not in options
+        else:
+            assert options["on_retry_exhausted"] == FAILED_ACTOR
+
+
+def test_every_stage_actor_is_registered_on_the_queue_its_job_uses() -> None:
+    queues = {
+        JobStage.VALIDATE: JobQueue.ANALYSIS,
+        JobStage.ANALYZE: JobQueue.ANALYSIS,
+        JobStage.DRAFT: JobQueue.FETCH,
+        JobStage.REPLAN: JobQueue.FETCH,
+        JobStage.RENDER: JobQueue.RENDER,
+        JobStage.REMUX: JobQueue.RENDER,
+    }  # the queues the job-creating code names for each stage
+    assert STAGE_ACTOR.keys() == queues.keys()
+    for stage, actor in STAGE_ACTOR.items():
+        assert actor in ACTORS
+        assert ACTORS[actor] is queues[stage]
 
 
 def test_there_is_no_placeholder_left_in_the_worker_sources() -> None:

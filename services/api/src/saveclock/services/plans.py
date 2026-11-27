@@ -374,6 +374,7 @@ async def apply_patch(
     project = await projects.get(user_id=user_id, project_id=project_id)
     if project is None:
         raise NotFound
+    await projects.touch(user_id=user_id, project_id=project_id)  # an edit is activity
     latest = await PlanRepository(session).latest(user_id=user_id, project_id=project_id)
     if latest is None:
         raise Conflict(ConflictReason.NO_PLAN_YET)

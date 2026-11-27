@@ -12,14 +12,24 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from saveclock.adapters.events import EventPublisher
 from saveclock.adapters.queue import Enqueuer
-from saveclock.domain.states import RETRYABLE_FROM
+from saveclock.domain.states import RETRYABLE_FROM, can_transition
 from saveclock.errors import BadRequest, Conflict, ConflictReason, NotFound
 from saveclock.ids import new_id
-from saveclock.models import Analysis, JobQueue, JobStage, Project, ProjectStatus, Song
+from saveclock.models import (
+    Analysis,
+    JobQueue,
+    JobStage,
+    Project,
+    ProjectStatus,
+    RenderState,
+    Song,
+)
 from saveclock.repositories.analyses import AnalysisRepository
 from saveclock.repositories.jobs import JobRepository
 from saveclock.repositories.plans import PlanRepository
 from saveclock.repositories.projects import ProjectRepository
+from saveclock.repositories.renders import ACTIVE as ACTIVE_RENDER
+from saveclock.repositories.renders import RenderRepository
 from saveclock.repositories.songs import SongRepository
 from saveclock.services import project_state
 from saveclock.services.plans import PlanSummary, restore_keywords_override, summary_of
@@ -192,6 +202,47 @@ async def cancel(
     await project_state.announce_pending(session, publisher)
     await session.refresh(project)
     return project
+
+
+DELETABLE = tuple(s.value for s in ProjectStatus if can_transition(s.value, "deleted"))
+
+
+async def delete_project(
+    session: AsyncSession, user_id: UUID, project_id: UUID, enqueuer: Enqueuer
+) -> None:
+    """Delete now (ARCH §7 #5): cancel the jobs and a queued render, hide the project (`deleted`)
+    and send `purge_project`, which removes every file and then the rows. A render that is already
+    running sees `cancel_requested`; the purge waits for it. The project disappears from the list
+    at once; its files are gone within minutes.
+
+    shortcut: a Redis-down send leaves a `deleted` project with its files; the sweeper's retry of
+    `deleted` projects purges it within the sweep interval (upgrade: send before the commit).
+    """
+    project = await _owned(session, user_id, project_id)
+    if project.status == ProjectStatus.DELETED.value:
+        raise NotFound
+    await JobRepository(session).request_cancel(user_id=user_id, project_id=project_id)
+    renders = RenderRepository(session)
+    render = await renders.latest_for_project(user_id=user_id, project_id=project_id)
+    if render is not None and render.state in ACTIVE_RENDER:
+        await renders.set_state(
+            user_id=user_id,
+            render_id=render.id,
+            from_=(RenderState.QUEUED.value,),
+            to=RenderState.CANCELED.value,
+        )
+    # no `state` event: a deleted project has no UI status and nobody watches it any more
+    if not await ProjectRepository(session).transition(
+        user_id=user_id,
+        project_id=project_id,
+        from_=DELETABLE,
+        to=ProjectStatus.DELETED.value,
+        reason="deleted_by_owner",
+    ):
+        await session.rollback()
+        raise NotFound
+    await session.commit()
+    await asyncio.to_thread(enqueuer.send, "purge_project", str(user_id), str(project_id))
 
 
 async def retry(

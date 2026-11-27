@@ -29,6 +29,7 @@ export function settingsFixture(overrides: Partial<SettingsOut> = {}): SettingsO
       volume: { total: 40e9, free: 36.8e9 },
       by_area: { songs: 0, work: 0, renders: 0 },
       projects: [],
+      low: false,
     },
     intermediate_ttl_days: 7,
     ...overrides,

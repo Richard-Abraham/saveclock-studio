@@ -36,7 +36,12 @@ from saveclock.adapters.ffmpeg import (
     run,
 )
 from saveclock.adapters.heavy_lock import HeavyLock
-from saveclock.config import REMUX_FFMPEG_S, RENDER_FFMPEG_S, RENDER_HEAVY_WAIT_S
+from saveclock.config import (
+    REMUX_FFMPEG_S,
+    RENDER_FFMPEG_S,
+    RENDER_HEAVY_WAIT_S,
+    RENDER_REHYDRATE_S,
+)
 from saveclock.domain import cutlist
 from saveclock.domain import verify as v
 from saveclock.domain.edit_plan import EditPlan
@@ -44,7 +49,7 @@ from saveclock.domain.events import FailedEvent, ModeAReadyEvent, RenderReadyEve
 from saveclock.domain.framemath import FPS
 from saveclock.domain.media_sniff import sniff
 from saveclock.domain.plan_validator import blocking, validate_plan
-from saveclock.errors import ErrorCode
+from saveclock.errors import ClipUnavailable, ErrorCode
 from saveclock.models import Job, JobStage, ModeAState, Render, RenderState
 from saveclock.repositories.jobs import JobRepository
 from saveclock.repositories.projects import ProjectRepository
@@ -52,10 +57,12 @@ from saveclock.repositories.renders import ACTIVE, RenderRepository
 from saveclock.repositories.songs import SongRepository
 from saveclock.services import project_state
 from saveclock.services.analysis import JobCanceled
-from saveclock.services.autotune import effective, host_facts
 from saveclock.services.context import WorkerContext, cancel_probe
 from saveclock.services.events import ProgressEmitter
+from saveclock.services.footage import build_footage_deps, effective_pixabay
+from saveclock.services.rehydrate import rehydrate_plan
 from saveclock.services.scratch import scratch_dir
+from saveclock.services.tuning import get_tuning
 
 log = structlog.get_logger()
 
@@ -139,30 +146,58 @@ async def render_master(ctx: WorkerContext, user_id: UUID, job_id: UUID) -> None
             retryable=False,
         )
         return
-    missing = sorted(
-        {c.clip.mezzanine_key for c in plan.cuts if not ctx.blobs.exists(c.clip.mezzanine_key)}
-    )
-    if missing:  # plan 008 adds rehydration
-        await _end(  # plan 008 adds rehydration; the owner keeps the plan and renders again
+    emitter = ProgressEmitter(ctx.publisher, ids.project_id)
+    try:
+        await _rehydrate_if_needed(ctx, ids, plan, emitter)
+        await _render_and_verify(ctx, ids, plan, emitter)
+    except ClipUnavailable:  # gone at its provider: the owner keeps the plan and replans
+        await _end(
             ctx,
             ids,
             render_to=RenderState.FAILED,
             project_to="draft_ready",
-            code=ErrorCode.CONFLICT.value,
-            reason="intermediates_missing",
-            detail="intermediates_missing",
-            retryable=True,
+            code=ErrorCode.CLIP_UNAVAILABLE.value,
+            reason="clip_unavailable",
+            retryable=False,
         )
-        return
-    try:
-        await _render_and_verify(ctx, ids, plan)
     except (JobCanceled, FfCanceled):
         await _delete_outputs(ctx, ids)
         await _end_canceled(ctx, ids)
 
 
-async def _render_and_verify(ctx: WorkerContext, ids: _Ids, plan: EditPlan) -> None:
-    emitter = ProgressEmitter(ctx.publisher, ids.project_id)
+async def _rehydrate_if_needed(
+    ctx: WorkerContext, ids: _Ids, plan: EditPlan, emitter: ProgressEmitter
+) -> None:
+    """Swept intermediates come back first (P8-10): the clips are fetched again inside this job,
+    before the heavy slot is taken. `RENDER_REHYDRATE_S` bounds it; a retry continues."""
+    if all(ctx.blobs.exists(c.clip.mezzanine_key) for c in plan.cuts):
+        return
+    redis: Redis = Redis.from_url(ctx.settings.redis_url.get_secret_value())
+    deps = None
+    try:
+        deps = build_footage_deps(
+            ctx,
+            redis,
+            pixabay_on=await effective_pixabay(ctx, ids.user_id),
+            cancel=cancel_probe(ctx, ids.user_id, ids.job_id),
+        )
+        await rehydrate_plan(
+            deps,
+            plan,
+            user_id=ids.user_id,
+            project_id=ids.project_id,
+            emitter=emitter,
+            deadline_s=RENDER_REHYDRATE_S,
+        )
+    finally:
+        if deps is not None:
+            deps.close()
+        redis.close()
+
+
+async def _render_and_verify(
+    ctx: WorkerContext, ids: _Ids, plan: EditPlan, emitter: ProgressEmitter
+) -> None:
     started = time.monotonic()
     with scratch_dir(ctx.settings.scratch_root, ids.job_id) as scratch:
         master, progress = scratch / "master.mp4", scratch / "progress.txt"
@@ -215,7 +250,7 @@ def _encode(
 ) -> None:
     """One FFmpeg pass under the heavy slot, held for this render only (ADR-0020). A slot wait
     that times out raises `HeavyLockTimeout`, which Dramatiq retries."""
-    tuning = effective(ctx.settings, host_facts())
+    tuning = get_tuning(ctx.settings)
     cmd = render_cmd(
         ctx.tools, plan, paths, master, progress=progress, threads=tuning.ffmpeg_threads
     )

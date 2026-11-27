@@ -164,3 +164,9 @@ class UploadAccepted(BaseModel):
 
     job_id: UUID
     ui_status: UiStatus
+
+
+class DeleteAccepted(BaseModel):
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    project_id: UUID

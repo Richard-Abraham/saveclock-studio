@@ -23,6 +23,23 @@ class RenderRepository:
         stmt = select(Render).where(Render.id == render_id, Render.user_id == user_id)
         return (await self.session.scalars(stmt)).one_or_none()
 
+    async def ids_of_project(self, *, user_id: UUID, project_id: UUID) -> list[UUID]:
+        stmt = select(Render.id).where(Render.project_id == project_id, Render.user_id == user_id)
+        return list((await self.session.scalars(stmt)).all())
+
+    async def ids_by_project(self, *, user_id: UUID) -> dict[UUID, list[UUID]]:
+        """Render ids grouped by project, for the disk numbers of a whole page."""
+        stmt = select(Render.project_id, Render.id).where(Render.user_id == user_id)
+        out: dict[UUID, list[UUID]] = {}
+        for project_id, render_id in (await self.session.execute(stmt)).all():
+            out.setdefault(project_id, []).append(render_id)
+        return out
+
+    async def list_all_ids(self) -> set[UUID]:
+        """Every render id of every user (the orphan reconcile: the blob root is shared)."""
+        stmt = select(Render.id)
+        return set((await self.session.scalars(stmt)).all())
+
     async def for_job(self, *, user_id: UUID, job_id: UUID) -> Render | None:
         """The render a job carries in `jobs.render_id`."""
         stmt = (

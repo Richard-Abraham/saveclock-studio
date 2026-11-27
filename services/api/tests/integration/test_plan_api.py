@@ -1,6 +1,7 @@
 """GET and PATCH /projects/{id}/plan over HTTP with a real draft behind them."""
 
 import asyncio
+import contextlib
 import json
 from typing import Any
 from uuid import UUID
@@ -351,10 +352,19 @@ async def test_two_patches_on_one_base_of_an_unfrozen_plan_do_not_both_win(
 ) -> None:
     pid = await draft.drafted()
     real = PlanRepository.replace_working
-    both_read = asyncio.Barrier(2)
+    arrived = 0
+    both_read = asyncio.Event()
 
     async def after_both_read(self: PlanRepository, **kw: Any) -> bool:
-        await both_read.wait()  # each request has read version 1 before either writes
+        # Wait (bounded) for the other request before writing. Since plan 008 the activity touch
+        # row-locks the project, so the second request usually waits for the first commit and then
+        # reads version 2; an unbounded barrier would deadlock. Either way exactly one may win.
+        nonlocal arrived
+        arrived += 1
+        if arrived == 2:
+            both_read.set()
+        with contextlib.suppress(TimeoutError):
+            await asyncio.wait_for(both_read.wait(), 2)
         return await real(self, **kw)
 
     monkeypatch.setattr(PlanRepository, "replace_working", after_both_read)
@@ -362,10 +372,18 @@ async def test_two_patches_on_one_base_of_an_unfrozen_plan_do_not_both_win(
         patch(draft, pid, 1, {"op": "set_density", "level": 1}),
         patch(draft, pid, 1, {"op": "set_density", "level": -2}),
     )
-    assert sorted([first.status_code, second.status_code]) == [200, 409]
-    winner = first if first.status_code == 200 else second
+    codes = sorted([first.status_code, second.status_code])
     stored = await draft.plan(pid)
-    assert stored.options.density == winner.json()["options"]["density"]
+    if codes == [200, 409]:  # interleaved: the content-hash guard refused the second write
+        winner = first if first.status_code == 200 else second
+        assert stored.options.density == winner.json()["options"]["density"]
+    else:  # serialized by the project row lock: the later edit applied on top of the first
+        assert codes == [200, 200]
+        assert stored.options.density in {
+            first.json()["options"]["density"],
+            second.json()["options"]["density"],
+        }
+    assert [r[0] for r in await draft.sql("SELECT version FROM edit_plans")] == [1]
 
 
 async def test_a_cancelled_replan_drops_the_new_keywords(draft: Draft) -> None:

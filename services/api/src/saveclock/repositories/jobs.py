@@ -1,7 +1,8 @@
+from datetime import datetime
 from typing import Any
 from uuid import UUID
 
-from sqlalchemy import Uuid, func, literal, select, update
+from sqlalchemy import Uuid, and_, delete, func, literal, or_, select, update
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.sql.elements import ColumnElement
@@ -152,5 +153,44 @@ class JobRepository:
             )
             .values(cancel_requested=True)
             .execution_options(synchronize_session=False)
+        )
+        return int((await self.session.execute(stmt)).rowcount)  # type: ignore[attr-defined]
+
+    async def stuck(
+        self, *, user_id: UUID, queued_before: datetime, running_before: datetime
+    ) -> list[Job]:
+        """Jobs `queued` since before `queued_before` or `running` since before `running_before`
+        (both measured on `updated_at`)."""
+        stmt = select(Job).where(
+            self._owned(user_id),
+            or_(
+                and_(Job.state == JobState.QUEUED.value, Job.updated_at < queued_before),
+                and_(Job.state == JobState.RUNNING.value, Job.updated_at < running_before),
+            ),
+        )
+        return list((await self.session.scalars(stmt)).all())
+
+    async def touch_resent(self, *, user_id: UUID, job_id: UUID) -> None:
+        """The reaper re-sent the job: restart its clock (set
+        explicitly, not left to `onupdate`)."""
+        stmt = (
+            update(Job)
+            .where(
+                Job.id == job_id,
+                Job.state.in_([JobState.QUEUED.value, JobState.RUNNING.value]),
+                self._owned(user_id),
+            )
+            .values(updated_at=func.now())
+            .execution_options(synchronize_session=False)
+        )
+        await self.session.execute(stmt)
+
+    async def prune_finished(self, *, user_id: UUID, older_than: datetime) -> int:
+        """Delete terminal jobs that finished before `older_than`; unfinished jobs never go."""
+        stmt = delete(Job).where(
+            self._owned(user_id),
+            Job.state.in_([JobState.OK.value, JobState.ERROR.value, JobState.DEAD.value]),
+            Job.finished_at.is_not(None),
+            Job.finished_at < older_than,
         )
         return int((await self.session.execute(stmt)).rowcount)  # type: ignore[attr-defined]

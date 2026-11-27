@@ -29,12 +29,16 @@ def repository_methods() -> Iterator[tuple[str, str, inspect.Signature]]:
                     yield cls_name, name, inspect.signature(fn)
 
 
+# The documented exceptions: the orphan reconcile compares the shared blob root with all ids.
+ALL_USERS = {"ProjectRepository.list_all_ids", "RenderRepository.list_all_ids"}
+
+
 @pytest.mark.unit
 def test_every_repository_method_takes_user_id() -> None:
     seen = list(repository_methods())
     assert seen, "no repository methods found: the introspection is broken"
     missing = [f"{c}.{m}" for c, m, sig in seen if "user_id" not in sig.parameters]
-    assert missing == []  # the documented exception list is empty
+    assert missing == sorted(ALL_USERS)
 
 
 def _depends_on_current_user(dependant: Dependant) -> bool:
@@ -95,3 +99,19 @@ def test_ui_status_mapping_covers_all_states_except_deleted() -> None:
         assert ui_status(status) is UiStatus(expected)
     with pytest.raises(KeyError):
         ui_status("deleted")
+
+
+@pytest.mark.unit
+def test_the_app_serves_no_stub_path_and_no_module_is_named_for_one() -> None:
+    """Plan 008 removed the Phase 1 stub: its routes, actors and modules must not come back."""
+    from pathlib import Path
+
+    paths: set[str] = set()
+    for included in make_app(checks={}).routes:  # an included router: its prefix and its routes
+        prefix = included.include_context.prefix  # type: ignore[attr-defined]
+        inner = included.original_router.routes  # type: ignore[attr-defined]
+        paths |= {f"{prefix}{r.path}" for r in inner}
+    assert any(p.startswith(API_PREFIX) for p in paths)  # the walk sees the app's routes
+    assert [p for p in paths if "/_stub" in p] == []
+    root = Path(__file__).resolve().parents[2] / "src" / "saveclock"
+    assert [p for p in root.rglob("*.py") if "stub" in p.name] == []

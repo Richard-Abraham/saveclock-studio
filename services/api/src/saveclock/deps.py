@@ -10,7 +10,6 @@ from saveclock.adapters.events import EventPublisher
 from saveclock.adapters.queue import Enqueuer
 from saveclock.services.health import Check
 from saveclock.services.settings import UsageCache
-from saveclock.services.stub import Enqueue
 
 
 @dataclass(frozen=True)
@@ -21,7 +20,6 @@ class Deps:
     blobs: BlobStore
     checks: dict[str, Check]
     enqueuer: Enqueuer
-    enqueue_stub: Enqueue | None = None  # set only when APP_ENV is local or ci
     usage_cache: UsageCache = field(default_factory=UsageCache)
     publisher: EventPublisher | None = None
 

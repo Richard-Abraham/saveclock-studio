@@ -58,9 +58,9 @@ from saveclock.models import ClipCandidate, ClipStatus
 from saveclock.repositories.candidates import CandidateRepository, NewCandidate
 from saveclock.repositories.users import UserRepository
 from saveclock.services.analysis import JobCanceled
-from saveclock.services.autotune import effective, host_facts
 from saveclock.services.context import WorkerContext
 from saveclock.services.scratch import scratch_dir
+from saveclock.services.tuning import get_tuning
 
 log = structlog.get_logger()
 
@@ -536,7 +536,7 @@ def get_ranker(settings: Settings) -> ImageTextRanker:
                 _RANKERS[key] = FakeRanker()
             else:
                 directory = verified_group(settings.models_dir, SIGLIP_GROUP)  # ModelIntegrityError
-                threads = effective(settings, host_facts()).torch_threads
+                threads = get_tuning(settings).torch_threads
                 _RANKERS[key] = SigLipRanker(directory, threads)
         return _RANKERS[key]
 
@@ -549,7 +549,7 @@ def build_footage_deps(
     cancel: Callable[[], bool] | None = None,
     seed: int | str = 0,
 ) -> FootageDeps:
-    tuning = effective(ctx.settings, host_facts())
+    tuning = get_tuning(ctx.settings)
     http = httpx.Client(timeout=httpx.Timeout(20.0, connect=10.0))
     try:
         providers = build_providers(ctx.settings, redis, pixabay_on=pixabay_on, http=http)

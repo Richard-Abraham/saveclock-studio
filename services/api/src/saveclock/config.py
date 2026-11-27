@@ -39,13 +39,16 @@ DRAFT_LIMIT_S = 180
 # The render (plan 007), one job on the render queue. The heavy slot is held only around FFmpeg
 # (from the preflight to the end of the encode); verification and publishing run after release.
 # In one place, asserted by tests/unit/test_time_budgets.py:
-#   HEAVY_TTL_S > RENDER_LIMIT_S >= RENDER_HEAVY_WAIT_S + RENDER_FFMPEG_S
+#   HEAVY_TTL_S > RENDER_LIMIT_S >= RENDER_HEAVY_WAIT_S + RENDER_REHYDRATE_S + RENDER_FFMPEG_S
 #                                   + RENDER_VERIFY_S + RENDER_PUBLISH_S
 # The actor limit covers the slot wait (a retryable HeavyLockTimeout), the FFmpeg child, the
 # verification (about 1.0 to 1.4 times the render time) and the publish and finish; the slot TTL
 # outlives it, so a live worker never loses a slot it holds. A remux is far shorter; it shares the
-# worker threads with the render.
-RENDER_LIMIT_S = 700
+# worker threads with the render. Plan 008: a render whose intermediates were swept first fetches
+# its clips again (RENDER_REHYDRATE_S, before the slot is taken), inside the same limit.
+RENDER_LIMIT_S = 840  # 30 s of slack over the sum of the parts below
+# hypothesis: up to 20 clips, one download plus one normalize each, unmeasured (plan 008 Step 4)
+RENDER_REHYDRATE_S = 150
 RENDER_FFMPEG_S = 270
 RENDER_VERIFY_S = 240  # hypothesis: verify runs 1.0 to 1.4 x the render time, unmeasured
 RENDER_PUBLISH_S = 30  # hypothesis: three small puts and the finish transaction
@@ -53,6 +56,16 @@ RENDER_PUBLISH_S = 30  # hypothesis: three small puts and the finish transaction
 RENDER_HEAVY_WAIT_S = 120
 REMUX_LIMIT_S = 30
 REMUX_FFMPEG_S = 20  # the remux child; the verification calls that follow share the same limit
+
+# The maintenance actors (plan 008). A sweep, an orphan pass or a prune is a few queries and file
+# removals; a purge removes every file of a project and may wait for a job to end (it retries).
+# The stuck-job reaper (every 5 minutes) re-sends a job that sat `queued` for STUCK_QUEUED_S (more
+# than a draft, so shorter backlogs are left alone) or `running` for three slot lifetimes (no job
+# outlives its slot TTL, so a `running` job that old is dead). Asserted by test_time_budgets.py.
+MAINT_LIMIT_S = 60
+PURGE_LIMIT_S = 600
+STUCK_QUEUED_S = 600
+STUCK_RUNNING_S = 3 * HEAVY_TTL_S
 
 
 def _f(
@@ -156,6 +169,8 @@ class Settings(BaseSettings):
     app_version: str = _f("dev", "all", doc="plan 001")
     # true only on the worker that serves the heavy queues, so one process owns settings:tuning
     tuning_publisher: bool = _f(False, "K", doc="plan 001")
+    # true only on worker-maint: the in-process ticker that sends the periodic maintenance actors
+    maintenance_scheduler: bool = _f(False, "M", doc="plan 008")
     heavy_ttl_s: int = _f(
         HEAVY_TTL_S, "K", doc="plan 004; heavy-slot TTL, must exceed the analyze limit"
     )

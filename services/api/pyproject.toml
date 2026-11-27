@@ -114,6 +114,7 @@ markers = [
   "integration: needs postgres/redis/files",
   "golden: golden-file tests",
   "slow: slow tests",
+  "security: the security pass (plan 008): hostile media, route matrix, path containment",
   "live: hits real external services",
   "migration_roundtrip: alembic check and downgrade/upgrade, run by the migrations stage",
 ]
