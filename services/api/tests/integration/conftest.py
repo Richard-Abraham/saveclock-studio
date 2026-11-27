@@ -2,8 +2,10 @@
 
 import os
 import signal
+import socket
 import subprocess
 import sys
+import time
 import uuid
 from collections.abc import AsyncIterator, Iterator
 from contextlib import asynccontextmanager
@@ -248,6 +250,47 @@ class Harness:
             if proc.poll() is None:
                 os.killpg(proc.pid, signal.SIGKILL)
             proc.wait(timeout=10)
+
+
+class LiveApi:
+    """The real API as a uvicorn subprocess on an ephemeral 127.0.0.1 port, with the harness's
+    environment (plan 009): a CLI subprocess needs a listening server, and `ASGITransport` buffers
+    streams. Use as a context manager; `url` is the base URL."""
+
+    def __init__(self, harness: "Harness") -> None:
+        self.harness = harness
+        with socket.socket() as s:
+            s.bind(("127.0.0.1", 0))
+            self.port: int = s.getsockname()[1]
+        self.url = f"http://127.0.0.1:{self.port}"
+        self.proc: subprocess.Popen[bytes] | None = None
+
+    def __enter__(self) -> "LiveApi":
+        log = (self.harness.tmp_path / "api.log").open("wb")
+        self.proc = subprocess.Popen(  # noqa: S603 - fixed argument list, no shell
+            [sys.executable, "-m", "uvicorn", "saveclock.main:create_app", "--factory",
+             "--host", "127.0.0.1", "--port", str(self.port)],
+            cwd=API_DIR, env=self.harness.env(), stdout=log, stderr=subprocess.STDOUT,
+            start_new_session=True,
+        )  # fmt: skip
+        deadline = time.monotonic() + 60
+        while time.monotonic() < deadline:
+            try:
+                if httpx.get(f"{self.url}/api/v1/health/live", timeout=2).status_code == 200:
+                    return self
+            except httpx.HTTPError:
+                pass
+            if self.proc.poll() is not None:
+                break
+            time.sleep(0.2)
+        self.__exit__()
+        msg = f"the API did not start: {(self.harness.tmp_path / 'api.log').read_text()[-800:]}"
+        raise RuntimeError(msg)
+
+    def __exit__(self, *_exc: object) -> None:
+        if self.proc is not None and self.proc.poll() is None:
+            os.killpg(self.proc.pid, signal.SIGKILL)
+            self.proc.wait(timeout=10)
 
 
 @pytest.fixture

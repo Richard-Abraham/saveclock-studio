@@ -10,6 +10,7 @@ UV := uv --directory $(API)
 COMPOSE_BIN := $(shell command -v docker >/dev/null 2>&1 && echo "docker compose" || echo "podman compose")
 CONTAINER := $(shell command -v docker >/dev/null 2>&1 && echo docker || echo podman)
 COMPOSE = $(COMPOSE_BIN) -p $(PROJECT) --env-file .env -f infra/compose/compose.yml
+COMPOSE_FAKES = $(COMPOSE) -f infra/compose/compose.fakes.yml
 COMPOSE_TEST = $(COMPOSE_BIN) -p saveclock-test -f infra/compose/compose.test.yml
 GIT_SHA := $(shell git rev-parse --short HEAD 2>/dev/null || echo unknown)
 # value of a variable in .env (empty when absent): the one source of the web image's public origins
@@ -21,13 +22,13 @@ TRIVY := ghcr.io/aquasecurity/trivy@sha256:6e7f515a46af13a01d534734c666261de65c6
 
 # Stages, in order; the first failure stops the run and names the stage.
 FAST_STAGES := guard help-lint tooling-test secrets banned toolchain env-docs-check fmt-check lint types arch pins \
-  compose-lint test-deps-up ffmpeg-bin test security-pytest migrations web-install contracts-check audit \
+  skill-check eval-test compose-lint test-deps-up ffmpeg-bin test security-pytest migrations web-install contracts-check audit \
   web-env web-lint web-test web-build bundle-scan web-audit-prod
 CHECK_STAGES := $(FAST_STAGES) golden images image-guards security-container hadolint
 
 .PHONY: help help-lint tooling-test rollback toolchain doctor-dev guard secrets banned doctor fmt-check lint types arch pins compose-lint test golden \
   migrations audit env env-docs env-docs-check contracts contracts-check test-deps-up \
-  test-deps-down ffmpeg-cache ffmpeg-bin models-cache test-ml fake-stock images image-guards hadolint scan-images up dev down \
+  skill-check eval-test test-deps-down ffmpeg-cache ffmpeg-bin models-cache test-ml fake-stock images image-guards hadolint scan-images up dev dev-fakes dev-driver smoke-driver eval-smoke eval-soak down \
   down-volumes sandbox check-fast check web-install web-env web-lint web-test web-build \
   bundle-scan web-audit-prod measure-rewrite smoke-web web-audit stack-up seed smoke-stack security-pytest security-container security-pass hostile-corpus \
   predeploy-scan backup backup-init backup-test restore-proof backup-install-timer backup-timer-uninstall rollback-demo fresh-clone-timing
@@ -129,10 +130,29 @@ fake-stock: ffmpeg-bin ## generate the 8 fake stock clips FAKE_STOCK serves into
 migrations: ## check models match migrations and the downgrade round trip
 	$(UV) run pytest -q -m migration_roundtrip
 
+# plan 009: the skill's facts (commands, flags, keyword rule, error codes) against the code that owns them
+skill-check: ## fail if .claude/skills/saveclock/SKILL.md drifts from the CLI, the keyword rule or the error codes
+	$(UV) run python ../../scripts/check_skill.py
+
+# plan 009: the eval tooling's own tests (metric self-tests with injected faults, checks, report, sheets)
+eval-test: ## run the eval tooling's tests (needs the eval dependency group; uv syncs it)
+	$(UV) run --group eval pytest -q -c ../../eval/tests/pytest.ini ../../eval/tests
+
+# EVAL_ARGS=--live adds the owner's songs from eval/manifests/local.json; EVAL_ARGS='--stock pexels' is for a stack with a key.
+# Both talk to a RUNNING stack (make dev-fakes, or make dev with a Pexels key) and never start one.
+eval-smoke: ffmpeg-bin ## run the eval tooling on 3 renders against the running stack (minutes; writes eval/results)
+	$(UV) run --group eval python ../../eval/run_eval.py --smoke --api-url http://127.0.0.1:$(API_PORT) \
+	  --ffprobe "$(CURDIR)/.data/ffmpeg/ffprobe" --out "$(CURDIR)/eval/results" $(EVAL_ARGS)
+
+eval-soak: ffmpeg-bin ## run 100 consecutive renders and keep the masters (hours: the owner's PC, resumable with --resume)
+	$(UV) run --group eval python ../../eval/run_eval.py --soak 100 --api-url http://127.0.0.1:$(API_PORT) \
+	  --ffprobe "$(CURDIR)/.data/ffmpeg/ffprobe" --out "$(CURDIR)/eval/results" --keep-masters "$(CURDIR)/eval/results/masters" $(EVAL_ARGS)
+
 # openapi.json from the Python models, then the TS types from openapi.json (T-1.4a)
 contracts: ## regenerate openapi.json and the TypeScript types
 	$(UV) run python ../../scripts/export_openapi.py
 	$(UV) run python ../../scripts/export_edit_plan_schema.py
+	$(UV) run python ../../scripts/export_cli_schema.py
 	pnpm --filter @saveclock/contracts generate
 
 # Regenerates into a temp dir and compares with the checked-in files, so a hand edit of either
@@ -144,6 +164,10 @@ contracts-check: guard ## fail if the generated contracts are stale
 	diff -u packages/contracts/openapi.json "$$tmp/openapi.json" || { echo "CONTRACT DRIFT: openapi.json differs from the Python models (run make contracts)"; exit 1; }; \
 	$(UV) run python ../../scripts/export_edit_plan_schema.py "$$tmp/edit-plan.v1.schema.json"; \
 	diff -u packages/contracts/schemas/edit-plan.v1.schema.json "$$tmp/edit-plan.v1.schema.json" || { echo "CONTRACT DRIFT: edit-plan.v1.schema.json differs from the Python model (run make contracts)"; exit 1; }; \
+	$(UV) run python ../../scripts/export_cli_schema.py "$$tmp/cli"; \
+	for f in "$$tmp"/cli/*.json; do \
+	  diff -u "packages/contracts/schemas/$$(basename "$$f")" "$$f" || { echo "CONTRACT DRIFT: $$(basename "$$f") differs from the CLI output model (run make contracts)"; exit 1; }; done; \
+	[ "$$(ls packages/contracts/schemas/saveclock-*.json | wc -l)" = "$$(ls "$$tmp"/cli | wc -l)" ] || { echo "CONTRACT DRIFT: a CLI schema file is stale or missing (run make contracts)"; exit 1; }; \
 	diff -u packages/contracts/src/schema.d.ts "$$tmp/schema.d.ts" || { echo "CONTRACT DRIFT: schema.d.ts differs from openapi.json (run make contracts)"; exit 1; }; \
 	echo "contracts in sync"
 
@@ -234,6 +258,23 @@ dev: up ## start the stack and wait until api and web are ready
 	  [ "$$code" = 200 ] && { echo "web ready: $$code"; exit 0; }; sleep 2; done; \
 	echo "web did not become ready"; exit 1
 
+# plan 009 (D-1): the same as `dev`, with fake stock and fake keywords on the workers (no Pexels key needed)
+dev-fakes: fake-stock ## start the stack with fake stock and fake keywords (no Pexels key needed)
+	scripts/sync_env_flags.sh
+	$(MAKE) images
+	$(COMPOSE) up -d postgres redis
+	CONTAINER=$(CONTAINER) scripts/wait_healthy.sh $(PROJECT) 120
+	$(COMPOSE) run --rm migrate
+	$(COMPOSE_FAKES) up -d
+	@for i in $$(seq 1 60); do \
+	  code=$$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:$(API_PORT)/api/v1/health/ready); \
+	  [ "$$code" = 200 ] && { echo "ready: $$code"; exit 0; }; sleep 2; done; \
+	echo "api did not become ready"; exit 1
+	@for i in $$(seq 1 60); do \
+	  code=$$(curl -s -o /dev/null -w '%{http_code}' http://localhost:$(WEB_PORT)/healthz); \
+	  [ "$$code" = 200 ] && { echo "web ready: $$code"; exit 0; }; sleep 2; done; \
+	echo "web did not become ready"; exit 1
+
 down: ## stop the stack, keep the data
 	$(COMPOSE) down
 
@@ -307,6 +348,13 @@ seed: ## add the analysed click-track project to the running stack (needs make i
 smoke-stack: ## smoke-test the running stack: create, list, guards, logs, delete
 	COMPOSE="$(COMPOSE)" python3 scripts/smoke_stack.py --web http://localhost:$(WEB_PORT) \
 	  --api http://127.0.0.1:$(API_PORT)
+
+# plan 009: the throwaway driver page (/dev). Off by default; this recreates only `web` with DEV_DRIVER=1.
+dev-driver: ## recreate the web container with the dev-only driver page on (/dev); `make up` or dev turns it off again
+	DEV_DRIVER=1 $(COMPOSE) up -d --no-deps --force-recreate web
+
+smoke-driver: ## check /dev is 404 with the flag off and 200 with it on (needs the stack and the rebuilt web image)
+	COMPOSE="$(COMPOSE)" python3 scripts/smoke_driver.py --web http://localhost:$(WEB_PORT)
 
 predeploy-scan: ## scan what is about to leave the machine
 	scripts/predeploy_scan.sh .

@@ -119,6 +119,7 @@ services:
     environment:
       API_INTERNAL_URL: "http://api:8000/api/v1"
       ALLOWED_HOSTS: "localhost" # W14: the web layer checks Host itself; 127.0.0.1 is another origin (CORS)
+      DEV_DRIVER: "${DEV_DRIVER:-}" # plan 009: the throwaway /dev page; empty = off (make dev-driver turns it on)
     networks: [front]
     user: "10001:10001"
     read_only: true

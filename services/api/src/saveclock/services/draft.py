@@ -160,14 +160,23 @@ async def run_draft(ctx: WorkerContext, job_id: UUID, user_id: UUID, *, mode: Mo
             if isinstance(exc, StockUnavailable)
             else "plan_failed"
         )
+        detail = str(getattr(exc, "reason", None) or exc)[:200]
+        log.warning(
+            "draft.plan_failed",
+            reason=reason,
+            detail=detail,
+            job_id=str(job_id),
+            project_id=str(project_id),
+        )
         if mode == "replan" or await _has_plan(run):  # the previous plan is untouched
             await _back_to_draft(
                 run,
                 project_state.failure_code(ProjectStatus.FAILED_PLAN.value, reason).value,
                 reason,
+                detail,
             )
         else:
-            await _fail_plan(run, reason)
+            await _fail_plan(run, reason, detail)
 
 
 async def _run(run: _Run, mode: Mode) -> None:
@@ -378,7 +387,7 @@ async def _has_plan(run: _Run) -> bool:
     return latest is not None
 
 
-async def _fail_plan(run: _Run, reason: str) -> None:
+async def _fail_plan(run: _Run, reason: str, detail: str | None = None) -> None:
     """planning -> failed_plan; the job's error is the catalogue code for `reason`."""
     async with run.ctx.sessionmaker() as session:
         await project_state.transition(
@@ -395,12 +404,15 @@ async def _fail_plan(run: _Run, reason: str) -> None:
             user_id=run.user_id,
             job_id=run.job_id,
             error_code=project_state.failure_code(ProjectStatus.FAILED_PLAN.value, reason).value,
+            detail=detail,
         )
         await session.commit()
         await project_state.announce_pending(session, run.ctx.publisher)
 
 
-async def _back_to_draft(run: _Run, error_code: str, reason: str) -> None:
+async def _back_to_draft(
+    run: _Run, error_code: str, reason: str, detail: str | None = None
+) -> None:
     """A replan that could not finish: the previous plan stays (planning -> draft_ready)."""
     async with run.ctx.sessionmaker() as session:
         await plans.restore_keywords_override(session, run.user_id, run.project_id)
@@ -415,7 +427,7 @@ async def _back_to_draft(run: _Run, error_code: str, reason: str) -> None:
             commit=False,
         )
         await JobRepository(session).fail(
-            user_id=run.user_id, job_id=run.job_id, error_code=error_code
+            user_id=run.user_id, job_id=run.job_id, error_code=error_code, detail=detail
         )
         await session.commit()
         await project_state.announce_pending(session, run.ctx.publisher)

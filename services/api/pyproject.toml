@@ -43,6 +43,9 @@ explicit = true
 torch = { index = "pytorch-cpu" }
 torchaudio = { index = "pytorch-cpu" }
 
+[project.scripts]
+saveclock = "saveclock.cli.main:main"
+
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"
@@ -67,6 +70,11 @@ dev = [
     "scipy>=1.18.1",  # the unit tests run FakeBeatModel and the DSP without the ml extra
     "soundfile>=0.14.0",
     "types-pyyaml>=6.0.12.20261122",
+]
+
+# the eval tooling (plan 009): never a dependency, an extra or part of `dev`, and never in an image
+eval = [
+    "mir-eval==0.8.2",  # the spike's pin (spike/results/mir_eval-pin.txt), metrics untrimmed
 ]
 
 [tool.ruff]
@@ -173,6 +181,28 @@ forbidden_modules = [
   "PIL",
   "anthropic",
 ]
+
+# The CLI is a thin client (plan 009): the standard library, httpx, pydantic and saveclock.config
+# (constants only) are all it may import.
+[[tool.importlinter.contracts]]
+name = "cli is a thin client"
+type = "forbidden"
+source_modules = ["saveclock.cli"]
+forbidden_modules = [
+  "saveclock.domain",
+  "saveclock.services",
+  "saveclock.repositories",
+  "saveclock.adapters",
+  "saveclock.models",
+  "saveclock.workers",
+  "saveclock.api",
+  "saveclock.container",
+  "saveclock.errors",
+  "sqlalchemy",
+  "redis",
+  "fastapi",
+]
+allow_indirect_imports = false
 
 [tool.uv]
 # scenedetect 0.7.3 hard-requires opencv-python (the GUI build, which bundles Qt). The headless build

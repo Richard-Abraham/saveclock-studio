@@ -1,0 +1,19 @@
+# Plan 009 (D-1): the stack with fake stock and fake keywords, so a CLI flow, the eval smoke and the
+# soak can finish a render without a Pexels key. Evidence and tests only: `make dev` never reads this
+# file, and config.py refuses FAKE_* when APP_ENV=prod. Worker and worker-maint only; nothing else.
+# Use it through `make dev-fakes` (it also writes the fake clips into .data/fake-stock).
+services:
+  worker:
+    environment:
+      FAKE_STOCK: "true"
+      FAKE_LLM: "true"
+      FAKE_STOCK_DIR: /fake-stock
+    volumes:
+      - "../../.data/fake-stock:/fake-stock:ro,z"
+  worker-maint:
+    environment:
+      FAKE_STOCK: "true"
+      FAKE_LLM: "true"
+      FAKE_STOCK_DIR: /fake-stock
+    volumes:
+      - "../../.data/fake-stock:/fake-stock:ro,z"

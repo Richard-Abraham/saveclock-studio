@@ -1,0 +1,25 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "opened": {
+      "title": "Opened",
+      "type": "boolean"
+    },
+    "schema_version": {
+      "const": "1",
+      "default": "1",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "url": {
+      "title": "Url",
+      "type": "string"
+    }
+  },
+  "required": [
+    "url",
+    "opened"
+  ],
+  "title": "OpenOut",
+  "type": "object"
+}

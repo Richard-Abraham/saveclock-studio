@@ -1,7 +1,7 @@
 import pytest
 from pydantic import ValidationError
 
-from saveclock.config import COMPOSE_ONLY, MigrateSettings, Settings
+from saveclock.config import COMPOSE_ONLY, CliSettings, MigrateSettings, Settings
 
 BASE = {
     "APP_ENV": "local",
@@ -41,6 +41,13 @@ def test_missing_required_names_variable_without_values() -> None:
 def test_prod_refuses_fakes() -> None:
     with pytest.raises(ValidationError):
         make_settings(APP_ENV="prod", FAKE_STOCK="true")
+
+
+@pytest.mark.unit
+def test_prod_refuses_the_dev_driver() -> None:
+    with pytest.raises(ValidationError):
+        make_settings(APP_ENV="prod", DEV_DRIVER="true")
+    assert make_settings(APP_ENV="local", DEV_DRIVER="true").dev_driver is True
 
 
 @pytest.mark.unit
@@ -96,6 +103,7 @@ def test_inventory_parity_with_arch_18() -> None:
     ours = (
         {n.upper() for n in Settings.model_fields}
         | {n.upper() for n in MigrateSettings.model_fields}
+        | {n.upper() for n in CliSettings.model_fields}
         | {c.name for c in COMPOSE_ONLY}
     )
     compose_only = {c.name for c in COMPOSE_ONLY}
@@ -110,6 +118,7 @@ def test_inventory_parity_with_arch_18() -> None:
         "FAKE_STOCK_DIR",  # plan 005
         "LLM_MONTHLY_BUDGET_USD",  # plan 005
         "NEXT_PUBLIC_API_ORIGIN",  # plan 002 Branch B (OQ-26)
+        "DEV_DRIVER",  # plan 009
         # plan 003: the host backup script's variables (ARCH §18 only says BACKUP_*)
         "BACKUP_REPO",
         "BACKUP_STAGING_DIR",

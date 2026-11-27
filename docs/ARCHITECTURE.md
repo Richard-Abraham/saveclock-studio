@@ -124,10 +124,10 @@ Two ways in, one pipeline (DECISIONS §8f): the web editor and a `saveclock` com
 
 | Command | Calls (endpoint # from the §7 table) | Notes |
 |---|---|---|
-| `new <song> [--vibe]` | #1 `POST /projects`, then #6 `POST /projects/{id}/song` (streamed upload); prints the project id | `--vibe` has **no field to land in yet** (OQ-25a) |
+| `new <song> [--vibe]` | #1 `POST /projects`, then #6 `POST /projects/{id}/song` (streamed upload); prints the project id | `--vibe` goes to `options.vibe` (<= 200 chars) and `--keywords` to `options.keywords_override` (DECISIONS §8g resolved OQ-25a) |
 | `show <id> --json` | #3 `GET /projects/{id}` + #10 `GET /projects/{id}/analysis` (+ #11 `GET /plan` when a draft exists) | merged into one JSON object: project, song meta, tempo, sections, energy, keywords, UI status, flags |
-| `keywords set <id> <words…>` | #12 `PATCH /projects/{id}/plan` with op `set_keywords` (`base_version` from #11) | triggers a replan-fetch, `draft_ready → planning` (OQ-28) |
-| `plan <id>` | #11 `GET /projects/{id}/plan` (+ #13 `GET /candidates` with `--candidates`) | read-only view of the working plan (OQ-25c) |
+| `keywords set <id> <words…>` | #12 `PATCH /projects/{id}/plan` with op `set_keywords` (`base_version` from #11) | triggers a replan-fetch, `draft_ready → planning` (OQ-28); the CLI waits for `draft` again and counts success only when no `status_reason` is left (an unfrozen plan is replaced in place, so the version does not change) |
+| `plan <id>` | #11 `GET /projects/{id}/plan` (`--candidates` is not built: #13 is Phase 3) | read-only view of the working plan (OQ-25c) |
 | `render <id>` | #17 `POST /projects/{id}/renders`, then #18 `GET /renders/{id}` (or #7 SSE) until `ready` | prints the `render_id` |
 | `export <id> --mode a\|b` | **a:** #20 `POST /renders/{id}/mode-a`, poll #18, then #21 `GET /renders/{id}/download?kind=with_song`. **b:** #21 with `kind=silent_video`, `cutlist_json`, `cutlist_csv`, plus #16 `GET /credits` | saves files to the current directory or `--out` |
 | `status [<id>]` | with id: #3 `GET /projects/{id}` (`--watch` follows #7 SSE); without: #2 `GET /projects` | |

@@ -13,7 +13,6 @@
 | `REDIS_URL` | `pydantic.types.SecretStr` | `` | yes | yes | A,K,M | ARCH §18 |
 | `ALLOWED_HOSTS` | `list[str]` | `localhost,127.0.0.1` | no | no | A,W | ARCH §18 |
 | `BIND_ADDR` | `str` | `127.0.0.1` | no | no | compose | ARCH §18 |
-| `SAVECLOCK_API_URL` | `str` | `http://127.0.0.1:8000` | no | no | CLI | ARCH §18 |
 | `PEXELS_KEY_CONFIGURED` | `bool` | `False` | no | no | A | ARCH §18 |
 | `PIXABAY_KEY_CONFIGURED` | `bool` | `False` | no | no | A | ARCH §18 |
 | `ANTHROPIC_KEY_CONFIGURED` | `bool` | `False` | no | no | A | ARCH §18 |
@@ -58,6 +57,7 @@
 | `BACKUP_ALLOW_SAME_DISK` | `Literal['yes', 'no']` | `no` | no | no | host | ARCH §23; plan 003 B5 |
 | `NEXT_PUBLIC_APP_ORIGIN` | `str | None` | `` | no | no | W | ARCH §18 |
 | `NEXT_PUBLIC_API_ORIGIN` | `str` | `http://localhost:8000` | no | no | W | ARCH §18 |
+| `DEV_DRIVER` | `bool` | `False` | no | no | W | plan 009; dev-only driver page, off by default |
 | `FAKE_STOCK` | `bool` | `False` | no | no | local/CI | ARCH §18 |
 | `FAKE_ML` | `bool` | `False` | no | no | local/CI | ARCH §18 |
 | `FAKE_LLM` | `bool` | `False` | no | no | local/CI | ARCH §18 |
@@ -73,6 +73,7 @@
 | `MIGRATOR_DATABASE_URL` | `pydantic.types.SecretStr` | `` | yes | yes | migrate | ARCH §18 |
 | `OWNER_DISPLAY_NAME` | `str` | `` | yes | no | migrate | ARCH §18 |
 | `OWNER_EMAIL` | `str` | `owner@saveclock.local` | no | no | migrate | ARCH §18 |
+| `SAVECLOCK_API_URL` | `str` | `http://127.0.0.1:8000` | no | no | CLI | ARCH §18 |
 | `POSTGRES_PASSWORD` | `str` | `` | yes | yes | compose | superuser password for the postgres container |
 | `POSTGRES_APP_PASSWORD` | `str` | `` | yes | yes | compose | password of role app_rw |
 | `POSTGRES_MIGRATOR_PASSWORD` | `str` | `` | yes | yes | compose | password of role migrator |

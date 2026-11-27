@@ -1,0 +1,165 @@
+{
+  "$defs": {
+    "StatusLine": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "title": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Title"
+        },
+        "ui_status": {
+          "title": "Ui Status",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "ui_status",
+        "title"
+      ],
+      "title": "StatusLine",
+      "type": "object"
+    },
+    "StatusProject": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "mode_a_state": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Mode A State"
+        },
+        "plan_version": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Plan Version"
+        },
+        "render_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Render Id"
+        },
+        "render_state": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Render State"
+        },
+        "status_reason": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Status Reason"
+        },
+        "title": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Title"
+        },
+        "ui_status": {
+          "title": "Ui Status",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "title",
+        "ui_status",
+        "status_reason",
+        "plan_version",
+        "render_id",
+        "render_state",
+        "mode_a_state"
+      ],
+      "title": "StatusProject",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "project": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/StatusProject"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "projects": {
+      "anyOf": [
+        {
+          "items": {
+            "$ref": "#/$defs/StatusLine"
+          },
+          "type": "array"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "title": "Projects"
+    },
+    "schema_version": {
+      "const": "1",
+      "default": "1",
+      "title": "Schema Version",
+      "type": "string"
+    }
+  },
+  "required": [
+    "project",
+    "projects"
+  ],
+  "title": "StatusOut",
+  "type": "object"
+}
