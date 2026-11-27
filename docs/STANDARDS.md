@@ -68,12 +68,12 @@ saveclock/
 │       │   ├── config.py             # pydantic-settings, fail-fast (source of infra/ENV.md)
 │       │   ├── container.py  deps.py  errors.py  ids.py  export.py
 │       │   ├── api/                  # deps (current_user = seeded owner), middleware (access guard, headers, request id), error_handlers, schemas/ (Pydantic I/O)
-│       │   │   └── v1/               # health, projects, settings, stub (stub routes only when APP_ENV is local or ci)
-│       │   ├── services/             # autotune, files (direct, path-contained serving), health, identity, projects, settings, stub
+│       │   │   └── v1/               # health, projects, settings, housekeeping (plan 008 removed the stub routes)
+│       │   ├── services/             # autotune, files (direct, path-contained serving), health, identity, projects, settings, housekeeping, rehydrate, tuning
 │       │   ├── repositories/         # SQLAlchemy queries only; every method takes user_id when user-owned (jobs, projects, users)
 │       │   ├── models/               # SQLAlchemy ORM models: user, project, song, job (single source of schema truth)
 │       │   ├── adapters/             # blobstore/ (port, filesystem, blob_keys), db.py (later: pexels, pixabay, llm, ffmpeg, scenedetect, siglip, beat_this)
-│       │   ├── workers/              # Dramatiq: broker, main, heartbeat, healthcheck, stub actors
+│       │   ├── workers/              # Dramatiq: broker, main, launch (derives threads from the CPU count), periodic (in-process scheduler), maintenance actors, heartbeat, healthcheck
 │       │   └── observability/        # structured logging (metrics/tracing: later)
 │       │   (domain/ planned: Phase 2, pure logic: beat_grid, tempo, energy, planner, edit_plan models, keywords_fallback)
 │       └── tests/

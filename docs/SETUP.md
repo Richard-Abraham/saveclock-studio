@@ -2,7 +2,7 @@
 
 This guide takes a fresh PC from `git clone` to a running, tested app. Every command here comes from the repo's own files (`Makefile`, `scripts/`, `infra/`). If a command and this guide disagree, the repo wins; fix the guide.
 
-**Status of the app.** Phase 1 (the walking skeleton) is built: web shell, API, workers, Postgres, Redis, backups. Phase 2 has started: song upload, validation, beat analysis (plan 004) and stock-clip search, ranking and normalizing (plan 005) are built. The planner, render and the CLI are **not built yet (Phase 2)**. Today `make smoke-stub` pushes a stub job through every hop. Sections marked "not built yet (Phase 2)" will be completed as Phase 2 lands.
+**Status of the app.** Phase 1 (the walking skeleton) is built: web shell, API, workers, Postgres, Redis, backups. Phase 2 has started: song upload, validation, beat analysis (plan 004) and stock-clip search, ranking and normalizing (plan 005) are built, and so are the planner (plan 006) and the render with its verification (plan 007). The CLI and the Claude Code skill (plan 009) are **not built yet (Phase 2)**. Plan 008 adds the operate side: retention sweeps, auto-tuning, the Settings API (tuning, disk usage, stock provider) and the security checks. Today `make smoke-stack` checks the running stack. Sections marked "not built yet (Phase 2)" will be completed as Phase 2 lands.
 
 ## 1. What you need on the PC
 
@@ -196,25 +196,29 @@ Never commit `.env`. `make secrets` fails if a `.env*` file is tracked.
 
    ```bash
    make smoke-web
-   make smoke-stub
+   make smoke-stack
    ```
 
    `make smoke-web` prints one `PASS ...` line per check, for example `PASS GET / is 200`, `PASS GET /settings is 200`, `PASS GET /healthz is 200`, `PASS foreign Host straight to the API is 403`, and ends with `WEB SMOKE OK`. Any failure prints `FAIL <label>` and ends with `WEB SMOKE FAILED (n): ...`.
 
-   `make smoke-stub` pushes a stub project through the four queues and prints, among others, `PASS all four hops (analysis, fetch, render, maintenance) reach ok within 60 s`, `PASS download through :web is the literal stub body`, `PASS Range bytes=0-3 is 206 with stub`, `PASS foreign Host to the web shell is 403`, and ends with `STUB SMOKE OK`. It adds a stub project to the live database.
+   `make smoke-stack` smoke-tests the running stack: it creates a project, lists it, checks the guards and logs, and deletes the project again. It uses the default ports 3000 and 8000. The old stub project and `make smoke-stub` are gone.
 
-   `make seed` adds just one stub project (and prints its id), handy to see something in the UI.
+   `make seed` adds one analysed click-track project (30 s at 128 BPM) to the running stack. It needs `make images` first. It prints `created <project id>` the first time and `exists` when you run it again. It is handy to see something in the UI.
 
 ## 4. Verify it is healthy
 
 ```bash
 make check          # the full gate; needs the dev tools and the network, takes a while
-make sandbox        # checks the RUNNING containers' hardening
+make sandbox        # checks the RUNNING containers' hardening (default ports 8000 and 3000)
+podman info --format '{{.Host.CgroupControllers}}'    # must list "memory"
 ss -ltn | grep -E ':(3000|8000)\b'
 ```
 
 - Since plan 007, `make check` also runs `make golden`: real renders of six test songs that must be frame-exact, Mode A A/V offsets, and the sync canary. On a 4-core laptop the whole gate takes about an hour (the test stage about 50 minutes, golden about 8). Run nothing else heavy at the same time; the remux tests have a 20 s FFmpeg limit and can time out on an overloaded machine.
-- `make check` stops at the first failure, names the stage (`FAILED stage: <name>`) and ends with `CHECK OK`. `make check-fast` skips the image build, image guards and hadolint, and ends with `CHECK-FAST OK`.
+- `make check` now also runs the security stages: `security-pytest` (hostile media corpus, route matrix, path containment; it needs the pinned FFmpeg and the test deps) and `security-container` (FFmpeg's sandbox checks inside the built worker image). It is longer than before, so plan for more than the hour above. `make security-pass` runs both security stages alone, and `make hostile-corpus` writes the hostile media files into `.data/hostile` (git-ignored, generated, never downloaded).
+- `security-container` needs the cgroup v2 **memory** controller. On this PC run `podman info --format '{{.Host.CgroupControllers}}'`; the list must include `memory`. On a host without it the two memory checks print `NOT MEASURED: cgroup memory controller not delegated` and are skipped; every other check must still pass. Treat the memory limits as not proven until the controller is delegated to your user and the stage is run again.
+- `make sandbox` and `make restore-proof` assume the default ports 8000 and 3000. Run both on this PC with the stack on those ports.
+- `make check` stops at the first failure, names the stage (`FAILED stage: <name>`) and ends with `CHECK OK`. `make check-fast` skips the image build, image guards, `security-container` and hadolint, and ends with `CHECK-FAST OK`.
 - `make sandbox` prints one `PASS ...` line per check and ends with `SANDBOX OK`. One line is `PASS host: ss shows only 127.0.0.1:3000 and :8000`.
 - `ss -ltn` must show only `127.0.0.1:3000` and `127.0.0.1:8000`. Postgres and Redis publish nothing.
 
