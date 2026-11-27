@@ -122,5 +122,14 @@ CLI-only codes: `keywords_not_applied` (the replan failed; the previous plan is 
 - Use `localhost` or `127.0.0.1` in the API URL. The URL must stay on this machine: a non-loopback
   host is refused before any request.
 - A timeout means "still running", not "failed": check `saveclock status <id>`.
-- A project that ends `failed` shows its reason in `status <id>`; `no_usable_clips` means the
-  keywords found no usable stock footage: try other keywords with `keywords set`.
+- A project that ends `failed` shows its reason in `status <id>`. `keywords set` only works on a
+  project that already has a draft (`conflict` / `no_plan_yet` otherwise), so it is **not** a
+  recovery after a failed first draft.
+  - `no_usable_clips`: the first draft found no usable stock footage. Start again with
+    `saveclock new` and `--keywords` of your own (5 to 8 short phrases).
+  - `stock_unavailable`: stock search failed; retry later with a new `saveclock new`.
+  - `plan_failed`: the planner could not lay out the video. The usual cause is a song that is
+    about as long as the requested length, so no bar start leaves room for the whole video. Start
+    again with a shorter `--duration` (15 or 30) or a longer song. The server log line
+    `draft.plan_failed` has the exact reason. The CLI has no `retry` command: the API's retry
+    operation is not part of this tool, and a new `saveclock new` is the recovery.
