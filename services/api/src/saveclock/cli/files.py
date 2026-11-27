@@ -70,7 +70,14 @@ def write_stream(chunks: Iterable[bytes], directory: Path, name: str, *, force: 
                 os.link(tmp, dest)  # fails if `dest` appeared after the check above
             except FileExistsError:
                 raise FileExistsError(str(dest)) from None
-            tmp.unlink()
+            except OSError:
+                # no hard links here (exFAT/FAT USB sticks): re-check, then rename
+                # shortcut: not atomic on such filesystems, upgrade if a race is ever seen there
+                if dest.exists():
+                    raise FileExistsError(str(dest)) from None
+                tmp.replace(dest)
+            else:
+                tmp.unlink()
     except BaseException:
         tmp.unlink(missing_ok=True)
         raise

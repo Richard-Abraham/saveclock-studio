@@ -102,3 +102,17 @@ def test_a_file_created_after_the_check_is_not_overwritten(tmp_path: Path) -> No
         files.write_stream(chunks(), tmp_path, "a.mp4", force=False)
     assert (tmp_path / "a.mp4").read_bytes() == b"racer"
     assert [p.name for p in tmp_path.iterdir()] == ["a.mp4"]  # no temp file left behind
+
+
+def test_a_filesystem_without_hard_links_still_gets_the_file(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    def no_links(*_a: object) -> None:
+        raise PermissionError(1, "Operation not permitted")  # what exFAT/FAT answer
+
+    monkeypatch.setattr(files.os, "link", no_links)
+    dest = files.write_stream(iter([b"abc"]), tmp_path, "a.mp4", force=False)
+    assert dest.read_bytes() == b"abc"
+    assert sorted(p.name for p in tmp_path.iterdir()) == ["a.mp4"]  # no temp file left
+    with pytest.raises(FileExistsError):
+        files.write_stream(iter([b"x"]), tmp_path, "a.mp4", force=False)
