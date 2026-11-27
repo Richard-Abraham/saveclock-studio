@@ -213,6 +213,7 @@ make sandbox        # checks the RUNNING containers' hardening
 ss -ltn | grep -E ':(3000|8000)\b'
 ```
 
+- Since plan 007, `make check` also runs `make golden`: real renders of six test songs that must be frame-exact, Mode A A/V offsets, and the sync canary. On a 4-core laptop the whole gate takes about an hour (the test stage about 50 minutes, golden about 8). Run nothing else heavy at the same time; the remux tests have a 20 s FFmpeg limit and can time out on an overloaded machine.
 - `make check` stops at the first failure, names the stage (`FAILED stage: <name>`) and ends with `CHECK OK`. `make check-fast` skips the image build, image guards and hadolint, and ends with `CHECK-FAST OK`.
 - `make sandbox` prints one `PASS ...` line per check and ends with `SANDBOX OK`. One line is `PASS host: ss shows only 127.0.0.1:3000 and :8000`.
 - `ss -ltn` must show only `127.0.0.1:3000` and `127.0.0.1:8000`. Postgres and Redis publish nothing.
