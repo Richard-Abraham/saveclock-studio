@@ -28,10 +28,10 @@ from tests.integration.conftest import REDIS_URL, ApiEnv
 
 OWNER = UUID("00000000-0000-4000-8000-000000000001")
 PALETTE = {
-    "red": (0xD0, 0x30, 0x30),  # the colours of `make fake-stock` (eval/scripts/make_fake_stock.py)
-    "green": (0x30, 0xC0, 0x30),
-    "blue": (0x30, 0x30, 0xD0),
-    "yellow": (0xE0, 0xD0, 0x30),
+    "red": (0xF0, 0x30, 0x30),  # the colours of `make fake-stock` (eval/scripts/make_fake_stock.py)
+    "green": (0x30, 0xE0, 0x30),
+    "blue": (0x30, 0x30, 0xF0),
+    "yellow": (0xF0, 0xE0, 0x30),
 }
 
 

@@ -16,11 +16,12 @@ from pathlib import Path
 
 from saveclock.adapters.ffmpeg import Tools, ffmpeg_cmd, run
 
-# mid-bright (no channel under 0x30) and at least 80 apart, so no render of them is black and the
-# colour of each shot is unmistakable. A small white box moves across every solid clip so that
-# freezedetect never fires on it: temporal noise (`noise=alls=8:allf=t`) does not survive the
-# CRF 44 encode of these tiny files (measured: frame difference 0, a 6 s freeze), motion does.
-RED, GREEN, BLUE, YELLOW = "0xd03030", "0x30c030", "0x3030d0", "0xe0d030"
+# Bright but never near black (no channel under 0x30) and at least 80 apart, so no render of them
+# is black and the colour of each shot is unmistakable; saturated enough that a clip scores clearly
+# lower against another colour's keyword (the ranking tests). A small white box moves across every
+# solid clip so that freezedetect never fires on it: temporal noise (`noise=alls=8:allf=t`) does
+# not survive the CRF 44 encode of these tiny files (measured: frame difference 0, a 6 s freeze).
+RED, GREEN, BLUE, YELLOW = "0xf03030", "0x30e030", "0x3030f0", "0xf0e030"
 GRADIENT_S = 4.0
 GRID = "drawgrid=w=48:h=48:t=2:c=white@0.6"
 BOX = "color=c=white:s=64x64:r={fps}:d={d}"
