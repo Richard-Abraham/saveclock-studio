@@ -19,6 +19,7 @@ from pathlib import Path
 from types import ModuleType
 from typing import Any
 from urllib.parse import quote
+from uuid import UUID
 
 import httpx
 import pytest
@@ -27,6 +28,7 @@ from saveclock.adapters.ffmpeg import FfError, Tools, canonicalize, probe_audio
 from saveclock.domain.audio_rules import FileRejectReason
 from saveclock.domain.media_sniff import ALLOWED_EXT
 from tests.integration.conftest import Harness
+from tests.integration.housekeeping_harness import Hk
 
 pytestmark = [pytest.mark.security, pytest.mark.integration, pytest.mark.ffmpeg]
 ROOT = Path(__file__).resolve().parents[4]
@@ -129,13 +131,17 @@ def descendants(pid: int) -> set[int]:
     return found
 
 
-async def settle(client: httpx.AsyncClient, project_id: str) -> str:
+async def settle(hk: Hk, project_id: str) -> tuple[str, str | None]:
+    """The project's (status, status_reason) once the worker is done with it."""
     deadline = time.monotonic() + WORKER_SETTLE_S
     status = ""
     while time.monotonic() < deadline:
-        status = str((await client.get(f"/api/v1/projects/{project_id}")).json()["status"])
+        row = (
+            await hk.sql("SELECT status, status_reason FROM projects WHERE id=$1", UUID(project_id))
+        )[0]
+        status = str(row[0])
         if status not in IN_FLIGHT:
-            return status
+            return status, row[1]
         await asyncio.sleep(0.4)
     msg = f"{project_id} did not settle in {WORKER_SETTLE_S} s (last: {status})"
     raise AssertionError(msg)
@@ -143,6 +149,7 @@ async def settle(client: httpx.AsyncClient, project_id: str) -> str:
 
 async def test_layer_a_every_file_reaches_a_documented_outcome(  # noqa: PLR0917
     harness: Harness,
+    hk: Hk,
     api_client: httpx.AsyncClient,
     listener: Listener,
     ffmpeg_tools: Tools,
@@ -176,13 +183,13 @@ async def test_layer_a_every_file_reaches_a_documented_outcome(  # noqa: PLR0917
             accepted.append((entry["path"], project))
     outcomes: dict[str, str] = {}
     for name, project in accepted:
-        status = await settle(api_client, project)
+        status, reason = await settle(hk, project)
         assert status in SETTLED_OK, (name, status)
         outcomes[name] = status
         body = (await api_client.get(f"/api/v1/projects/{project}")).json()
         bodies.append(json_text(body))
         if status == "rejected":
-            assert body["status_reason"] in REJECT_REASONS | {"file_rejected"}, (name, body)
+            assert reason in REJECT_REASONS, (name, reason)
             left = await asyncio.to_thread(incoming_files, harness.blob_root, project)
             assert not left, f"{name}: upload left behind"
 

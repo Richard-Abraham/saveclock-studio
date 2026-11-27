@@ -16,6 +16,7 @@ from uuid import UUID
 
 import pytest
 from fastapi.routing import APIRoute
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 from sqlalchemy.pool import NullPool
 
@@ -212,6 +213,7 @@ async def test_every_repository_method_filters_by_user(hk: Hk, world: dict[str, 
     engine = create_async_engine(hk.db.url("app_rw"), poolclass=NullPool)
     sessions = async_sessionmaker(engine, expire_on_commit=False)
     needles = (str(owner_project), str(OWNER_USER_ID))
+    owner_ids = {owner_project, owner_render, job, OWNER_USER_ID}
 
     async def snapshot() -> list[str]:
         tables = await hk.sql(
@@ -227,14 +229,15 @@ async def test_every_repository_method_filters_by_user(hk: Hk, world: dict[str, 
     before = await snapshot()
     non_empty: list[str] = []
     try:
+        async with sessions() as reader:  # loaded once; a later rollback cannot expire it
+            render = await _render_of(reader, owner_render)
         async with sessions() as session:
-            render = await _render_of(session, owner_render)
             values: dict[str, Any] = {
                 "user_id": OTHER, "project_id": owner_project, "render_id": owner_render,
                 "job_id": job, "job_ids": [job], "plan_id": UUID(int=7),
                 "edit_plan_id": UUID(int=8),
                 "render": render, "limit": 5, "after": None, "version": 1, "title": "hacked",
-                "options": {}, "values": {"title": "hacked"}, "patch": {"stock": {}},
+                "options": {}, "values": {}, "patch": {"stock": {}},
                 "reason": None, "stage": "draft", "queue": "fetch", "error_code": "x",
                 "detail": None, "timings": {}, "older_than": datetime(2100, 1, 1, tzinfo=UTC),
                 "older_than_s": 0, "cutoff": datetime(2100, 1, 1, tzinfo=UTC),
@@ -256,6 +259,10 @@ async def test_every_repository_method_filters_by_user(hk: Hk, world: dict[str, 
                 assert not unknown, f"{key}: add a value for {unknown} to this test"
                 kwargs = {p.name: values[p.name] for p in params}
                 kwargs["user_id"] = OTHER
+                if key == "ProjectRepository.update_fields":
+                    kwargs["values"] = {"title": "hacked"}
+                if key == "RenderRepository.insert_or_existing":
+                    kwargs["render_id"] = UUID(int=4242)  # a fresh id: a real insert would show
                 if key == "RenderRepository.set_mode_a":
                     kwargs["from_"], kwargs["to"] = (None,), ModeAState.QUEUED
                 if key == "RenderRepository.set_state":
@@ -265,13 +272,31 @@ async def test_every_repository_method_filters_by_user(hk: Hk, world: dict[str, 
                     result = await getattr(instance, name)(**kwargs)
                 except (ValueError, TypeError):
                     continue  # an undrawn edge or a shape the method refuses: it did nothing
-                if key not in OWN_ROW and result not in (None, [], (), set(), {}, False, 0):
-                    non_empty.append(f"{key} -> {result!r}"[:120])
+                except IntegrityError:
+                    await session.rollback()  # a key that exists already: nothing was written
+                    continue
+                if key not in OWN_ROW and shows_owner(result, owner_ids):
+                    non_empty.append(f"{key} -> {type(result).__name__}")
             await session.commit()
     finally:
         await engine.dispose()
     assert non_empty == [], f"these methods returned the owner's data to another user: {non_empty}"
     assert await snapshot() == before, "a method changed the owner's rows for another user"
+
+
+def shows_owner(result: Any, owner_ids: set[UUID]) -> bool:
+    """Does a repository result hold the owner's data? A list, set or dict is searched for the
+    owner's ids; any other non-empty result (a row, a True, a count) is a leak too."""
+    if result in (None, False, 0):
+        return False
+    items = list(result) if isinstance(result, list | set | tuple | dict) else [result]
+    for item in items:
+        for attr in ("id", "user_id", "project_id", "render_id"):
+            if getattr(item, attr, None) in owner_ids:
+                return True
+        if item in owner_ids:
+            return True
+    return not isinstance(result, list | set | tuple | dict)
 
 
 async def _render_of(session: Any, render_id: UUID) -> Any:

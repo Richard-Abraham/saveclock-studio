@@ -3,7 +3,7 @@ and what is never served (the song, the upload, the intermediates) is never serv
 
 import os
 from pathlib import Path
-from urllib.parse import quote
+from urllib.parse import quote, urlsplit
 from uuid import UUID
 
 import pytest
@@ -106,6 +106,9 @@ async def test_no_route_leaks_or_escapes_for_a_hostile_id(
     for template in ROUTES:
         url = template.format(x=quote(value, safe=""))
         response = await api.client.get(url)
+        if response.status_code in {307, 308}:  # a trailing-slash redirect: it must stay in the API
+            assert urlsplit(response.headers["location"]).path.startswith("/api/v1/"), url
+            continue
         assert response.status_code in {400, 404, 422}, (url, response.status_code)
         assert CANARY_TEXT not in response.content
         assert b"root:x:" not in response.content
@@ -121,6 +124,7 @@ async def test_a_hostile_download_kind_is_422_and_a_symlinked_file_is_not_served
     rid = await hk.render(pid, await hk.plan(pid), mode_a=True)
     canary = tmp_path / "canary.txt"
     canary.write_bytes(CANARY_TEXT)
+    await hk.sql("UPDATE renders SET mode_a_state='ready' WHERE id=$1", rid)
     master = api.blob_root / "renders" / str(rid) / "master.mp4"
     master.unlink()
     os.symlink(canary, master)  # the render's own file replaced by a link to the outside
@@ -131,7 +135,9 @@ async def test_a_hostile_download_kind_is_422_and_a_symlinked_file_is_not_served
         f"/api/v1/renders/{rid}/download", params={"kind": "silent_video"}
     )
     assert CANARY_TEXT not in response.content
-    assert response.status_code in {404, 409, 500}  # never the canary; a link is refused
+    # never the canary. A planted link is refused; today `serve` lets the store's InvalidKey
+    # surface as a 500 instead of a 404 (a finding, reported: services/files.py is out of scope)
+    assert response.status_code in {404, 409, 500}
     ok = await api.client.get(f"/api/v1/renders/{rid}/download", params={"kind": "with_song"})
     assert ok.status_code == 200  # the untouched file of the same render still serves
 
