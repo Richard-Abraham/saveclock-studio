@@ -42,7 +42,7 @@ def test_every_row_of_a_run_is_in_the_vocabulary() -> None:
 def test_a_not_measured_row_never_becomes_pass() -> None:
     rows = {r.id: r for r in report.build_rows([rec(i) for i in range(3)], FACTS)}
     for qm in ("QM-001", "QM-003", "QM-004", "QM-010", "QM-016"):
-        assert rows[qm].status == report.NO_GOLDEN
+        assert rows[qm].status.startswith("NOT MEASURED (no golden set")
     assert rows["QM-083"].status.startswith("NOT MEASURED")
     assert rows["QM-069"].status.startswith("PENDING")
     # three renders can never make a soak row PASS, even when every one of them is clean
