@@ -155,7 +155,8 @@ def generate(out: Path, *, port: int = 9, ffmpeg_bin: str = ".data/ffmpeg/ffmpeg
     w.add("wrong_extension", "wav_as.m4a", body, content_type="audio/mp4")
     # 6. raw ADTS AAC (not accepted: unsupported_media)
     for profile in (0, 1, 2):
-        w.add("adts_aac", f"adts_{profile}.m4a", adts(200, profile), content_type="audio/mp4")
+        # named .mp3: with an .m4a name the extension check refuses it before the sniff matters
+        w.add("adts_aac", f"adts_{profile}.mp3", adts(200, profile), content_type="audio/mpeg")
     # 7. WAV size bombs
     w.add("wav_bomb", "declares_4gb.wav", wav_header(0xFFFFFFF0) + bytes(1024))
     w.add("wav_bomb", "declares_10h.wav", wav_header(8000 * 2 * 36000) + bytes(1024))

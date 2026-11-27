@@ -87,7 +87,11 @@ async def test_a_second_user_gets_404_from_every_route_that_names_the_owners_ids
     unprocessable: list[str] = []
     try:
         for route in v1_routes():
-            if not ID_PARAMS & {p.name for p in route.dependant.path_params}:
+            names = {p.name for p in route.dependant.path_params}
+            assert names <= ID_PARAMS, (
+                f"{route.operation_id}: add a fixture for {names - ID_PARAMS}"
+            )
+            if not names:
                 continue
             url = fill(route, world)
             for method in methods(route):

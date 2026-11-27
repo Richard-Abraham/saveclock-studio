@@ -102,7 +102,12 @@ def test_the_app_serves_no_stub_path_and_no_module_is_named_for_one() -> None:
     """Plan 008 removed the Phase 1 stub: its routes, actors and modules must not come back."""
     from pathlib import Path
 
-    paths = {getattr(r, "path", "") for r in make_app(checks={}).routes}
+    paths: set[str] = set()
+    for included in make_app(checks={}).routes:  # an included router: its prefix and its routes
+        prefix = included.include_context.prefix  # type: ignore[attr-defined]
+        inner = included.original_router.routes  # type: ignore[attr-defined]
+        paths |= {f"{prefix}{r.path}" for r in inner}
+    assert any(p.startswith(API_PREFIX) for p in paths)  # the walk sees the app's routes
     assert [p for p in paths if "/_stub" in p] == []
     root = Path(__file__).resolve().parents[2] / "src" / "saveclock"
     assert [p for p in root.rglob("*.py") if "stub" in p.name] == []
