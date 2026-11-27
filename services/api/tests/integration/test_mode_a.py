@@ -145,7 +145,8 @@ async def test_a_remux_that_re_encodes_the_video_is_a_block_and_ends_mode_a(
     def reencoding(*a: Any, **kw: Any) -> list[str]:
         cmd: list[str] = real_remux_cmd(*a, **kw)
         i = cmd.index("-c:v")
-        return [*cmd[: i + 1], "libx264", "-crf", "30", *cmd[i + 2 :]]  # the video is not copied
+        return [*cmd[: i + 1], "libx264", "-preset", "ultrafast", "-crf", "30", *cmd[i + 2 :]]
+        # not copied; ultrafast keeps the re-encode under REMUX_FFMPEG_S on a loaded machine
 
     monkeypatch.setattr("saveclock.services.render_job.remux_cmd", reencoding)
     pid, rid = await ready_render(renderer)

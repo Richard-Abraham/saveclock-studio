@@ -52,7 +52,8 @@ async def test_settings_body_shape_and_no_key_material(
     assert body["tuning"] is None  # worker not running: no heartbeat key
     assert set(body) == {"keys", "stock", "tuning", "disk", "intermediate_ttl_days"}
     assert body["intermediate_ttl_days"] == 3
-    assert set(body["disk"]) == {"volume", "by_area", "projects"}
+    assert set(body["disk"]) == {"volume", "by_area", "projects", "low"}
+    assert body["disk"]["low"] is False  # watermark 0 GB: never low (plan 008)
     assert body["disk"]["by_area"] == {"songs": 0, "work": 0, "renders": 0}
     assert body["disk"]["projects"] == []
     assert set(body["disk"]["volume"]) == {"total", "free"}
